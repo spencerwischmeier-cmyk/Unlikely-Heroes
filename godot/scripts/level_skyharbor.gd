@@ -17,6 +17,11 @@ var checkpoints: Array = []    # { pos: Vector3, r: float }
 var islands := {}
 ## Story zones in play order (read by story.gd; see the key list at the top of that script).
 var zones: Array = []
+## Spots other systems read (filled in _define_zones; systems must cope with these being empty):
+var shop_spots: Array = []      # { pos: Vector3, yaw: float, stock: Array of item ids }
+var crate_spots: Array = []     # Vector3 (breakable nut crates)
+var pickup_spots: Array = []    # { kind: "washer"|"page", id: String, pos: Vector3 }
+var gripe_ids: Array = []       # skill tasks on this level, e.g. "return_to_sender"
 var t := 0.0
 
 var mat_white := M.std(Color(0.93, 0.95, 0.97), 0.6, 0.3)
@@ -345,6 +350,12 @@ func _build() -> void:
 	_define_zones()
 
 func _define_zones() -> void:
+	shop_spots = [{ pos = Vector3(-12, 0, 66), yaw = PI * 0.5, stock = ["scatter_bloom", "thump_lobber"] },
+		{ pos = Vector3(-50, 0, -118), yaw = 0.0, stock = ["seeker_hive"] }]
+	crate_spots = [Vector3(6, 0, 70), Vector3(-14, 0, 56), Vector3(-6, 0, 12), Vector3(24, 0, -60), Vector3(0, 0, -50)]
+	pickup_spots = [{ kind = "washer", id = "w1", pos = Vector3(10, 6.6, -12) }, { kind = "washer", id = "w2", pos = Vector3(26, 0.8, -46) },
+		{ kind = "washer", id = "w3", pos = Vector3(-36, 0.8, -104) }, { kind = "page", id = "p1", pos = Vector3(12, 9.2, -101) }]
+	gripe_ids = ["return_to_sender"]
 	zones = [
 		{ id = "dock", name = "SKYHARBOR DOCKS", rect = islands.dock, objective = "Clear the bots off the dock",
 			enter_lines = ["dock_intro_1", "dock_intro_2"], clear_lines = ["dock_clear_1", "dock_clear_2", "dock_clear_3"],

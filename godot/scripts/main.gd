@@ -41,6 +41,7 @@ func _ready() -> void:
 	add_child(hud)
 	Game.main = self; Game.player = player; Game.cam = cam; Game.combat = combat; Game.level = level; Game.hud = hud
 	Game.add_nuts(0)
+	_install_systems()
 	story = Story.new(); story.name = "Story"; add_child(story); Game.story = story
 	if not OS.get_cmdline_user_args().has("--no-bots"): story.start()
 	Snd.music("skyharbor", 3.0)
@@ -124,6 +125,15 @@ func spawn_bot(kind: String, pos: Vector3, zone := Rect2()) -> Node3D:
 	FX.ring(pos + Vector3(0, 0.05, 0), Color(1, 0.35, 0.25))
 	Snd.at("bot_spawn", pos, -2)
 	return b
+
+## Every script in res://scripts/systems/ is added as a child node at start (after Game's refs are set).
+## Add new gameplay systems there instead of editing this file.
+func _install_systems() -> void:
+	var dir := "res://scripts/systems/"
+	var names := Array(DirAccess.get_files_at(dir)).filter(func(f): return f.ends_with(".gd"))
+	names.sort()
+	for f in names:
+		var n: Node = load(dir + f).new(); n.name = f.get_basename().capitalize().replace(" ", ""); add_child(n)
 
 ## Cutscene support hook: return true once a cutscene player is installed (story waits for it).
 func has_cutscenes() -> bool:
