@@ -1,17 +1,33 @@
 extends Node
 ## Runs a level's story from data. The level script defines `zones` (in play order); this script
-## walks through them: entering a zone starts its fight (waves of bots), clearing it opens the way
-## on (unlocks rails), plays Dodger/Vesk lines and sets the next objective. Special zone kinds:
-##   "relay"  a shootable relay target must be destroyed
-##   "boss"   the Crane Bot fight; beating it completes the level
+## walks through them: entering a zone starts it, finishing it applies its effects (unlock rails,
+## open gates, power movers), plays Dodger/Vesk lines and sets the next objective.
+##
+## Zone kinds (key "kind"):
+##   ""         (default) a fight: waves of bots; cleared when every wave is down
+##   "reach"    cleared as soon as the player gets inside the zone
+##   "activate" hit every switch in `switches` (wrench or bolt); optional `guards` spawn at the start
+##   "relay"    a shootable relay target must be destroyed
+##   "boss"     the Crane Bot fight; beating it completes the level
 ##
 ## Zone dictionary keys (all optional except id/rect):
 ##   id, name, rect (Rect2 on XZ), y (floor height, default 0), objective (shown while heading there),
 ##   enter_lines / clear_lines (voice ids), waves (Array of {roller:int, hornet:int}),
-##   unlock_rails (Array of rail indexes), relay_pos (Vector3), boss_pos (Vector3)
+##   unlock_rails (Array of rail indexes), open_gates (Array of gate ids, calls level.open_gate),
+##   power (Array of mover ids, calls level.power), grants (Array of item ids, Game.unlock),
+##   relay_pos (Vector3), boss_pos (Vector3),
+##   switches (Array of {pos: Vector3, yaw: float, label: String}) for "activate",
+##   guards (Array of {rect: Rect2, y: float, roller: int, hornet: int}) bots spawned when an
+##     "activate" zone starts, progress_text (objective text while switching, "%d/%d" is filled in),
+##   skippable (bool) this zone may be skipped if the player reaches a later `skip_to` zone first,
+##   skip_to (bool) entering this zone early skips the skippable zones before it,
+##   banner (String) clear banner, default "AREA CLEAR" ("" for none; reach zones default to none),
+##   y_range (float) vertical tolerance for being inside (default 6).
+## The level may define on_switch(zone_id, index, done, total) and on_zone_cleared(zone_id).
 
 const CraneBot := preload("res://scripts/cranebot.gd")
 const Relay := preload("res://scripts/relay.gd")
+const Switch := preload("res://scripts/level/switch_target.gd")
 
 var zones: Array = []
 var index := -1          # zone currently being fought / headed to
@@ -21,14 +37,22 @@ var alive: Array = []
 var wave_delay := 0.0
 var boss: Node3D
 var relay: Node3D
+var switches: Array = []
+var switched := 0
 var finished := false
+var debug_auto := false  # --story-auto: throws switches / clears fights by itself (flow test)
+var debug_t := 0.0
 
 func start() -> void:
 	zones = Game.level.zones
+	debug_auto = OS.get_cmdline_user_args().has("--story-auto")
 	Game.cutscene_started.emit("intro")
 	if Game.main.has_method("has_cutscenes") and Game.main.has_cutscenes():
 		await Game.cutscene_finished
 	_advance()
+
+func current_id() -> String:
+	return zones[index].id if index >= 0 and index < zones.size() else ""
 
 func _advance() -> void:
 	index += 1; active = false; wave = 0
@@ -38,17 +62,23 @@ func _advance() -> void:
 
 func _inside(z: Dictionary, p: Vector3) -> bool:
 	var r: Rect2 = z.rect
-	return r.has_point(Vector2(p.x, p.z)) and absf(p.y - z.get("y", 0.0)) < 6.0
+	return r.has_point(Vector2(p.x, p.z)) and absf(p.y - z.get("y", 0.0)) < z.get("y_range", 6.0)
 
 func _physics_process(dt: float) -> void:
 	if finished or index < 0 or index >= zones.size() or Game.player == null: return
 	var z: Dictionary = zones[index]
+	var p: Vector3 = Game.player.global_position
+	if debug_auto: _debug_step(dt, z)
+	_check_skip(p)
+	z = zones[index] if index < zones.size() else {}
+	if z.is_empty(): return
 	if not active:
-		if _inside(z, Game.player.global_position): _begin(z)
+		if _inside(z, p): _begin(z)
 		return
 	# fight in progress
 	alive = alive.filter(func(b): return is_instance_valid(b) and not b.dead)
-	if z.get("kind", "") == "relay" or z.get("kind", "") == "boss": return
+	var kind: String = z.get("kind", "")
+	if kind == "relay" or kind == "boss" or kind == "activate": return
 	if alive.is_empty():
 		wave_delay -= dt
 		if wave_delay > 0.0: return
@@ -58,12 +88,43 @@ func _physics_process(dt: float) -> void:
 		else:
 			_clear(z)
 
+## Reaching a later `skip_to` zone early skips the skippable zones in between (alternate routes).
+func _check_skip(p: Vector3) -> void:
+	for j in range(index + 1, zones.size()):
+		var zj: Dictionary = zones[j]
+		if not zj.get("skip_to", false) or not _inside(zj, p): continue
+		for k in range(index, j):
+			if not zones[k].get("skippable", false): return
+		for k in range(index, j):
+			_apply_effects(zones[k]); Game.complete(zones[k].id)
+		for b in alive: if is_instance_valid(b) and not b.dead: b.die(true)
+		alive.clear()
+		index = j - 1
+		_advance()
+		return
+
 func _begin(z: Dictionary) -> void:
 	active = true; wave_delay = 0.6
 	Game.zone_entered.emit(z.id)
 	for l in z.get("enter_lines", []): Game.say(l)
 	if z.has("name"): Game.hud.show_banner(z.name, z.get("objective", ""))
 	match z.get("kind", ""):
+		"reach":
+			_clear(z)
+		"activate":
+			switches.clear(); switched = 0
+			var list: Array = z.get("switches", [])
+			for i in list.size():
+				var s: Dictionary = list[i]
+				var sw: Node3D = Switch.new(); sw.label_text = s.get("label", "")
+				Game.main.add_child(sw); sw.global_position = s.pos; sw.rotation.y = s.get("yaw", 0.0)
+				sw.set_meta("index", i)
+				sw.activated.connect(func(n): _switched(z, n))
+				switches.append(sw)
+			for g in z.get("guards", []):
+				_spawn_in(g.rect, g.get("y", 0.0), g)
+			_progress(z)
+			if list.is_empty(): _clear(z)
 		"relay":
 			relay = Relay.new(); Game.main.add_child(relay); relay.global_position = z.relay_pos
 			relay.destroyed.connect(func(): _clear(z))
@@ -78,25 +139,50 @@ func _begin(z: Dictionary) -> void:
 			Game.boss_started.emit("CRANE BOT")
 			Snd.music("boss", 1.0)
 
-func _spawn_wave(z: Dictionary, w: Dictionary) -> void:
-	var r: Rect2 = z.rect
-	var y: float = z.get("y", 0.0)
+func _progress(z: Dictionary) -> void:
+	var total: int = z.get("switches", []).size()
+	if total <= 1: return
+	var txt: String = z.get("progress_text", z.get("objective", "") + " (%d/%d)")
+	Game.objective_set.emit(z.id, txt % [switched, total])
+
+func _switched(z: Dictionary, sw: Node3D) -> void:
+	if not active or zones[index] != z: return
+	switched += 1
+	var total: int = z.get("switches", []).size()
+	if Game.level.has_method("on_switch"): Game.level.on_switch(z.id, int(sw.get_meta("index")), switched, total)
+	_progress(z)
+	if switched >= total: _clear(z)
+
+func _spawn_in(r: Rect2, y: float, w: Dictionary) -> void:
 	var n := 0
 	for kind in ["roller", "hornet"]:
 		for i in int(w.get(kind, 0)):
 			var a := TAU * float(n) / 5.0 + randf() * 0.6
 			var c := r.get_center() + Vector2(cos(a), sin(a)) * minf(r.size.x, r.size.y) * 0.3
 			alive.append(Game.main.spawn_bot(kind, Vector3(c.x, y, c.y), r)); n += 1
+
+func _spawn_wave(z: Dictionary, w: Dictionary) -> void:
+	_spawn_in(z.rect, z.get("y", 0.0), w)
 	if wave == 0 and randf() < 0.6: Snd.bark("dodger", "spawn")
+
+## Unlocks, gates, power and grants of a zone (also applied when a zone is skipped).
+func _apply_effects(z: Dictionary) -> void:
+	for i in z.get("unlock_rails", []): Game.level.set_rail_locked(i, false); Snd.play("rail_unlock", -2)
+	for g in z.get("open_gates", []): if Game.level.has_method("open_gate"): Game.level.open_gate(g)
+	for m in z.get("power", []): if Game.level.has_method("power"): Game.level.power(m)
+	for it in z.get("grants", []): Game.unlock(it)
+	if Game.level.has_method("on_zone_cleared"): Game.level.on_zone_cleared(z.id)
 
 func _clear(z: Dictionary) -> void:
 	if not active: return
 	active = false
+	switches.clear()
 	Game.complete(z.id); Game.zone_cleared.emit(z.id)
-	for i in z.get("unlock_rails", []): Game.level.set_rail_locked(i, false); Snd.play("rail_unlock", -2)
+	_apply_effects(z)
 	for l in z.get("clear_lines", []): Game.say(l)
 	if z.get("kind", "") == "relay": Game.boss_defeated.emit("SIGNAL RELAY")
-	Game.hud.show_banner("AREA CLEAR", z.get("name", ""), Color(0.5, 1, 0.6))
+	var banner: String = z.get("banner", "" if z.get("kind", "") == "reach" else "AREA CLEAR")
+	if banner != "": Game.hud.show_banner(banner, z.get("name", ""), Color(0.5, 1, 0.6))
 	Game.save()
 	_advance()
 
@@ -111,3 +197,22 @@ func _boss_down(z: Dictionary, p: Vector3) -> void:
 	await get_tree().create_timer(4.0).timeout
 	Game.level_complete.emit(Game.data.level)
 	Game.cutscene_started.emit("outro")
+
+## Flow test (--story-auto): teleports the player into each zone, then throws its switches or
+## destroys its bots, printing each step. Stops at the boss.
+func _debug_step(dt: float, z: Dictionary) -> void:
+	debug_t -= dt
+	if debug_t > 0.0: return
+	debug_t = 0.5
+	var kind: String = z.get("kind", "")
+	if not active:
+		var c: Vector2 = z.rect.get_center()
+		print("[story-auto] zone %d %s (%s): %s" % [index, z.id, kind if kind != "" else "fight", z.get("objective", "")])
+		if kind == "boss": debug_auto = false; print("[story-auto] teleporting into the boss arena, auto off")
+		Game.player.global_position = Vector3(c.x, z.get("y", 0.0) + 0.3, c.y); Game.player.velocity = Vector3.ZERO
+		return
+	match kind:
+		"activate":
+			for sw in switches: if is_instance_valid(sw) and not sw.dead: sw.damage(1.0, sw.center(), Vector3.ZERO); return
+		"":
+			for b in alive: if is_instance_valid(b) and not b.dead: b.die(true)
