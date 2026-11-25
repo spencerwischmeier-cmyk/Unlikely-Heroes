@@ -18,8 +18,12 @@ var level: Node3D
 var respawn_pos := Vector3.ZERO
 var model: Node3D
 var body: Node3D
-var upper: Node3D
-var legs: Array = []
+var skel: Skeleton3D
+var anim: AnimationPlayer
+var bones := {}
+var cur_anim := "idle"
+var melee_t := 0.0
+var land_play := 0.0
 var jets: Array = []
 
 var grounded := false
@@ -72,19 +76,20 @@ func _ready() -> void:
 	platform_on_leave = CharacterBody3D.PLATFORM_ON_LEAVE_ADD_VELOCITY
 	model = Node3D.new(); add_child(model)
 	body = Node3D.new(); model.add_child(body)
-	var hero: Node3D = load("res://models/hero.glb").instantiate()
+	var hero: Node3D = load("res://models/vesk.glb").instantiate()
 	body.add_child(hero)
 	_shadows(hero)
-	for n in [["hip_L", 1], ["hip_R", -1]]:
-		var hip := hero.find_child(n[0], true, false) as Node3D
-		var knee := hero.find_child(n[0].replace("hip", "knee"), true, false) as Node3D
-		if hip: legs.append({ hip = hip, knee = knee, side = n[1] })
-	upper = hero.find_child("upper", true, false) as Node3D
-	for j in ["jet_L", "jet_R"]:
-		var jn := hero.find_child(j, true, false) as Node3D
-		if jn:
-			var l := OmniLight3D.new(); l.light_color = Color(0.3, 0.9, 1); l.light_energy = 0.0; l.omni_range = 2.5
-			jn.add_child(l); jets.append(l)
+	skel = hero.find_child("Skeleton3D", true, false)
+	anim = hero.find_child("AnimationPlayer", true, false)
+	anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	for n in ["idle", "run", "fall", "dash", "glide", "grind", "swing"]:
+		anim.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+	anim.play("idle")
+	for b in ["pelvis", "spine", "chest", "neck", "head"]: bones[b] = skel.find_bone(b)
+	for sx in [-1, 1]:
+		var l := OmniLight3D.new(); l.light_color = Color(0.3, 0.9, 1); l.light_energy = 0.0; l.omni_range = 2.5
+		l.position = Vector3(0.15 * sx, 0.66, -0.3)
+		body.add_child(l); jets.append(l)
 	rope = MeshInstance3D.new()
 	var rm := CylinderMesh.new(); rm.top_radius = 0.035; rm.bottom_radius = 0.035; rm.height = 1.0
 	rope.mesh = rm
@@ -328,46 +333,46 @@ func _face(dt: float) -> void:
 	turn_rate = lerpf(turn_rate, angle_difference(prev, face_yaw) / maxf(dt, 1e-4), 1.0 - exp(-10.0 * dt))
 	model.rotation.y = face_yaw
 
+func _play(n: String, blend := 0.15, spd := 1.0) -> void:
+	anim.speed_scale = spd
+	if n != cur_anim:
+		cur_anim = n
+		anim.play(n, blend)
+
 func _animate(dt: float) -> void:
 	anim_t += dt
 	var aiming := aim_hold > 0.0
-	var speed := 0.0 if riding or swing_hook else Vector2(velocity.x, velocity.z).length()
+	var speed := Vector2(velocity.x, velocity.z).length()
 	var run := minf(1.0, speed / 7.0)
 	var vy := velocity.y
 	var dashing := dash_t > 0.0 or long_jump
-	phase += dt * (3.0 + speed * 1.15)
-	var k30 := 1.0 - exp(-30.0 * dt)
-	var k12 := 1.0 - exp(-12.0 * dt)
-	for L in legs:
-		var off := 0.0 if L.side > 0 else PI
-		var hip_x: float; var knee_x: float; var rate := k30
-		if grounded and not riding:
-			hip_x = sin(phase + off) * 0.85 * run - land_t * 0.3
-			knee_x = maxf(0.0, -cos(phase + off)) * 1.25 * run + 0.06 + land_t * 0.6
-		elif riding:
-			hip_x = -0.5 if L.side > 0 else 0.3; knee_x = 0.9 if L.side > 0 else 0.4; rate = k12
-		elif swing_hook:
-			hip_x = -0.9; knee_x = 1.1; rate = k12
-		elif dashing:
-			hip_x = 0.5 if L.side > 0 else 0.9; knee_x = 0.3 if L.side > 0 else 0.9; rate = k12
-		else:
-			var up_ := vy > 0.0
-			hip_x = (-0.8 if L.side > 0 else 0.35) if up_ else (-0.25 if L.side > 0 else 0.1)
-			knee_x = (1.3 if L.side > 0 else 0.5) if up_ else 0.35
-			rate = 1.0 - exp(-10.0 * dt)
-		L.hip.rotation.x = lerpf(L.hip.rotation.x, hip_x, rate)
-		if L.knee: L.knee.rotation.x = lerpf(L.knee.rotation.x, knee_x, rate)
-	var breathe := (1.0 - run) * sin(anim_t * 2.2) * 0.012
-	body.position.y = (absf(sin(phase)) * 0.07 * run - land_t * 0.12 + breathe) if grounded else 0.0
-	var want_pitch := (run * (0.08 if aiming else 0.2) + land_t * 0.25) if grounded else (0.5 if dashing else clampf(-vy * 0.02, -0.15, 0.2))
-	pitch_s = lerpf(pitch_s, want_pitch, k12)
+	melee_t = maxf(0.0, melee_t - dt)
+	land_play = maxf(0.0, land_play - dt)
+	if land_t > 0.55 and land_play <= 0.0 and grounded and speed < 4.0: land_play = 0.3
+	# pick the animation for what Vesk is doing
+	if melee_t > 0.0: _play("melee", 0.06)
+	elif swing_hook: _play("swing", 0.12)
+	elif riding: _play("grind", 0.15)
+	elif dashing and not grounded: _play("dash", 0.08)
+	elif dash_t > 0.0: _play("dash", 0.05)
+	elif not grounded:
+		if jumps == 2 and vy < 0.0 and Input.is_action_pressed("jump"): _play("glide", 0.2)
+		elif vy > 1.0: _play("jump", 0.08)
+		else: _play("fall", 0.25)
+	elif land_play > 0.0: _play("land", 0.05)
+	elif speed > 0.6: _play("run", 0.12, clampf(speed / 8.4, 0.6, 1.7))
+	else: _play("idle", 0.2)
+	anim.advance(dt)
+	# aim: lean the upper body toward the crosshair (or hold the blaster low when not shooting)
+	var aim_pitch: float = cam.pitch if aiming else -0.25
+	pitch_s = lerpf(pitch_s, aim_pitch, 1.0 - exp(-(20.0 if aiming else 8.0) * dt))
+	for b in ["spine", "chest"]:
+		var i: int = bones[b]
+		skel.set_bone_pose_rotation(i, skel.get_bone_pose_rotation(i) * Quaternion(Vector3.RIGHT, -pitch_s * 0.5))
+	# body: bank into turns, squash on landing
 	lean = lerpf(lean, clampf(-turn_rate * 0.09 * maxf(run, 0.3), -0.35, 0.35), 1.0 - exp(-10.0 * dt))
-	if riding: lean = lerpf(lean, 0.0, k12)
-	body.rotation = Vector3(pitch_s, 0, lean)
-	body.scale = Vector3(1 + land_t * 0.12, 1 - land_t * 0.14, 1 + land_t * 0.12)
-	if upper:
-		var aim_pitch: float = cam.pitch if aiming else -0.45
-		upper.rotation.x = lerpf(upper.rotation.x, clampf(-aim_pitch, -0.75, 0.6) - (0.0 if aiming else pitch_s * 0.5), k30 if aiming else 1.0 - exp(-10.0 * dt))
-		upper.rotation.y = sin(phase) * 0.12 * run if (grounded and not aiming) else lerpf(upper.rotation.y, 0.0, 1.0 - exp(-10.0 * dt))
+	if riding or swing_hook: lean = lerpf(lean, 0.0, 1.0 - exp(-12.0 * dt))
+	body.rotation = Vector3(0, 0, lean)
+	body.scale = Vector3(1 + land_t * 0.08, 1 - land_t * 0.1, 1 + land_t * 0.08)
 	var jetting := jet_t > 0.0 or (not grounded and jumps == 2 and vy > -3.0)
-	for j in jets: j.light_energy = (2.5 + randf()) if jetting else 0.4
+	for j in jets: j.light_energy = (2.5 + randf()) if jetting else 0.3
