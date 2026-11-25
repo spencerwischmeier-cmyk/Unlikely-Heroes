@@ -1,9 +1,9 @@
-# Blaster game (working title)
+# Unlikely Heroes
 
 An original 3D action-platformer shooter for the browser and phone: a hero with a big arsenal of weapons, a robot
 sidekick drone, and planets to explore. Built with Three.js.
 
-This folder now holds a **first playable prototype** (`index.html`) and the original still **look test** (`look.html`).
+This repo holds a **first playable prototype** (`index.html`) and the original still **look test** (`look.html`).
 
 ![Playable prototype](docs/play.jpg)
 
