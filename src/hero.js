@@ -160,26 +160,51 @@ function animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash,
   flashables.forEach(m => { m.userData.baseEmissive = m.emissive.clone(); m.userData.baseEI = m.emissiveIntensity; });
 
   // ---- animation state ----
-  let phase = 0, flashT = 0, hurtT = 0;
-  function animate(dt, { speed, grounded, vy, aimPitch, firing, heat, jetting }) {
-    // running cycle
-    const run = Math.min(1, speed / 6);
-    phase += dt * (4 + speed * 1.6);
-    for (const L of legs) {
-      const sw = Math.sin(phase + (L.side > 0 ? 0 : Math.PI));
+  let swingT = 0;
+  let phase = 0, flashT = 0, hurtT = 0, t = 0, lean = 0, pitchS = 0, airT = 0;
+  const L = (a, b, k, dt) => THREE.MathUtils.lerp(a, b, 1 - Math.exp(-k * dt));
+  function animate(dt, { speed, grounded, vy, aimPitch, firing, heat, jetting, turn = 0, landT = 0, aiming = true, dash = false }) {
+    t += dt;
+    // running cycle: stride gets longer with speed, cadence rises more slowly so it doesn't look frantic
+    const run = Math.min(1, speed / 7);
+    phase += dt * (3 + speed * 1.15);
+    airT = grounded ? 0 : airT + dt;
+    for (const Lg of legs) {
+      const off = Lg.side > 0 ? 0 : Math.PI;
+      const sw = Math.sin(phase + off);
       if (grounded) {
-        L.hip.rotation.x = sw * 0.75 * run;
-        L.knee.rotation.x = Math.max(0, -Math.cos(phase + (L.side > 0 ? 0 : Math.PI))) * 1.1 * run + 0.05;
+        const hipT = sw * 0.85 * run, kneeT = Math.max(0, -Math.cos(phase + off)) * 1.25 * run + 0.06 + landT * 0.6;
+        Lg.hip.rotation.x = L(Lg.hip.rotation.x, hipT - landT * 0.3, 30, dt);
+        Lg.knee.rotation.x = L(Lg.knee.rotation.x, kneeT, 30, dt);
+      } else if (dash) {
+        // long jump / dash: legs stretched out behind
+        Lg.hip.rotation.x = L(Lg.hip.rotation.x, Lg.side > 0 ? 0.5 : 0.9, 14, dt);
+        Lg.knee.rotation.x = L(Lg.knee.rotation.x, Lg.side > 0 ? 0.3 : 0.9, 14, dt);
       } else {
-        // tuck in the air
-        L.hip.rotation.x = THREE.MathUtils.lerp(L.hip.rotation.x, L.side > 0 ? -0.6 : 0.25, 1 - Math.exp(-10 * dt));
-        L.knee.rotation.x = THREE.MathUtils.lerp(L.knee.rotation.x, L.side > 0 ? 1.0 : 0.5, 1 - Math.exp(-10 * dt));
+        // rising: one knee up; falling: legs reach down for the landing
+        const up = vy > 0;
+        Lg.hip.rotation.x = L(Lg.hip.rotation.x, up ? (Lg.side > 0 ? -0.8 : 0.35) : (Lg.side > 0 ? -0.25 : 0.1), 10, dt);
+        Lg.knee.rotation.x = L(Lg.knee.rotation.x, up ? (Lg.side > 0 ? 1.3 : 0.5) : 0.35, 10, dt);
       }
     }
-    body.position.y = grounded ? Math.abs(Math.sin(phase)) * 0.05 * run : 0;
-    body.rotation.x = grounded ? run * 0.08 : THREE.MathUtils.clamp(-vy * 0.02, -0.15, 0.15);
-    upper.rotation.x = THREE.MathUtils.clamp(-aimPitch, -0.75, 0.6);
-    upper.rotation.z = grounded ? Math.sin(phase) * 0.04 * run : 0;
+    // body: bob with the stride, lean forward with speed, bank into turns, squash on landing, breathe when still
+    const breathe = (1 - run) * Math.sin(t * 2.2) * 0.012;
+    body.position.y = grounded ? Math.abs(Math.sin(phase)) * 0.07 * run - landT * 0.12 + breathe : 0;
+    const wantPitch = grounded ? run * (aiming ? 0.08 : 0.2) + landT * 0.25 : dash ? 0.5 : THREE.MathUtils.clamp(-vy * 0.02, -0.15, 0.2);
+    pitchS = L(pitchS, wantPitch, 12, dt);
+    body.rotation.x = pitchS;
+    lean = L(lean, THREE.MathUtils.clamp(-turn * 0.09 * Math.max(run, 0.3), -0.35, 0.35), 10, dt);
+    body.rotation.z = lean;
+    body.scale.set(1 + landT * 0.12, 1 - landT * 0.14 + (!grounded && vy > 4 ? 0.05 : 0), 1 + landT * 0.12);
+    upper.rotation.x = L(upper.rotation.x, THREE.MathUtils.clamp(-aimPitch, -0.75, 0.6) - (aiming ? 0 : pitchS * 0.5), aiming ? 30 : 10, dt);
+    upper.rotation.z = grounded ? Math.sin(phase) * 0.05 * run : 0;
+    upper.rotation.y = grounded && !aiming ? Math.sin(phase) * 0.12 * run : L(upper.rotation.y, 0, 10, dt);
+    // melee: wind up to the right, then whip the blaster across to the left
+    if (swingT > 0) {
+      swingT = Math.max(0, swingT - dt); const k = 1 - swingT / 0.32;
+      upper.rotation.y = k < 0.25 ? -0.9 * (k / 0.25) : -0.9 + 2.0 * Math.min(1, (k - 0.25) / 0.3);
+      upper.rotation.x = -0.1;
+    }
     // jetpack flames grow when hovering
     jets.forEach(j => { const s = jetting ? 0.7 + Math.random() * 0.3 : 0.3; j.scale.setScalar(s); j.material.opacity = jetting ? 1 : 0.6; });
     // muzzle flash fade
@@ -198,6 +223,7 @@ function animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash,
   return {
     root, upper, muzzle, gun, animate, gunSide,
     fireFlash() { flashT = 1; },
+    swing() { swingT = 0.32; },
     hurt() { hurtT = 1; },
   };
 }

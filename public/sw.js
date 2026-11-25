@@ -1,7 +1,7 @@
 // Offline support: pages load fresh from the network when online (so updates show up right away)
 // and fall back to the cached copy when offline. Build files in assets/ have a content hash in their name, so
 // they are served from the cache once fetched; everything else (models, icons) is checked online first.
-const CACHE = 'unlikely-heroes-v3';
+const CACHE = 'unlikely-heroes-v4';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './manifest.webmanifest', './icons/icon-192.png'])).then(() => self.skipWaiting()));
 });

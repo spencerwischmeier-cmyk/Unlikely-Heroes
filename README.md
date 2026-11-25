@@ -49,14 +49,15 @@ Pick a mode on the title screen:
 | Move | WASD | left stick |
 | Aim | mouse | right stick |
 | Fire (hold) | left click | RT |
-| Jump, then jet-boost in the air | Space (hold to glide) | A (hold to glide) |
-| Dash | Shift | B or LT |
+| Jump (hold for higher), then jet-boost in the air | Space (hold to glide) | A (hold to glide) |
+| Dash (jump right after for a long jump) | Shift | B or LT |
+| Melee bash | F, V or middle click | X |
 | Weapon wheel | hold Q, move the mouse, let go | hold LB, push a stick, let go |
-| Switch weapon | 1-4 or mouse wheel | RB / X / Y next, d-pad picks |
+| Switch weapon | 1-4 or mouse wheel | RB / Y next, d-pad picks |
 | Pause | Esc or P | Start |
 
 On a phone or tablet: drag your left thumb to move (the stick rests bottom left and jumps to where you touch), drag
-on the right side to aim, hold **FIRE** to shoot (slide your thumb on it to aim too), and tap **JUMP** and **DASH**.
+on the right side to aim, hold **FIRE** to shoot (slide your thumb on it to aim too), and tap **JUMP**, **DASH** and **BASH**.
 Tap the weapon button for the wheel, then tap a weapon (or slide from the button toward one). Add `?touch=1` to force
 touch controls, or `?touch=0` to turn them off.
 

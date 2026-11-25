@@ -139,6 +139,7 @@ body.pad #touch{display:none}
 .tbtn.fire{--s:112px;right:calc(24px + env(safe-area-inset-right));bottom:calc(28px + env(safe-area-inset-bottom));border-color:#5ff2ff;color:#bff9ff;background:radial-gradient(#3ef6ff55,#0d3a4c66)}
 .tbtn.jump{--s:76px;right:calc((24px + 112px * var(--bs) + 16px) + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom))}
 .tbtn.dash{--s:66px;right:calc(30px + env(safe-area-inset-right));bottom:calc((28px + 112px * var(--bs) + 18px) + env(safe-area-inset-bottom));overflow:hidden}
+.tbtn.melee{--s:62px;right:calc((24px + 112px * var(--bs) + 16px + 76px * var(--bs) + 14px) + env(safe-area-inset-right));bottom:calc(18px + env(safe-area-inset-bottom));border-color:#ffd27a;color:#ffe7b0}
 .tbtn.dash .cd{position:absolute;inset:0;border-radius:50%;background:conic-gradient(#000a var(--p,0%),transparent 0);pointer-events:none}
 .tbtn.dash.cool{border-color:#ffffff55}
 .tbtn.wsel{--s:64px;--c:#5ff2ff;right:calc((24px + 112px * var(--bs) + 22px) + env(safe-area-inset-right));bottom:calc((20px + 76px * var(--bs) + 22px) + env(safe-area-inset-bottom));border-color:var(--c);color:var(--c);background:radial-gradient(#0d3a4c99,#05141d99)}

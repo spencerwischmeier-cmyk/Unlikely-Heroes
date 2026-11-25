@@ -74,6 +74,7 @@ export function createEnemies(scene, fx, models = {}) {
   const makeH = () => (models.hornet ? hornetFromModel(models.hornet) : makeHornet());
   const makeR = () => (models.roller ? rollerFromModel(models.roller) : makeRoller());
   const list = [];
+  const chunkMats = {};
   const shots = [];
   const shotGeo = new THREE.CapsuleGeometry(0.07, 0.6, 4, 8);
   const shotMat = glow(0xff3a2a, 12);
@@ -99,14 +100,22 @@ export function createEnemies(scene, fx, models = {}) {
     if (e.dead) return;
     e.dead = true;
     scene.remove(e.g);
-    fx.explosion(e.pos.clone().add(V(0, e.type === 'roller' ? 0.55 : 0, 0)), e.type === 'hornet' ? 1 : 0.8, debrisMats);
+    const at = e.pos.clone().add(V(0, e.type === 'roller' ? 0.55 : 0, 0));
+    if (!chunkMats[e.type]) chunkMats[e.type] = [...e.hitMats.map(m => { const c = m.clone(); c.emissive?.setRGB(0, 0, 0); return c; }), ...debrisMats];
+    fx.explosion(at, e.type === 'hornet' ? 1.15 : 0.95, chunkMats[e.type]);
+    fx.shock(at, e.type === 'hornet' ? 0xffb040 : 0xff7040);
     ctx.onKill(e);
   }
 
   function damage(e, amount, hitPos, ctx) {
     if (e.dead) return;
-    e.hp -= amount; e.flash = 1;
-    if (e.type === 'hornet') e.vel.add(V(rand(-2, 2), rand(0, 2), rand(-2, 2)));
+    e.hp -= amount; e.flash = 1; e.pop = 1;
+    // knock the bot back from the hit
+    const push = hitPos ? e.pos.clone().sub(hitPos).setY(0) : V(rand(-1, 1), 0, rand(-1, 1));
+    if (push.lengthSq() > 1e-4) push.normalize();
+    const k = Math.min(2.5, 0.8 + amount * 0.6);
+    if (e.type === 'hornet') e.vel.add(push.multiplyScalar(k * 2.2).add(V(rand(-1, 1), rand(0.5, 2), rand(-1, 1))));
+    else if (e.fuse < 0) { e.vel.addScaledVector(push, k * 2.6); e.stun = 0.18; }
     if (e.hp <= 0) kill(e, ctx);
   }
 
@@ -141,6 +150,8 @@ export function createEnemies(scene, fx, models = {}) {
       if (e.dead) continue;
       e.t += dt;
       e.flash = Math.max(0, e.flash - dt * 8);
+      e.pop = Math.max(0, (e.pop || 0) - dt * 7); e.stun = Math.max(0, (e.stun || 0) - dt);
+      if (e.fuse < 0 || e.type === 'hornet') e.g.scale.setScalar(1 + e.pop * 0.22);
       e.hitMats.forEach(m => { m.emissive.setRGB(e.flash, e.flash, e.flash); m.emissiveIntensity = 2; });
       if (e.type === 'hornet') {
         // orbit the hero, slowly drifting around them
@@ -175,7 +186,7 @@ export function createEnemies(scene, fx, models = {}) {
         const to = V(hp.x - e.pos.x, 0, hp.z - e.pos.z); const dist = to.length();
         if (e.fuse < 0) {
           const speed = 4.2 * ctx.aggression;
-          if (e.pos.y === 0) e.vel.lerp(to.normalize().multiplyScalar(speed), 1 - Math.exp(-2.5 * dt));
+          if (e.pos.y === 0 && e.stun <= 0) e.vel.lerp(to.normalize().multiplyScalar(speed), 1 - Math.exp(-2.5 * dt));
           if (dist < 1.4 && e.pos.y === 0) e.fuse = 0.55;
         } else {
           e.vel.multiplyScalar(Math.exp(-6 * dt));

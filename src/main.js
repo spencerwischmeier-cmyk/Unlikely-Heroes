@@ -99,6 +99,7 @@ const MAX_HULL = 8;
 const player = {
   pos: V(0, 0, 4), vel: V(0, 0, 0), yaw: Math.PI, pitch: -0.05, grounded: true, jumps: 0, coyote: 0,
   hull: MAX_HULL, invuln: 0, dashT: 0, dashCd: 0, jetT: 0, regenT: 0, groundY: 0, sparkT: 0,
+  meleeCd: 0, meleeHit: 0, jumpBuf: 0, jumpAge: 0, jumpCut: false, longJump: false, sinceDash: 9, aimHold: 0, lookIdle: 9, landT: 0, faceYaw: Math.PI, turnRate: 0,
 };
 const stats = { nuts: 0, kills: 0, wave: 0, shots: 0, hits: 0 };
 let waveState = { toSpawn: [], spawnT: 0, clearT: -1 };
@@ -259,13 +260,14 @@ function buy(id) {
 
 // ---------- input ----------
 const keys = new Set();
-const input = { fire: false, look: { dx: 0, dy: 0 }, jumpPressed: false, dashPressed: false };
+const input = { fire: false, look: { dx: 0, dy: 0 }, jumpPressed: false, dashPressed: false, meleePressed: false };
 addEventListener('keydown', e => {
   if (e.repeat) return;
   keys.add(e.code);
   if (state !== 'playing') return;
   if (e.code === 'Space') { input.jumpPressed = true; e.preventDefault(); }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.dashPressed = true;
+  if (e.code === 'KeyF' || e.code === 'KeyV') input.meleePressed = true;
   if (e.code === 'KeyQ' || e.code === 'Tab') { openWheel(); e.preventDefault(); }
   if (/^Digit[1-4]$/.test(e.code)) selectWeapon(+e.code.slice(5) - 1);
   if (e.code === 'KeyP' || (e.code === 'Escape' && !document.pointerLockElement)) pause();
@@ -281,6 +283,7 @@ addEventListener('mousedown', e => {
   if (!realMouse(e) || state !== 'playing' || wheel.open) return;
   if (e.button === 0) input.fire = true;
   if (e.button === 2) input.dashPressed = true;
+  if (e.button === 1) { input.meleePressed = true; e.preventDefault(); }
 });
 addEventListener('mouseup', e => { if (realMouse(e) && e.button === 0) input.fire = false; });
 addEventListener('wheel', e => { if (state === 'playing' && !wheel.open) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
@@ -326,7 +329,7 @@ function reset() {
   arsenal.infinite = mode === 'range';
   if (mode === 'range') player.pos.set(5.5, 0, -12.5);
   if (mode === 'story') { player.pos.copy(sky1.start.pos); player.yaw = sky1.start.yaw; stats.nuts = 100; story.reset(); } else story.stop();
-  player.groundY = player.pos.y; camPivot.copy(player.pos);
+  player.groundY = player.pos.y; camPivot.copy(player.pos); camY = player.pos.y; player.faceYaw = player.yaw; player.aimHold = 0; player.longJump = false;
   hud.hull(player.hull); hud.nuts(stats.nuts); hud.weapon(arsenal.state, arsenal.index);
 }
 function begin() {
@@ -416,7 +419,7 @@ function updateCalls(dt) {
 }
 
 // ---------- hero physics ----------
-const GRAV = 26, RUN = 6.8, JUMP = 8.6, BOOST = 7.8, RADIUS = 0.38;
+const GRAV = 28, RUN = 8.4, JUMP = 9.4, BOOST = 8.2, RADIUS = 0.38, LONG_SPEED = 15.5, LONG_UP = 8;
 function floorAt(p) {
   let f = onDeck(p.x, p.z, 0.15) ? 0 : -Infinity; // open sky between Skyharbor's islands
   for (const c of world.colliders) {
@@ -428,6 +431,8 @@ function updatePlayer(dt, p) {
   // look: mouse/touch deltas plus the right stick (with a curve so small pushes are precise)
   const sens = 0.0024, inv = settings.invertY ? -1 : 1;
   player.yaw -= input.look.dx * sens; player.pitch -= input.look.dy * sens * inv;
+  const looked = Math.abs(input.look.dx) + Math.abs(input.look.dy) > 0.5 || (p && Math.abs(p.lx) + Math.abs(p.ly) > 0.12);
+  player.lookIdle = looked ? 0 : player.lookIdle + dt;
   input.look.dx = input.look.dy = 0;
   if (p && !padWheel) {
     const curve = v => Math.sign(v) * Math.pow(Math.abs(v), 1.8);
@@ -466,6 +471,7 @@ function updatePlayer(dt, p) {
   // riding a grind rail: the rail moves you; jump hops off with the rail's momentum
   if (rails.riding) {
     if (input.jumpPressed) {
+      input.jumpPressed = false; player.jumpCut = true; player.longJump = false;
       rails.detach(); player.vel.y = Math.max(player.vel.y, 0) + JUMP; player.grounded = false; player.jumps = 1; sfx.jump();
     } else {
       rails.step(dt, player.pos, player.vel);
@@ -481,33 +487,103 @@ function updatePlayer(dt, p) {
     }
   }
 
-  player.dashCd -= dt;
+  // melee bash: hits everything in a wide arc in front, with a small lunge toward the nearest bot
+  player.meleeCd -= dt;
+  if (input.meleePressed && player.meleeCd <= 0) {
+    player.meleeCd = 0.42; player.meleeHit = 0.09;
+    let near = null, nd = 3.2;
+    for (const t of liveTargets()) { const c = centerOf(t); const d = Math.hypot(c.x - player.pos.x, c.z - player.pos.z); if (d < nd && Math.abs(c.y - player.pos.y - 0.8) < 2) { nd = d; near = c; } }
+    if (near) player.faceYaw = Math.atan2(near.x - player.pos.x, near.z - player.pos.z);
+    const f = V(Math.sin(player.faceYaw), 0, Math.cos(player.faceYaw));
+    player.vel.x += f.x * 5; player.vel.z += f.z * 5;
+    hero.swing(); sfx.swing();
+    fx.swipe(player.pos.clone().add(V(0, 0.95, 0)), player.faceYaw);
+  }
+  input.meleePressed = false;
+  if (player.meleeHit > 0) {
+    player.meleeHit -= dt;
+    if (player.meleeHit <= 0) {
+      const f = V(Math.sin(player.faceYaw), 0, Math.cos(player.faceYaw));
+      let any = false;
+      for (const t of liveTargets()) {
+        const c = centerOf(t), d = c.clone().sub(player.pos); const dy = d.y - 0.8; d.y = 0;
+        const reach = 2.4 + (t.radius || 0.5) * 0.6;
+        if (d.length() < reach && Math.abs(dy) < 1.8 && (d.length() < 0.8 || d.normalize().dot(f) > -0.1)) {
+          deal(t, t.type === 'boss' ? 3 : 2, c, 'melee'); any = true;
+          fx.sparks(c, 0xfff0b0, 14, 6);
+        }
+      }
+      if (any) { sfx.bash(); hitStop = Math.max(hitStop, 0.06); shake = Math.max(shake, 0.5); }
+    }
+  }
+
+  const jumpHeld = keys.has('Space') || p?.held(p.BTN.A) || input.jumpHeld;
+  // a jump pressed a moment before landing still counts
+  if (input.jumpPressed) player.jumpBuf = 0.14;
+  input.jumpPressed = false;
+  player.jumpBuf -= dt;
+
+  player.dashCd -= dt; player.sinceDash += dt;
   if (input.dashPressed && player.dashCd <= 0) {
-    const dir = ml > 0.1 ? wish.clone().normalize() : V(Math.sin(player.yaw), 0, Math.cos(player.yaw));
-    player.vel.x = dir.x * 17; player.vel.z = dir.z * 17;
-    player.dashT = 0.17; player.dashCd = 0.75; player.invuln = Math.max(player.invuln, 0.2); sfx.dash();
+    const dir = ml > 0.1 ? wish.clone().normalize() : V(Math.sin(player.faceYaw), 0, Math.cos(player.faceYaw));
+    player.vel.x = dir.x * 18; player.vel.z = dir.z * 18;
+    player.dashT = 0.16; player.dashCd = 0.6; player.sinceDash = 0; player.invuln = Math.max(player.invuln, 0.2); sfx.dash();
     fx.puff(player.pos.clone().add(V(0, 0.3, 0)));
   }
   input.dashPressed = false;
+  const hs = Math.hypot(player.vel.x, player.vel.z);
   if (player.dashT > 0) player.dashT -= dt;
-  else {
-    const accel = player.grounded ? 14 : 5;
-    player.vel.x = damp(player.vel.x, wish.x, accel, dt);
-    player.vel.z = damp(player.vel.z, wish.z, accel, dt);
+  else if (player.grounded) {
+    // on the ground: turn the run direction smoothly instead of sliding through a stop, and get up to speed fast
+    const want = Math.hypot(wish.x, wish.z);
+    if (want > 0.3) {
+      const cur = hs > 0.5 ? Math.atan2(player.vel.x, player.vel.z) : Math.atan2(wish.x, wish.z);
+      const tgt = Math.atan2(wish.x, wish.z), diff = angleDiff(cur, tgt);
+      // a sharp reversal skids (loses speed); gentle turns keep it
+      const turned = cur + clamp(diff, -16 * dt, 16 * dt);
+      let speed = Math.abs(diff) > 2.3 ? hs * Math.exp(-14 * dt) : hs;
+      speed = speed < want ? Math.min(want, speed + 55 * dt) : damp(speed, want, 7, dt);
+      player.vel.x = Math.sin(turned) * speed; player.vel.z = Math.cos(turned) * speed;
+    } else {
+      // stop quickly but not instantly
+      const k = Math.exp(-16 * dt); player.vel.x *= k; player.vel.z *= k;
+    }
+  } else {
+    // in the air: steer, but keep momentum (long jumps and rail hops carry you)
+    const cap = Math.max(RUN, hs);
+    player.vel.x += wish.x * 2.2 * dt * (player.longJump ? 0.4 : 1); player.vel.z += wish.z * 2.2 * dt * (player.longJump ? 0.4 : 1);
+    if (!player.longJump) { player.vel.x = damp(player.vel.x, Math.max(-cap, Math.min(cap, wish.x)), 2.5, dt); player.vel.z = damp(player.vel.z, Math.max(-cap, Math.min(cap, wish.z)), 2.5, dt); }
+    const nh = Math.hypot(player.vel.x, player.vel.z); if (nh > cap) { player.vel.x *= cap / nh; player.vel.z *= cap / nh; }
   }
 
-  // jump / jet boost
+  // jump / long jump / jet boost
   player.coyote -= dt;
-  if (input.jumpPressed) {
-    if (player.grounded || player.coyote > 0) { player.vel.y = JUMP; player.grounded = false; player.coyote = 0; player.jumps = 1; fx.puff(player.pos.clone().add(V(0, 0.1, 0))); sfx.jump(); }
-    else if (player.jumps < 2) { player.vel.y = BOOST; player.jumps = 2; player.jetT = 0.35; fx.sparks(player.pos.clone().add(V(0, 0.6, 0)), 0x60e8ff, 12, 3); sfx.boost(); }
+  if (player.jumpBuf > 0) {
+    if (player.grounded || player.coyote > 0) {
+      player.jumpBuf = 0; player.grounded = false; player.coyote = 0; player.jumps = 1; player.jumpCut = false; player.jumpAge = 0;
+      if (player.sinceDash < 0.28 && hs > 9) {
+        // jumping out of a dash: a long, low leap
+        const d = V(player.vel.x, 0, player.vel.z).normalize();
+        player.vel.x = d.x * LONG_SPEED; player.vel.z = d.z * LONG_SPEED; player.vel.y = LONG_UP; player.longJump = true; player.dashT = 0;
+        fx.sparks(player.pos.clone().add(V(0, 0.5, 0)), 0x60e8ff, 10, 3); sfx.boost();
+      } else { player.vel.y = JUMP; player.longJump = false; sfx.jump(); }
+      fx.puff(player.pos.clone().add(V(0, 0.1, 0)));
+    } else if (player.jumps < 2) {
+      player.jumpBuf = 0; player.vel.y = BOOST; player.jumps = 2; player.jetT = 0.35; player.jumpCut = true; player.longJump = false;
+      fx.sparks(player.pos.clone().add(V(0, 0.6, 0)), 0x60e8ff, 12, 3); sfx.boost();
+    }
   }
-  input.jumpPressed = false;
+  // let go of jump early for a short hop
+  player.jumpAge += dt;
+  if (!jumpHeld && !player.jumpCut && player.jumpAge > 0.09 && !player.grounded && player.vel.y > 0 && player.jumps === 1 && !player.longJump) { player.vel.y *= 0.55; player.jumpCut = true; }
   player.jetT -= dt;
   // holding jump while falling glides a little
-  const gliding = !player.grounded && player.vel.y < 0 && (keys.has('Space') || p?.held(p.BTN.A) || input.jumpHeld) && player.jumps === 2;
-  player.vel.y -= GRAV * dt * (gliding ? 0.35 : 1);
+  const gliding = !player.grounded && player.vel.y < 0 && jumpHeld && player.jumps === 2;
+  // a floatier top of the jump arc, faster fall afterwards
+  const g = gliding ? 0.35 : Math.abs(player.vel.y) < 2.5 ? 0.7 : player.vel.y < 0 ? 1.25 : 1;
+  player.vel.y -= GRAV * dt * g;
   if (gliding) player.vel.y = Math.max(player.vel.y, -3);
+  player.vel.y = Math.max(player.vel.y, -30);
 
   // integrate and collide
   const pp = player.pos;
@@ -517,8 +593,9 @@ function updatePlayer(dt, p) {
   pp.y += player.vel.y * dt;
   const f = floorAt(pp);
   if (pp.y <= f) {
-    if (!player.grounded && player.vel.y < -6) { fx.puff(pp.clone().add(V(0, 0.05, 0))); sfx.land(); }
-    pp.y = f; player.vel.y = 0; player.grounded = true; player.jumps = 0; player.coyote = 0.1; player.groundY = f;
+    if (!player.grounded && player.vel.y < -6) { fx.puff(pp.clone().add(V(0, 0.05, 0))); sfx.land(); player.landT = clamp(-player.vel.y / 20, 0.3, 1); }
+    if (!player.grounded) player.longJump = false;
+    pp.y = f; player.vel.y = 0; player.grounded = true; player.jumps = 0; player.coyote = 0.12; player.groundY = f;
   } else if (player.grounded && pp.y > f) {
     player.grounded = false; player.jumps = 1; // walked off a ledge
   }
@@ -532,16 +609,29 @@ function updatePlayer(dt, p) {
 // ---------- camera + aim ----------
 const camPivot = V(0, 0, 0), aimDir = V(0, 0, 1), aimPoint = V(0, 0, 0);
 const camRay = new THREE.Ray(), camBox = new THREE.Box3(), camHit = V(0, 0, 0), aimRay = new THREE.Ray(), aimBox = new THREE.Box3(), aimHit = V(0, 0, 0);
-let camSmooth = 4.0;
+let camSmooth = 4.0, camY = 0, shoulder = 0.95, fovKick = 0, hitStop = 0;
 let shake = 0;
 function updateCamera(dt) {
+  // controller and touch players: while running and not steering the view, the camera slowly swings in behind
+  if (state === 'playing' && (touch || pad.state.active) && player.lookIdle > 0.7 && player.aimHold <= 0 && !rails.riding) {
+    const hs = Math.hypot(player.vel.x, player.vel.z);
+    if (hs > 3) player.yaw += angleDiff(player.yaw, Math.atan2(player.vel.x, player.vel.z)) * (1 - Math.exp(-0.9 * dt)) * Math.min(1, (hs - 3) / 4);
+  }
   const cp = Math.cos(player.pitch);
   aimDir.set(Math.sin(player.yaw) * cp, Math.sin(player.pitch), Math.cos(player.yaw) * cp);
   const right = V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));
   // over the left shoulder, on the side the blaster is held
-  const target = player.pos.clone().add(V(0, 1.55, 0)).addScaledVector(right, -0.95);
-  camPivot.lerp(target, 1 - Math.exp(-18 * dt));
-  const dist = 4.0 - Math.max(0, player.pitch) * 2.2; // pull in when looking up so the camera stays off the floor
+  shoulder = damp(shoulder, player.aimHold > 0 ? 0.95 : 0.6, 5, dt);
+  // follow height smoothly: jumps don't yank the view, but falls and big drops are tracked
+  const footY = player.grounded || rails.riding ? player.pos.y : Math.min(Math.max(camY, player.pos.y - 1.5), player.pos.y);
+  camY = damp(camY, footY, player.grounded || rails.riding ? 10 : player.pos.y < camY ? 12 : 3, dt);
+  const target = V(player.pos.x, camY + 1.55, player.pos.z).addScaledVector(right, -shoulder);
+  // a little lag sideways and forwards makes motion read better
+  camPivot.x = damp(camPivot.x, target.x, 13, dt); camPivot.z = damp(camPivot.z, target.z, 13, dt); camPivot.y = damp(camPivot.y, target.y, 16, dt);
+  const speedFov = clamp((Math.hypot(player.vel.x, player.vel.z) - 9) / 8, 0, 1) * 7;
+  fovKick = damp(fovKick, speedFov, 4, dt);
+  const fov = 55 + fovKick; if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  const dist = 4.3 - Math.max(0, player.pitch) * 2.4; // pull in when looking up so the camera stays off the floor
   // pull the camera in front of any crate or wall that would block the view
   let camDist = dist;
   camRay.set(camPivot, aimDir.clone().negate());
@@ -601,8 +691,8 @@ function updatePickups(dt) {
     const p = pickups[i]; p.t += dt;
     const d = p.m.position.distanceTo(target);
     // nuts home in when close, or from anywhere once they have settled; cells and ammo need you to walk close
-    if (p.t > 0.5 && (d < (p.kind === 'nut' ? 7 : 2.5) || (p.kind === 'nut' && p.t > 2.2)) && state === 'playing') {
-      p.vel.lerp(target.clone().sub(p.m.position).normalize().multiplyScalar(16), 1 - Math.exp(-8 * dt));
+    if (p.t > 0.5 && (d < (p.kind === 'nut' ? 10 : 3) || (p.kind === 'nut' && p.t > 2.2)) && state === 'playing') {
+      p.vel.lerp(target.clone().sub(p.m.position).normalize().multiplyScalar(Math.max(14, 30 - d * 1.5)), 1 - Math.exp(-10 * dt));
     } else p.vel.y -= 20 * dt;
     p.m.position.addScaledVector(p.vel, dt);
     const fl = floorAt(p.m.position) + 0.12;
@@ -645,8 +735,10 @@ const ctx = {
     dropNuts(e.pos.clone().add(V(0, 0.6, 0)), e.nuts);
     if (Math.random() < (player.hull <= 3 ? 0.35 : 0.12)) dropItem('cell', e.pos.clone().add(V(0, 0.8, 0)));
     else if (mode === 'waves' && Math.random() < 0.3) dropItem('ammo', e.pos.clone().add(V(0, 0.8, 0)));
-    arsenal.addXp(lastWid, e.type === 'hornet' ? 40 : 20);
-    shake = Math.max(shake, 0.5);
+    if (lastWid !== 'melee') arsenal.addXp(lastWid, e.type === 'hornet' ? 40 : 20);
+    const kd = e.pos.distanceTo(player.pos);
+    shake = Math.max(shake, kd < 20 ? 0.75 - kd * 0.02 : 0.3);
+    hitStop = Math.max(hitStop, 0.045);
   },
 };
 
@@ -674,7 +766,8 @@ function readPad(dt) {
     if (p.pressed(B.A)) input.jumpPressed = true;
     if (p.pressed(B.B) || p.pressed(B.LT)) input.dashPressed = true;
     if (p.pressed(B.START) || p.pressed(B.SELECT)) pause();
-    if (p.pressed(B.RB) || p.pressed(B.Y) || p.pressed(B.X)) cycleWeapon(1);
+    if (p.pressed(B.X)) input.meleePressed = true;
+    if (p.pressed(B.RB) || p.pressed(B.Y)) cycleWeapon(1);
     [B.UP, B.RIGHT, B.DOWN, B.LEFT].forEach((b, i) => { if (p.pressed(b)) selectWeapon(i); });
     if (p.held(B.LB)) {
       if (!padWheel) { padWheel = true; openWheel(); }
@@ -689,7 +782,9 @@ function readPad(dt) {
 function frame(dtRaw, render = true) {
   const p = readPad(Math.min(dtRaw, 0.1));
   timeScale = damp(timeScale, wheel.open ? 0.25 : 1, 12, Math.min(dtRaw, 0.1));
-  const dt = Math.min(dtRaw, 1 / 30) * timeScale;
+  // hit-stop: the game freezes for a few hundredths of a second when something big lands
+  const stopped = hitStop > 0; hitStop = Math.max(0, hitStop - Math.min(dtRaw, 0.1));
+  const dt = Math.min(dtRaw, 1 / 30) * timeScale * (stopped ? 0.06 : 1);
   simTime += dt;
   const playing = state === 'playing';
   if (playing) {
@@ -697,13 +792,15 @@ function frame(dtRaw, render = true) {
     updateWaves(dt); updateCalls(dt);
     if (mode === 'story') story.update(dt);
   } else {
-    input.jumpPressed = input.dashPressed = false; input.look.dx = input.look.dy = 0;
+    input.jumpPressed = input.dashPressed = input.meleePressed = false; input.look.dx = input.look.dy = 0;
     if (state === 'title') player.yaw += dt * 0.08; // slow orbit behind the title card
   }
   const onTarget = updateCamera(dt);
   if (state !== 'paused') {
     const wantFire = !wheel.open && (input.fire || (p && p.fire) || (touch && settings.autoFire && onTarget));
     if (arsenal.update(dt, { wantFire, aimPoint, aimDir, canFire: playing })) stats.shots++;
+    player.aimHold = wantFire && playing ? 0.9 : player.aimHold - dt;
+    player.landT = Math.max(0, player.landT - dt * 4);
     enemies.update(dt, ctx);
     boss.update(dt, bossCtx);
     dodger.update(dt);
@@ -715,17 +812,25 @@ function frame(dtRaw, render = true) {
 
   // hero pose: turn the body so the shouldered blaster lines up with whatever is under the crosshair
   hero.root.position.copy(player.pos);
+  // shooting: turn so the shouldered blaster lines up with the crosshair (strafing). Otherwise face where you run.
   const ad = aimPoint.clone().sub(player.pos), aDist = Math.hypot(ad.x, ad.z);
-  const targetYaw = player.hull > 0 && aDist > 0.8 ? Math.atan2(ad.x, ad.z) - Math.asin(clamp(hero.gunSide / aDist, -0.6, 0.6)) : player.yaw;
-  const gunPitch = Math.atan2(aimPoint.y - (player.pos.y + 1.2), Math.max(aDist, 0.5));
-  hero.root.rotation.y += angleDiff(hero.root.rotation.y, targetYaw) * (1 - Math.exp(-20 * dt));
+  const aiming = player.aimHold > 0 || player.hull <= 0;
+  const hsp = Math.hypot(player.vel.x, player.vel.z);
+  let targetYaw = player.faceYaw;
+  if (aiming) targetYaw = aDist > 0.8 ? Math.atan2(ad.x, ad.z) - Math.asin(clamp(hero.gunSide / aDist, -0.6, 0.6)) : player.yaw;
+  else if (hsp > 0.8) targetYaw = Math.atan2(player.vel.x, player.vel.z);
+  const gunPitch = aiming ? Math.atan2(aimPoint.y - (player.pos.y + 1.2), Math.max(aDist, 0.5)) : -0.45;
+  const prevFace = player.faceYaw;
+  player.faceYaw += angleDiff(player.faceYaw, targetYaw) * (1 - Math.exp(-(aiming ? 20 : 13) * dt));
+  player.turnRate = damp(player.turnRate, dt > 0 ? angleDiff(prevFace, player.faceYaw) / dt : 0, 10, dt);
+  hero.root.rotation.y = player.faceYaw;
   hero.root.visible = !(player.invuln > 0 && player.hull > 0 && Math.floor(simTime * 20) % 2 === 0 && player.dashT <= 0);
   if (player.hull <= 0) { hero.root.rotation.x = damp(hero.root.rotation.x, -1.4, 4, dt); }
   else hero.root.rotation.x = 0;
   const w = arsenal.current;
   hero.animate(dt, {
     speed: rails.riding ? 0 : Math.hypot(player.vel.x, player.vel.z), grounded: player.grounded, vy: player.vel.y,
-    aimPitch: gunPitch, heat: w.hot, jetting: player.jetT > 0 || (!player.grounded && player.jumps === 2 && player.vel.y > -3),
+    aimPitch: gunPitch, heat: w.hot, turn: aiming ? 0 : player.turnRate, landT: player.landT, aiming, dash: player.dashT > 0 || player.longJump, jetting: player.jetT > 0 || (!player.grounded && player.jumps === 2 && player.vel.y > -3),
   });
 
   world.update(dt, player.pos);
