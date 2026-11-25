@@ -24,7 +24,7 @@
  ["dock_clear_3","dodger","[whispering] We are a little bit shopping."],
  ["terrace_intro","dodger","Terraces ahead. Hop the gaps, and try not to fall off the sky this time."],
  ["swing_hint","dodger","See those rings? Grab one with your hook and swing. Like a monkey. A grumpy monkey."],
- ["cargo_intro","dodger","Cargo docks. Lots of boxes. Some of them have hex nuts in them. Smash responsibly."],
+ ["cargo_intro","dodger","Cargo docks. Lots of boxes. Some of them have sprockets in them. Smash responsibly."],
  ["cargo_clear_1","dodger","The signal is stronger up on that tower. Rail's open."],
  ["cargo_clear_2","vesk","[deadpan] Of course it's up."],
  ["mast_intro","dodger","There! A relay dish on top of the mast. That thing is boosting the signal. Scrap it!"],
@@ -55,6 +55,56 @@
  ["outro_12","dodger","Road trip!"],
  ["outro_13","narrator","[warmly] And so, very much against his will, Vesk's adventure had only just begun."]
 ],
+"skyharbor": [
+ ["sky_junk_found_1","dodger","Vesk! Up here! I'm fine. My rotor is not fine. My rotor is a pretzel."],
+ ["sky_junk_found_2","vesk","[flatly] You flew into the scrap pile again."],
+ ["sky_junk_found_3","dodger","The scrap pile flew into ME. Also, bots incoming. Use the wrench!"],
+ ["sky_junk_bots_1","dodger","They're taking apart your fence! Wrench them, wrench them!"],
+ ["sky_junk_bots_2","vesk","[grumbling] Nobody touches the fence."],
+ ["sky_junk_clear_1","dodger","Yard's clear! Now whack my launch crank. Gently. Okay, not gently. It's stuck."],
+ ["sky_dodger_up_1","dodger","[whooshing] I'm up! I'm up! Flight systems: six out of ten. Rattly."],
+ ["sky_dodger_up_2","vesk","Gate's open. Let's find whoever is broadcasting and tell them to stop."],
+ ["sky_dodger_up_3","dodger","The Dock Plaza is across the pads. Hop, hop, don't fall."],
+ ["sky_plaza_turbines_1","dodger","The dock turbines are dead. No wind, no cargo lift. The docks are east."],
+ ["sky_docks_clear_1","dodger","The rail to the far piers is live! Jump on and grind."],
+ ["sky_docks_clear_2","vesk","Three turbines. Restart them and the lift runs again."],
+ ["sky_turbines_1","dodger","Turbine switches! Give each one a good whack. Your favorite repair method."],
+ ["sky_turbines_done_1","dodger","All three spinning! The cargo lift has power. That's our ride home."],
+ ["sky_turbines_done_2","vesk","[quietly] The turbine crew walked off mid-shift. Same minute as the toaster. Same signal."],
+ ["sky_turbines_done_3","dodger","Every bot heard it. So, the Signal Mast. Climb the Terrace, west of the plaza."],
+ ["sky_terrace_jump_1","dodger","Those ledges are too high for you, old man. Jump, then jump again with the jetpack."],
+ ["sky_terrace_clear_1","dodger","Nice. Big gap ahead. Double jump, then hold it to glide. Like a very grumpy kite."],
+ ["sky_gardens_clear_1","dodger","Gardens clear! The promenade leads to the mast. And that bounce pad is the express to the plaza."],
+ ["sky_mast_climb_1","dodger","We're on the mast! The dish is way up top. Climb the ledges."],
+ ["sky_mast_climb_2","vesk","[sighs] Every time. Always up."],
+ ["sky_mast_dish_1","dodger","There's the relay dish. It's pointed at nothing. Turn the cranks and line it up!"],
+ ["sky_mast_dish_2","vesk","Aim it right and we'll hear where the signal comes from."],
+ ["sky_shard_1","dodger","Dish aligned! Picking up the broadcast. There's something hidden in it."],
+ ["sky_shard_2","dodger","[glitchy, distracted] Inspection log... uh. Sorry. Static. It's a string of numbers. A piece of a code."],
+ ["sky_shard_3","vesk","Your eye just went orange."],
+ ["sky_shard_4","dodger","Did it? Huh. Seven out of ten, good look. Anyway, the rail to the Crane Yard is open."],
+ ["sky_shard_5","vesk","One shard of a code. Nana Quill can read it. After the crane."],
+ ["sky_yard_gate_1","dodger","The Crane Yard gate. Work crews, lined up in threes. Very organized. Very rude."],
+ ["sky_yard_gate_clear_1","dodger","And look, another Gizmart. He gets everywhere."],
+ ["sky_yard_gate_clear_2","vesk","Stock up. Something big is moving in there."]
+],
+"cutscene": [
+ ["sky_intro_coffee_1","dodger","[confused] Uh, Vesk? Did your coffee maker just punch a time card?"],
+ ["sky_intro_coffee_2","vesk","[flatly] No. I'm retired. The coffee maker is retired."],
+ ["sky_intro_coffee_3","dodger","[nervous] It's wearing a tiny hard hat."],
+ ["sky_intro_crash_1","dodger","[zooming away] Follow me! I know a shortcut over the scrap pi- [crash] Ow!"],
+ ["sky_junk_hop_1","dodger","Hop the junk wall! Tap jump. Hold it to go higher."],
+ ["sky_outro_grudd_1","grudd","[booming, crackly radio] Attention, all units! Shift starts NOW. Hard hats on!"],
+ ["sky_outro_eye_1","vesk","[quietly] Dodger. Your eye's doing the orange thing again."],
+ ["sky_outro_eye_2","dodger","[glitchy] Shift start... logged. Uh. Static! Just static. Rude static."],
+ ["sky_outro_nana_1","nana","[crackly radio, warm] Hello? Hello, dear? Is this the fellow from the junkyard with the chatty drone?"],
+ ["sky_outro_nana_2","vesk","[wary] Who's asking?"],
+ ["sky_outro_nana_3","nana","Nana Quill. Codebreaker, retired. I've been listening to that broadcast, and your little shard is a set of coordinates."],
+ ["sky_outro_nana_4","nana","A desert mining canyon called Dustvein Gulch. I'm sending them to your ship now. Wear a hat, dear. It's sunny."],
+ ["sky_outro_nana_5","vesk","How did you get this frequency?"],
+ ["sky_outro_nana_6","nana","[chuckles] Oh, I hear everything, dear."],
+ ["sky_outro_liftoff_1","dodger","[rattling] Liftoff: six out of ten. You forgot the handbrake."]
+],
 "dodger": {
  "spawn": ["Hey, bolt-brains! Over here! No, the other over here!", "Incoming bots. Try to look busy.", "More of them? Somebody's factory is working overtime.", "Rust buckets at twelve o'clock. Also two, four and nine.", "Bots inbound. I'll supervise.", "Oh good, a crowd. I love an audience."],
  "taunt": ["You call that rolling? My grandma had better bearings!", "Nice paint job. Did a toaster pick it?", "Beep boop, you're scrap.", "I've seen scarier vending machines. Actually, I know one."],
@@ -66,7 +116,7 @@
  "far": ["Long shot! Lucky.", "Sniped it. Okay, that was good."],
  "multi": ["Two for one! Thrifty.", "Group discount!"],
  "combo": ["Combo! Keep it going!", "Look at you go!", "Chain them, chain them!"],
- "comboEnd": ["Combo over. It was beautiful while it lasted.", "And the streak ends. Bonus nuts, though."],
+ "comboEnd": ["Combo over. It was beautiful while it lasted.", "And the streak ends. Bonus sprockets, though."],
  "rate": ["Wow. A shot. Three out of ten.", "Five out of ten. Points for effort.", "Solid. Six out of ten.", "Seven out of ten. Not bad, old man.", "Okay, that was an eight. Don't let it go to your head.", "Nine out of ten! I'm telling everyone!", "[shouting] TEN OUT OF TEN! Okay, nine. No, ten!"]
 },
 "vesk": {
@@ -77,8 +127,8 @@
 },
 "gizmart": {
  "hello": ["Welcome, welcome, valued customer! Gizmart has everything a hero needs!", "[cheerful] Ding ding! A shopper! Step right up!", "Back again? I knew you couldn't resist my selection!"],
- "buy": ["[delighted] Sold! Excellent choice! No refunds!", "Cha-ching! Pleasure doing business!", "A fine purchase! Your nuts are safe with me. Forever."],
- "poor": ["[sympathetic] Ooh, not enough nuts. Go smash some bots and come back!", "Sorry, friend. Gizmart does not do credit."],
- "bye": ["Come back soon, and bring nuts!", "Thank you for shopping at Gizmart! Have a haywire-free day!"]
+ "buy": ["[delighted] Sold! Excellent choice! No refunds!", "Cha-ching! Pleasure doing business!", "A fine purchase! Your sprockets are safe with me. Forever."],
+ "poor": ["[sympathetic] Ooh, not enough sprockets. Go smash some bots and come back!", "Sorry, friend. Gizmart does not do credit."],
+ "bye": ["Come back soon, and bring sprockets!", "Thank you for shopping at Gizmart! Have a haywire-free day!"]
 }
 }

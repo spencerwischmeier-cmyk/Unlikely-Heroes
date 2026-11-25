@@ -1,0 +1,17 @@
+[
+ ["sky_intro_coffee_1", "dodger", "[confused] Uh, Vesk? Did your coffee maker just punch a time card?"],
+ ["sky_intro_coffee_2", "vesk", "[flatly] No. I'm retired. The coffee maker is retired."],
+ ["sky_intro_coffee_3", "dodger", "[nervous] It's wearing a tiny hard hat."],
+ ["sky_intro_crash_1", "dodger", "[zooming away] Follow me! I know a shortcut over the scrap pi- [crash] Ow!"],
+ ["sky_junk_hop_1", "dodger", "Hop the junk wall! Tap jump. Hold it to go higher."],
+ ["sky_outro_grudd_1", "grudd", "[booming, crackly radio] Attention, all units! Shift starts NOW. Hard hats on!"],
+ ["sky_outro_eye_1", "vesk", "[quietly] Dodger. Your eye's doing the orange thing again."],
+ ["sky_outro_eye_2", "dodger", "[glitchy] Shift start... logged. Uh. Static! Just static. Rude static."],
+ ["sky_outro_nana_1", "nana", "[crackly radio, warm] Hello? Hello, dear? Is this the fellow from the junkyard with the chatty drone?"],
+ ["sky_outro_nana_2", "vesk", "[wary] Who's asking?"],
+ ["sky_outro_nana_3", "nana", "Nana Quill. Codebreaker, retired. I've been listening to that broadcast, and your little shard is a set of coordinates."],
+ ["sky_outro_nana_4", "nana", "A desert mining canyon called Dustvein Gulch. I'm sending them to your ship now. Wear a hat, dear. It's sunny."],
+ ["sky_outro_nana_5", "vesk", "How did you get this frequency?"],
+ ["sky_outro_nana_6", "nana", "[chuckles] Oh, I hear everything, dear."],
+ ["sky_outro_liftoff_1", "dodger", "[rattling] Liftoff: six out of ten. You forgot the handbrake."]
+]
