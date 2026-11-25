@@ -23,6 +23,7 @@ import { createGamepad } from './gamepad.js';
 import { settings } from './settings.js';
 import { sfx, music, audioState } from './audio.js';
 import { createRails } from './rails.js';
+import { createTraverse } from './traverse.js';
 import { createGizmart, SHOP, GIZ_LINES } from './gizmart.js';
 import { createDodger } from './dodger.js';
 import { createCraneBot } from './cranebot.js';
@@ -62,6 +63,7 @@ const enemies = createEnemies(scene, fx, models);
 const range = createRange(world.arenaG, fx);
 const sky1 = world.levels.skyharbor.data;
 const rails = createRails(world.skyG, sky1.rails);
+const trav = createTraverse(world.skyG, sky1, { colliders: world.colliders, fx, sfx });
 const gizmarts = sky1.gizmarts.map(g => createGizmart(world.skyG, g.pos, g.yaw));
 const boss = createCraneBot(scene, fx);
 const extraTargets = []; // story targets: the signal relay and the boss
@@ -115,6 +117,7 @@ const liveTargets = () => {
   for (const e of enemies.list) if (!e.dead) out.push(e);
   if (mode !== 'story') for (const t of range.targets) if (!t.dead) out.push(t);
   for (const t of extraTargets) if (!t.dead) out.push(t);
+  if (mode === 'story') for (const c of trav.crates) if (!c.dead) out.push(c);
   return out;
 };
 const hits = {
@@ -136,6 +139,7 @@ const hits = {
     for (const t of liveTargets()) {
       const d = centerOf(t).sub(camPivot); const dist = d.length(); if (dist > 55) continue;
       const a = d.normalize().angleTo(dir); if (a > 0.36) continue;
+      if (t.type === 'crate') continue;
       const s = a + dist * 0.002 + (t.type === 'dummy' ? 0.2 : 0);
       if (s < score) { score = s; best = t; }
     }
@@ -147,6 +151,7 @@ function deal(t, amount, point, wid) {
   lastWid = wid;
   stats.hits++;
   let kill;
+  if (t.type === 'crate') { trav.smash(t, dropNuts); return; }
   if (t.type === 'dummy') kill = range.damage(t, amount);
   else if (t.type === 'relay') kill = story.damageRelay(amount);
   else if (t.type === 'boss') kill = boss.damage(amount);
@@ -204,7 +209,8 @@ const story = createStory({
   hurtHero: (n, from, force) => ctx.hurtHero(n, from, force),
   heal: n => { player.hull = Math.min(MAX_HULL, player.hull + n); hud.hull(player.hull, true); },
   dropNuts: (p, n) => dropNuts(p, n), shake: n => { shake = Math.max(shake, n); },
-  openShop, onComplete: storyComplete,
+  openShop, onComplete: storyComplete, checkpoints: sky1.checkpoints,
+  onFall: () => { trav.swing.hook = null; trav.stepSwing(0, player.pos, player.vel, true); player.longJump = false; },
 });
 function startStory() {
   state = 'comic'; menu.hide(); music.start(); music.intensity = 0.3;
@@ -268,6 +274,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Space') { input.jumpPressed = true; e.preventDefault(); }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.dashPressed = true;
   if (e.code === 'KeyF' || e.code === 'KeyV') input.meleePressed = true;
+  if (e.code === 'KeyE') input.hookPressed = true;
   if (e.code === 'KeyQ' || e.code === 'Tab') { openWheel(); e.preventDefault(); }
   if (/^Digit[1-4]$/.test(e.code)) selectWeapon(+e.code.slice(5) - 1);
   if (e.code === 'KeyP' || (e.code === 'Escape' && !document.pointerLockElement)) pause();
@@ -318,7 +325,7 @@ const touch = TOUCH ? createTouch({
 
 function reset() {
   world.setLevel(mode === 'story' ? 'skyharbor' : 'arena');
-  if (mode === 'story') world.colliders.push(boss.collider);
+  if (mode === 'story') { world.colliders.push(boss.collider); trav.reset(); trav.addColliders(); }
   enemies.clear(); arsenal.reset(); rails.detach(0); boss.hide(); extraTargets.length = 0; hud.boss(null); dodger.reset(); callQueue.length = 0;
   arsenal.state.forEach((w, i) => { w.owned = mode !== 'story' || i === 0; });
   pickups.forEach(p => scene.remove(p.m)); pickups.length = 0;
@@ -419,6 +426,8 @@ function updateCalls(dt) {
 }
 
 // ---------- hero physics ----------
+let hookTarget = null, promptOn = false;
+const promptEl = document.createElement('div'); promptEl.id = 'prompt'; document.body.append(promptEl);
 const GRAV = 28, RUN = 8.4, JUMP = 9.4, BOOST = 8.2, RADIUS = 0.38, LONG_SPEED = 15.5, LONG_UP = 8;
 function floorAt(p) {
   let f = onDeck(p.x, p.z, 0.15) ? 0 : -Infinity; // open sky between Skyharbor's islands
@@ -443,6 +452,7 @@ function updatePlayer(dt, p) {
   if (assisted) {
     let best = null, bestA = 0.16;
     for (const t of liveTargets()) {
+      if (t.type === 'crate') continue;
       const d = centerOf(t).sub(camPivot);
       const a = d.clone().normalize().angleTo(aimDir);
       if (a < bestA && d.length() < 35) { bestA = a; best = d; }
@@ -467,6 +477,23 @@ function updatePlayer(dt, p) {
   const fwd = V(Math.sin(player.yaw), 0, Math.cos(player.yaw));
   const right = V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));
   const wish = fwd.multiplyScalar(mz).addScaledVector(right, mx).multiplyScalar(RUN);
+
+  // Skyharbor traversal: moving platforms carry you, bounce pads launch you, swing hooks swing you
+  if (mode === 'story') {
+    const tr = trav.update(dt, { pos: player.pos, grounded: player.grounded, lookDir: aimDir });
+    if (tr.carry) player.pos.add(tr.carry);
+    if (tr.bounce && !trav.swinging) { player.vel.y = tr.bounce; player.grounded = false; player.jumps = 1; player.jumpCut = true; player.longJump = false; player.coyote = 0; }
+    hookTarget = tr.hook;
+    if (input.hookPressed && tr.hook && !trav.swinging) { rails.detach(); trav.startSwing(tr.hook, player.pos); player.grounded = false; }
+    input.hookPressed = false;
+    if (trav.swinging) {
+      const r = trav.stepSwing(dt, player.pos, player.vel, input.jumpPressed);
+      input.jumpPressed = input.dashPressed = false;
+      player.grounded = false; player.jumps = 1; player.jumpCut = true;
+      if (r === 'release') { player.longJump = true; sfx.jump(); }
+      else return;
+    }
+  } else { hookTarget = null; input.hookPressed = false; }
 
   // riding a grind rail: the rail moves you; jump hops off with the rail's momentum
   if (rails.riding) {
@@ -767,7 +794,8 @@ function readPad(dt) {
     if (p.pressed(B.B) || p.pressed(B.LT)) input.dashPressed = true;
     if (p.pressed(B.START) || p.pressed(B.SELECT)) pause();
     if (p.pressed(B.X)) input.meleePressed = true;
-    if (p.pressed(B.RB) || p.pressed(B.Y)) cycleWeapon(1);
+    if (p.pressed(B.Y)) input.hookPressed = true;
+    if (p.pressed(B.RB)) cycleWeapon(1);
     [B.UP, B.RIGHT, B.DOWN, B.LEFT].forEach((b, i) => { if (p.pressed(b)) selectWeapon(i); });
     if (p.held(B.LB)) {
       if (!padWheel) { padWheel = true; openWheel(); }
@@ -792,7 +820,7 @@ function frame(dtRaw, render = true) {
     updateWaves(dt); updateCalls(dt);
     if (mode === 'story') story.update(dt);
   } else {
-    input.jumpPressed = input.dashPressed = input.meleePressed = false; input.look.dx = input.look.dy = 0;
+    input.jumpPressed = input.dashPressed = input.meleePressed = input.hookPressed = false; input.look.dx = input.look.dy = 0;
     if (state === 'title') player.yaw += dt * 0.08; // slow orbit behind the title card
   }
   const onTarget = updateCamera(dt);
@@ -806,7 +834,7 @@ function frame(dtRaw, render = true) {
     dodger.update(dt);
     range.update(dt, { heroPos: player.pos, active: mode === 'range' && playing, onCall: callBots });
     updatePickups(dt);
-    drone.update(dt, player.pos, player.yaw, liveTargets().filter(t => t.type !== 'dummy'), e => { deal(e, 0.75, centerOf(e), arsenal.current.id); fx.sparks(centerOf(e), 0x8ffcff, 6, 3); sfx.zap(); });
+    drone.update(dt, player.pos, player.yaw, liveTargets().filter(t => t.type !== 'dummy' && t.type !== 'crate'), e => { deal(e, 0.75, centerOf(e), arsenal.current.id); fx.sparks(centerOf(e), 0x8ffcff, 6, 3); sfx.zap(); });
     fx.update(dt);
   }
 
@@ -842,6 +870,10 @@ function frame(dtRaw, render = true) {
     leftText: mode === 'story' ? story.goal : mode === 'range' ? (out ? `${out} bot${out === 1 ? '' : 's'} out` : '') : stats.wave && waveState.clearT < 0 ? `${left} bot${left === 1 ? '' : 's'} left` : '',
   });
   if (wheel.open) wheel.refresh(arsenal.state, arsenal.index);
+  // "swing" prompt when a hook is in reach
+  const showHook = playing && !!hookTarget && !trav.swinging;
+  if (showHook !== promptOn) { promptOn = showHook; promptEl.classList.toggle('on', showHook); touch?.setHook(showHook); }
+  if (showHook) promptEl.innerHTML = pad.state.active ? '<b>Y</b>SWING' : '<b>E</b>SWING';
   if (touch) { touch.setDash(Math.max(0, player.dashCd) / 0.75); touch.setWeapon(ICONS[w.id], w.color); }
   if (render) composer.render();
 }

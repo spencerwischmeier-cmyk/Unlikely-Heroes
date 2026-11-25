@@ -6,6 +6,7 @@ import { settings, onSettings } from './settings.js';
 const ICON = {
   fire: '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M20 3v9M20 28v9M3 20h9M28 20h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
   jump: '<svg viewBox="0 0 40 40"><path d="M20 8l11 12h-7v11h-8V20H9z" fill="currentColor"/></svg>',
+  hook: '<svg viewBox="0 0 40 40"><circle cx="20" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="3.5"/><path d="M20 19v8a6 6 0 0 1-12 0" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>',
   melee: '<svg viewBox="0 0 40 40"><path d="M8 30C12 14 22 8 34 8" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M6 24c4-2 8-2 10 2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
   dash: '<svg viewBox="0 0 40 40"><path d="M6 12h14M3 20h17M6 28h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M22 9l13 11-13 11z" fill="currentColor"/></svg>',
 };
@@ -21,6 +22,7 @@ export function createTouch({ input, isPlaying, onPause, onWheelOpen, onWheelDra
     <button class="tbtn fire" id="tFire">${ICON.fire}<span>FIRE</span></button>
     <button class="tbtn jump" id="tJump">${ICON.jump}<span>JUMP</span></button>
     <button class="tbtn dash" id="tDash"><i class="cd" id="tDashCd"></i>${ICON.dash}<span>DASH</span></button>
+    <button class="tbtn hook off" id="tHook">${ICON.hook}<span>SWING</span></button>
     <button class="tbtn melee" id="tMelee">${ICON.melee}<span>BASH</span></button>
     <button class="tbtn wsel" id="tWpn"><svg viewBox="0 0 60 60" id="tWpnIcon"></svg></button>
     <button class="tpause" id="tPause" aria-label="Pause">&#10074;&#10074;</button>`;
@@ -65,6 +67,7 @@ export function createTouch({ input, isPlaying, onPause, onWheelOpen, onWheelDra
   press($('tJump'), () => { input.jumpPressed = true; input.jumpHeld = true; }, () => { input.jumpHeld = false; });
   press($('tDash'), () => { input.dashPressed = true; });
   press($('tMelee'), () => { input.meleePressed = true; });
+  press($('tHook'), () => { input.hookPressed = true; });
   press($('tWpn'), t => { if (!isPlaying()) return; wheelId = t.identifier; wx = t.clientX; wy = t.clientY; onWheelOpen(); },
     t => { if (t.identifier === wheelId) { wheelId = null; onWheelRelease(Math.hypot(t.clientX - wx, t.clientY - wy) > 40); } });
   $('tPause').addEventListener('touchstart', e => { e.preventDefault(); if (isPlaying()) onPause(); }, { passive: false });
@@ -104,6 +107,7 @@ export function createTouch({ input, isPlaying, onPause, onWheelOpen, onWheelDra
   return {
     show(on) { root.classList.toggle('on', on); },
     reset() { moveId = null; fireId = null; wheelId = null; lookIds.clear(); input.touchMove.x = input.touchMove.z = 0; input.fire = false; input.jumpHeld = false; restStick(); },
+    setHook(on) { $('tHook').classList.toggle('off', !on); },
     setDash(frac) { $('tDashCd').style.setProperty('--p', `${Math.round(frac * 100)}%`); $('tDash').classList.toggle('cool', frac > 0); },
     setWeapon(iconSvg, color) { const ic = $('tWpnIcon'); if (ic.dataset.k !== iconSvg) { ic.innerHTML = iconSvg; ic.dataset.k = iconSvg; } $('tWpn').style.setProperty('--c', color); },
     get fireHeld() { return fireId !== null; },

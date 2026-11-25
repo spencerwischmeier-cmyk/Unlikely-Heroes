@@ -107,7 +107,7 @@ export function createHud({ maxHull, weapons }) {
         const c = v.copy(t.pos); if (t.type === 'roller') c.y += 1.35; else c.y += t.type === 'dummy' ? 0.85 : 1.1;
         c.project(camera);
         const onScreen = c.z < 1 && Math.abs(c.x) < 1 && Math.abs(c.y) < 1;
-        if (!onScreen && t.type !== 'dummy' && t.type !== 'relay' && ai < arrows.length) {
+        if (!onScreen && t.type !== 'dummy' && t.type !== 'relay' && t.type !== 'crate' && ai < arrows.length) {
           // point from the screen centre toward the bot, pinned to an ellipse inside the screen edge
           let x = c.x, y = c.y; if (c.z > 1) { x = -x; y = -y; }
           const a = Math.atan2(y, x);

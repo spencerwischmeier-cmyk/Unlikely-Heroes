@@ -140,6 +140,13 @@ body.pad #touch{display:none}
 .tbtn.jump{--s:76px;right:calc((24px + 112px * var(--bs) + 16px) + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom))}
 .tbtn.dash{--s:66px;right:calc(30px + env(safe-area-inset-right));bottom:calc((28px + 112px * var(--bs) + 18px) + env(safe-area-inset-bottom));overflow:hidden}
 .tbtn.melee{--s:62px;right:calc((24px + 112px * var(--bs) + 16px + 76px * var(--bs) + 14px) + env(safe-area-inset-right));bottom:calc(18px + env(safe-area-inset-bottom));border-color:#ffd27a;color:#ffe7b0}
+.tbtn.hook{--s:84px;right:calc(30px + env(safe-area-inset-right));bottom:calc((28px + 112px * var(--bs) + 18px + 66px * var(--bs) + 16px) + env(safe-area-inset-bottom));border-color:#ffd060;color:#ffe7a0;background:radial-gradient(#ffd06055,#4a3a0d66);animation:hookPulse .6s ease-in-out infinite alternate}
+.tbtn.hook.off{display:none}
+@keyframes hookPulse{to{box-shadow:0 0 22px #ffd060aa}}
+#prompt{position:fixed;left:50%;top:62%;transform:translateX(-50%);font:900 italic 17px "Inter",system-ui,sans-serif;color:#ffe7a0;letter-spacing:1px;text-shadow:0 2px 6px #000c;pointer-events:none;opacity:0;transition:opacity .15s}
+#prompt.on{opacity:1}
+#prompt b{display:inline-block;min-width:26px;padding:2px 7px;margin-right:8px;border-radius:6px;background:#ffd060;color:#1a1200;font-style:normal;text-align:center}
+body.touch #prompt{display:none}
 .tbtn.dash .cd{position:absolute;inset:0;border-radius:50%;background:conic-gradient(#000a var(--p,0%),transparent 0);pointer-events:none}
 .tbtn.dash.cool{border-color:#ffffff55}
 .tbtn.wsel{--s:64px;--c:#5ff2ff;right:calc((24px + 112px * var(--bs) + 22px) + env(safe-area-inset-right));bottom:calc((20px + 76px * var(--bs) + 22px) + env(safe-area-inset-bottom));border-color:var(--c);color:var(--c);background:radial-gradient(#0d3a4c99,#05141d99)}

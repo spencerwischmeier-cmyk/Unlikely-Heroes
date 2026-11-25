@@ -10,25 +10,36 @@ const inRect = (p, r, m = 0) => p.x > r.minX - m && p.x < r.maxX + m && p.z > r.
 const RELAY_HP = 30;
 
 const ZONES = [
-  { id: 'dock', name: 'SKYHARBOR DOCKS', rect: ISLANDS.dock, y: 0, delay: 3.5, check: V(0, 0, 31), unlock: 0,
+  { id: 'dock', name: 'SKYHARBOR DOCKS', rect: ISLANDS.dock, y: 0, delay: 3.5, check: V(0, 0, 64),
     waves: [['roller', 'roller', 'roller']],
     goal: 'Clear the dock',
     intro: [['dodger', 'Bots! On OUR dock! Somebody left the haywire on.'], ['vesk', 'I just wanted one quiet day.']],
-    clear: [['dodger', 'Dock clear. That rail goes to the Cargo Yard. Hop on!']], next: 'Ride the rail to the Cargo Yard' },
-  { id: 'cargo', name: 'CARGO YARD', rect: ISLANDS.cargo, y: 0, delay: 1.2, check: V(30, 0, -1), unlock: 1,
+    clear: [['dodger', 'Dock clear. The sky steps lead to the Market Terrace. Mind the gaps.'], ['vesk', 'I always mind the gaps.']], next: 'Cross the sky steps to the Market Terrace' },
+  { id: 'terrace', name: 'MARKET TERRACE', rect: ISLANDS.terrace, y: 0, delay: 1.4, check: V(2, 0, 13),
+    waves: [['roller', 'roller', 'hornet'], ['roller', 'hornet', 'roller', 'roller']],
+    goal: 'Clear the Market Terrace',
+    intro: [['dodger', 'The market! Usually it smells like noodles. Today it smells like angry bots.']],
+    clear: [['dodger', 'See that green pad? Bounce up to the lookout, then grab the swing hooks across.'], ['vesk', 'Swing. Over the sky. Wonderful.']], next: 'Bounce up to the lookout, then swing across' },
+  { id: 'cargo', name: 'CARGO YARD', rect: ISLANDS.cargo, y: 0, delay: 1.2, check: V(12, 0, -50), unlock: 0,
     waves: [['roller', 'hornet', 'roller', 'roller'], ['hornet', 'roller', 'hornet', 'roller', 'roller']],
     goal: 'Clear the Cargo Yard',
     intro: [['dodger', 'Cargo Yard. Look, a welcome committee.']],
     clear: [['dodger', 'The signal is stronger up on that tower. Rail is open.'], ['vesk', 'Of course it is up.']], next: 'Ride up to the Signal Mast' },
-  { id: 'mast', name: 'SIGNAL MAST', rect: MAST, y: MAST.top, delay: 0.6, check: V(28, MAST.top, -32.5), unlock: 2, relay: true,
+  { id: 'mast', name: 'SIGNAL MAST', rect: MAST, y: MAST.top, delay: 0.6, check: V(12, MAST.top, -91), unlock: 1, relay: true,
     waves: [['hornet', 'hornet'], ['hornet', 'hornet', 'hornet']],
     goal: 'Destroy the signal relay',
     intro: [['dodger', 'That antenna is beaming the signal! Shoot the big red eye!']],
-    clear: [['vesk', 'Relay\'s down. The signal is still coming from somewhere else.'], ['dodger', 'Later problem. Crane Yard is down that rail.']], next: 'Ride down to the Crane Yard' },
-  { id: 'yard', name: 'CRANE YARD', rect: ISLANDS.yard, y: 0, delay: 4.5, check: V(-17.5, 0, -28), boss: true,
+    clear: [['vesk', 'Relay\'s down. The signal is still coming from somewhere else.'], ['dodger', 'Later problem. The rail goes down to the Fan Gardens.']], next: 'Ride down to the Fan Gardens' },
+  { id: 'gardens', name: 'FAN GARDENS', rect: ISLANDS.gardens, y: 0, delay: 1.0, check: V(-22, 0, -96),
+    waves: [['hornet', 'roller', 'roller'], ['hornet', 'hornet', 'roller']],
+    goal: 'Clear the Fan Gardens',
+    intro: [['dodger', 'The Fan Gardens. Very relaxing. Normally.']],
+    clear: [['dodger', 'The Crane Yard is past that floating platform. One more swing!'], ['vesk', 'I am getting too old for swinging.']], next: 'Ride the platform and swing to the Crane Yard' },
+  { id: 'yard', name: 'CRANE YARD', rect: ISLANDS.yard, y: 0, delay: 4.5, check: V(-58, 0, -118), boss: true,
     goal: 'Defeat the Crane Bot',
     intro: [['dodger', 'Uh, Vesk? That crane is looking at us.'], ['vesk', 'Cranes do not look at people.'], ['dodger', 'This one does!']] },
 ];
+const ZI = id => ZONES.findIndex(z => z.id === id);
 
 export function createStory(d) {
   // d: { player, enemies, rails, dodger, hud, sfx, fx, boss, gizmarts, relay, extraTargets, spawnIn(rect, minDist), openShop, hurtHero, onComplete, dropNuts, shake }
@@ -132,14 +143,16 @@ export function createStory(d) {
         }
       }
     }
-    if (S.zone === 2 && !relayT.dead) d.hud.boss(relayT.name, relayT.hp / relayT.maxHp);
-    else if (S.zone === 2) d.hud.boss(null);
+    if (S.zone === ZI('mast') && !relayT.dead) d.hud.boss(relayT.name, relayT.hp / relayT.maxHp);
+    else if (S.zone === ZI('mast')) d.hud.boss(null);
     // Gizmart
     for (const g of d.gizmarts) if (g.update(dt, p.pos, p.grounded)) { g.talk(); d.dodger.say(pick(GIZ_LINES.hello), 1, 'giz'); d.openShop(g); }
+    // touching a checkpoint pad on the way between areas
+    if (p.grounded) for (const c of d.checkpoints) if (Math.hypot(p.pos.x - c.pos.x, p.pos.z - c.pos.z) < c.r && Math.abs(p.pos.y - c.pos.y) < 0.6) S.checkpoint.copy(c.pos);
     // fell off: back to the last checkpoint
     if (p.pos.y < -14) {
       S.deaths++;
-      p.pos.copy(S.checkpoint); p.vel.set(0, 0, 0); d.rails.detach();
+      p.pos.copy(S.checkpoint); p.vel.set(0, 0, 0); d.rails.detach(); d.onFall?.();
       d.hurtHero(1, null, true);
       d.dodger.line('fall', 1); d.sfx.hurt();
     }
@@ -149,7 +162,7 @@ export function createStory(d) {
     d.dropNuts(at, 30);
     d.hud.boss(null);
     d.music?.boss?.(false);
-    zoneState[3].cleared = true; S.goal = 'Skyharbor is safe. For now.';
+    zoneState[ZI('yard')].cleared = true; S.goal = 'Skyharbor is safe. For now.';
     d.sfx.waveClear(); d.hud.banner('CRANE BOT SCRAPPED', '', '#ffd040');
     d.dodger.kill({ boss: true });
     d.dodger.story('vesk', 'That\'s one big piece of junk for the pile.');
