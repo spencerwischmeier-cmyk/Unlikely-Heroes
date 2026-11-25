@@ -38,6 +38,10 @@ func _ready() -> void:
 	hud = Hud.new(); hud.combat = combat; hud.player = player
 	add_child(hud)
 	_spawn_test_bots()
+	if not OS.get_cmdline_user_args().has("--no-bots"): Snd.voice("dock_intro_1"); Snd.voice("dock_intro_2")
+	Snd.music("skyharbor", 3.0)
+	Snd.loop("wind_loop", true, -16)
+	Snd.loop("city_loop", true, -20)
 	cam.yaw = level.start_yaw
 	player.face_yaw = level.start_yaw
 	if not OS.get_cmdline_user_args().has("--no-capture"):
@@ -114,6 +118,7 @@ func spawn_bot(kind: String, pos: Vector3, zone := Rect2()) -> Node3D:
 	add_child(b)
 	b.global_position = pos + (Vector3(0, 6, 0) if kind == "roller" else Vector3(0, 12, 0))
 	FX.ring(pos + Vector3(0, 0.05, 0), Color(1, 0.35, 0.25))
+	Snd.at("bot_spawn", pos, -2)
 	return b
 
 func _spawn_test_bots() -> void:

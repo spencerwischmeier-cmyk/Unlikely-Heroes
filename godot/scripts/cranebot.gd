@@ -162,7 +162,7 @@ func _physics_process(dt: float) -> void:
 	if state == "intro":
 		position.y = maxf(0.0, position.y - dt * 16.0)
 		if position.y == 0.0 and not landed:
-			landed = true; FX.explosion(position + Vector3(0, 0.3, 0), 1.4); FX.shake(1.2)
+			landed = true; FX.explosion(position + Vector3(0, 0.3, 0), 1.4); FX.shake(1.2); Snd.at("crane_slam", position, 4)
 		if st_t <= 0.0: state = "idle"; st_t = 0.8
 	elif state == "dying":
 		if randf() < dt * 14.0: FX.explosion(center() + Vector3(randf_range(-1.8, 1.8), randf_range(-1.5, 1.5), randf_range(-1.8, 1.8)), randf_range(0.4, 0.8))
@@ -170,7 +170,7 @@ func _physics_process(dt: float) -> void:
 		pitch = maxf(-0.1, pitch - dt * 0.4)
 		if st_t <= 0.0:
 			var at := center()
-			FX.explosion(at, 2.4); FX.explosion(position + Vector3(0, 1, 0), 2.0); FX.shake(2.0)
+			FX.explosion(at, 2.4); FX.explosion(position + Vector3(0, 1, 0), 2.0); FX.shake(2.0); Snd.at("explode_big", at, 6, 0.0)
 			_hide(); dead_at.emit(at)
 			return
 	else:
@@ -191,7 +191,7 @@ func _physics_process(dt: float) -> void:
 			var nxt: String = opts.pick_random()
 			if nxt == last_attack and randf() < 0.6: nxt = opts[(opts.find(nxt) + 1) % opts.size()]
 			last_attack = nxt; state = nxt
-			if nxt == "slam": st_t = 1.85 / speed; warn.visible = true
+			if nxt == "slam": st_t = 1.85 / speed; warn.visible = true; Snd.at("crane_warn", position, 0, 0.0)
 			elif nxt == "spray": st_t = 0.8; sprays = 2 if angry else 1
 			else: st_t = 1.2
 		if state == "slam":
@@ -218,7 +218,7 @@ func _physics_process(dt: float) -> void:
 				for i in n:
 					var a := base + (float(i) / (n - 1) - 0.5) * spread
 					combat.enemy_shot(from, Vector3(from.x + sin(a) * dist, to.y, from.z + cos(a) * dist))
-				sprays -= 1; st_t = 0.55
+				sprays -= 1; st_t = 0.55; Snd.at("crane_spray", from, 2)
 				if sprays <= 0: state = "idle"; st_t = randf_range(1.4, 2.0) / speed
 		elif state == "crew":
 			pitch += (0.5 - pitch) * (1.0 - exp(-3.0 * dt))
@@ -241,7 +241,7 @@ func _physics_process(dt: float) -> void:
 		mag_y = maxf(position.y + 0.3, mag.y - dt * 60.0)
 		if mag_y <= position.y + 0.3:
 			var hp_ := Vector3(mag.x, position.y, mag.z)
-			FX.explosion(hp_ + Vector3(0, 0.3, 0), 1.2); FX.ring(hp_ + Vector3(0, 0.06, 0), Color(1, 0.3, 0.2), 1.3); FX.shake(1.3)
+			FX.explosion(hp_ + Vector3(0, 0.3, 0), 1.2); FX.ring(hp_ + Vector3(0, 0.06, 0), Color(1, 0.3, 0.2), 1.3); FX.shake(1.3); Snd.at("crane_slam", hp_, 4)
 			if Vector2(hero.x - hp_.x, hero.z - hp_.z).length() < 2.2 and hero.y < position.y + 1.4: combat.hurt_player(2, hp_)
 			state = "hold"; st_t = 0.8 / speed; warn.visible = false
 	elif state == "hold":

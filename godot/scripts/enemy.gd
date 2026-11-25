@@ -69,6 +69,7 @@ func die(self_destruct := false) -> void:
 	var c := center()
 	FX.explosion(c, 1.0, chunk_mats)
 	FX.shake(0.6)
+	Snd.at("explode_small", c, 0.0)
 	FX.stop(0.045)
 	if not self_destruct and combat:
 		combat.drop_nuts(c, nuts)

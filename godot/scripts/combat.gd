@@ -54,7 +54,7 @@ func try_fire(dt: float, want: bool, muzzle: Vector3, aim_point: Vector3, aim_di
 	if not want or overheated or cool > 0.0: return false
 	cool = LANCER_INTERVAL
 	heat += 0.03
-	if heat >= 1.0: heat = 1.0; overheated = true
+	if heat >= 1.0: heat = 1.0; overheated = true; Snd.play("overheat", -4, 0.0)
 	var dir := (aim_point - muzzle).normalized()
 	if dir.dot(aim_dir) < 0.3: dir = aim_dir
 	dir = (dir + Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * 0.008).normalized()
@@ -65,6 +65,7 @@ func try_fire(dt: float, want: bool, muzzle: Vector3, aim_point: Vector3, aim_di
 	var l := OmniLight3D.new(); l.light_color = Color(0.4, 0.95, 1); l.light_energy = 1.5; l.omni_range = 3.0; mi.add_child(l)
 	bolts.append({ node = mi, vel = dir * 75.0, life = 1.6, dmg = LANCER_DMG })
 	FX.sparks(muzzle, Color(0.6, 0.98, 1.0), 4, 3.0)
+	Snd.play("blaster", -9, 0.07, 0.0)
 	return true
 
 func melee(origin: Vector3, facing: Vector3) -> bool:
@@ -79,7 +80,7 @@ func melee(origin: Vector3, facing: Vector3) -> bool:
 			t.damage(3.0 if t.is_in_group("boss") else 2.0, c, facing)
 			FX.sparks(c, Color(1, 0.95, 0.7), 16, 6)
 			any = true
-	if any: FX.stop(0.06); FX.shake(0.5)
+	if any: FX.stop(0.06); FX.shake(0.5); Snd.play("melee_hit", -2)
 	return any
 
 func nearest_target(origin: Vector3, max_d: float) -> Node3D:
@@ -101,10 +102,13 @@ func enemy_shot(from: Vector3, to: Vector3) -> void:
 	mi.global_basis = Basis(Quaternion(Vector3.UP, dir)).scaled(Vector3(1.4, 0.7, 1.4))
 	var l := OmniLight3D.new(); l.light_color = Color(1, 0.3, 0.2); l.light_energy = 2.0; l.omni_range = 3.5; mi.add_child(l)
 	shots.append({ node = mi, vel = dir * 17.0, life = 3.0 })
+	Snd.at("hornet_shot", from, -4, 0.1, 0.02)
 
 func hurt_player(n: int, from = null, force := false) -> void:
 	if (invuln > 0.0 and not force) or hull <= 0: return
-	hull -= n; invuln = 0.9
+	hull -= n; invuln = 0.9; Snd.play("hurt", -2)
+	if hull <= 2: Snd.bark("dodger", "low", 0.6)
+	else: Snd.bark("vesk", "hurt", 0.35)
 	FX.shake(1.0)
 	hull_changed.emit(hull, false)
 	if from != null and player:
@@ -171,6 +175,7 @@ func _physics_process(dt: float) -> void:
 				hit_marker.emit(kill)
 				if not t.is_in_group("crate"): damage_number(hit.position, b.dmg, kill)
 			FX.sparks(hit.position, Color(0.6, 0.98, 1.0), 8, 4)
+			if t: Snd.at("bolt_hit", hit.position, -6, 0.12, 0.04)
 			b.node.queue_free(); bolts.remove_at(i); continue
 		b.node.global_position = to
 		if b.life <= 0.0: b.node.queue_free(); bolts.remove_at(i)
@@ -211,7 +216,7 @@ func _physics_process(dt: float) -> void:
 			p.node.global_position = pos
 			p.node.rotation += p.spin * dt
 			if d < 0.75:
-				if p.kind == "nut": nuts += 10; nuts_changed.emit(nuts)
-				else: heal(1)
+				if p.kind == "nut": nuts += 10; nuts_changed.emit(nuts); Snd.play("nut_pickup", -8, 0.15, 0.04)
+				else: heal(1); Snd.play("cell_pickup", -3)
 				p.node.queue_free(); pickups.remove_at(i); continue
 			if p.t > 25.0 or pos.y < -40.0: p.node.queue_free(); pickups.remove_at(i)

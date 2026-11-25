@@ -22,7 +22,25 @@ var hit_kill := false
 var banner_t := 0.0
 var font: Font
 
+var sub_label: Label
+var sub_t := 0.0
+const SPEAKER_NAMES := {"vesk": "VESK", "dodger": "DODGER", "grudd": "FOREMAN GRUDD", "gizmart": "GIZMART", "narrator": ""}
+const SPEAKER_COLORS := {"vesk": Color(1, 0.62, 0.25), "dodger": Color(0.5, 0.9, 1), "grudd": Color(1, 0.35, 0.3), "gizmart": Color(0.6, 1, 0.5), "narrator": Color(1, 1, 1)}
+
+func _subtitle(_id: String, sp: String, text: String) -> void:
+	var who: String = SPEAKER_NAMES.get(sp, sp.to_upper())
+	sub_label.text = (who + ":  " if who != "" else "") + text
+	sub_label.add_theme_color_override("font_color", SPEAKER_COLORS.get(sp, Color.WHITE))
+	sub_label.modulate.a = 1.0; sub_t = 1.2 + text.length() * 0.06
+
 func _ready() -> void:
+	sub_label = Label.new(); sub_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub_label.custom_minimum_size = Vector2(900, 0); sub_label.position = Vector2(-450, -150)
+	sub_label.add_theme_font_size_override("font_size", 26)
+	sub_label.add_theme_constant_override("outline_size", 8); sub_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	add_child(sub_label); sub_label.modulate.a = 0.0
+	Snd.line_started.connect(_subtitle)
 	font = SystemFont.new()
 	(font as SystemFont).font_names = PackedStringArray(["Inter", "Segoe UI", "Arial", "sans-serif"])
 	(font as SystemFont).font_weight = 900
@@ -139,6 +157,8 @@ func _draw_cross() -> void:
 			cross.draw_line(c + d.normalized() * 10.0, c + d.normalized() * 18.0, hc, 3.0)
 
 func _process(dt: float) -> void:
+	sub_t -= dt
+	if sub_t <= 0.0: sub_label.modulate.a = maxf(0.0, sub_label.modulate.a - dt * 3.0)
 	hit_t -= dt
 	cross.queue_redraw()
 	heat_bar.value = combat.heat

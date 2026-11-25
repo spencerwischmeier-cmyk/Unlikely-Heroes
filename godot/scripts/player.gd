@@ -42,6 +42,7 @@ var dash_cd := 0.0
 var since_dash := 9.0
 var jet_t := 0.0
 var land_t := 0.0
+var step_t := 0.0
 var face_yaw := PI
 var turn_rate := 0.0
 var aim_hold := 0.0
@@ -132,12 +133,12 @@ func _physics_process(dt: float) -> void:
 	hook_target = _find_hook()
 	if Input.is_action_just_pressed("hook") and hook_target and swing_hook == null:
 		riding = false
-		_start_swing(hook_target)
+		_start_swing(hook_target); Snd.play("hook_fire", -3); Snd.play("hook_latch", -2)
 	if swing_hook:
 		var released := _step_swing(dt, Input.is_action_just_pressed("jump"))
 		jumps = 1; jump_cut = true; grounded = false
 		if released:
-			long_jump = true
+			long_jump = true; Snd.play("double_jump", -3)
 		else:
 			_post(dt); return
 
@@ -147,19 +148,20 @@ func _physics_process(dt: float) -> void:
 		if jump_buf > 0.0:
 			jump_buf = 0.0; riding = false; rail_cool = 0.45
 			velocity.y = maxf(velocity.y, 0.0) + JUMP; jumps = 1; jump_cut = true; long_jump = false
+			Snd.play("jump", -4)
 		else:
 			_step_rail(dt)
 			_post(dt); return
 	elif rail_cool <= 0.0 and level:
 		_try_rail()
-		if riding: _post(dt); return
+		if riding: Snd.play("grind_start", -3); _post(dt); return
 
 	# --- dash ---
 	dash_cd -= dt; since_dash += dt
 	if Input.is_action_just_pressed("dash") and dash_cd <= 0.0:
 		var dir := wish.normalized() if wish.length() > 0.8 else Vector3(sin(face_yaw), 0, cos(face_yaw))
 		velocity.x = dir.x * 18.0; velocity.z = dir.z * 18.0
-		dash_t = 0.16; dash_cd = 0.6; since_dash = 0.0
+		dash_t = 0.16; dash_cd = 0.6; since_dash = 0.0; Snd.play("dash", -3)
 
 	var hs := Vector2(velocity.x, velocity.z).length()
 	if dash_t > 0.0:
@@ -195,11 +197,12 @@ func _physics_process(dt: float) -> void:
 			if since_dash < 0.28 and hs > 9.0:
 				var d := Vector3(velocity.x, 0, velocity.z).normalized()
 				velocity.x = d.x * LONG_SPEED; velocity.z = d.z * LONG_SPEED; velocity.y = LONG_UP
-				long_jump = true; dash_t = 0.0
+				long_jump = true; dash_t = 0.0; Snd.play("double_jump", -2)
 			else:
-				velocity.y = JUMP; long_jump = false
+				velocity.y = JUMP; long_jump = false; Snd.play("jump", -4)
 		elif jumps < 2:
 			jump_buf = 0.0; velocity.y = BOOST; jumps = 2; jet_t = 0.35; jump_cut = true; long_jump = false
+			Snd.play("double_jump", -3)
 	jump_age += dt
 	if not jump_held and not jump_cut and jump_age > 0.09 and not grounded and velocity.y > 0.0 and jumps == 1 and not long_jump:
 		velocity.y *= 0.55; jump_cut = true
@@ -217,6 +220,7 @@ func _physics_process(dt: float) -> void:
 	if grounded:
 		if not was_grounded:
 			if vy_before < -6.0: land_t = clampf(-vy_before / 20.0, 0.3, 1.0)
+			if vy_before < -3.0: Snd.play("land", lerpf(-10.0, 0.0, clampf(-vy_before / 20.0, 0, 1)))
 			long_jump = false
 		jumps = 0; coyote = 0.12
 	elif was_grounded and velocity.y <= 0.0:
@@ -227,7 +231,7 @@ func _physics_process(dt: float) -> void:
 		for b in level.bouncers:
 			if Vector2(global_position.x - b.pos.x, global_position.z - b.pos.z).length() < 1.15 and absf(global_position.y - b.pos.y) < 0.6:
 				velocity.y = b.power; grounded = false; jumps = 1; jump_cut = true; long_jump = false; coyote = 0.0
-				b.squash = 1.0
+				b.squash = 1.0; Snd.play("bounce_pad", -1)
 
 	# --- fell off ---
 	if global_position.y < -25.0:
@@ -236,7 +240,13 @@ func _physics_process(dt: float) -> void:
 	if grounded and level:
 		for c in level.checkpoints:
 			if Vector2(global_position.x - c.pos.x, global_position.z - c.pos.z).length() < c.r and absf(global_position.y - c.pos.y) < 0.7:
+				if respawn_pos.distance_to(c.pos) > 0.5: Snd.play("checkpoint", -4)
 				respawn_pos = c.pos
+	# footsteps and held loops
+	var hs2 := Vector2(velocity.x, velocity.z).length()
+	if grounded and not riding and hs2 > 2.0 and dash_t <= 0.0:
+		step_t -= dt * hs2 / 8.4
+		if step_t <= 0.0: step_t = 0.3; Snd.play("step_metal", -12, 0.12)
 	_post(dt)
 
 func respawn() -> void:
@@ -261,7 +271,7 @@ func _combat(dt: float, wish: Vector3) -> void:
 	# melee: a wide swing with a small lunge toward the nearest bot
 	melee_cd -= dt
 	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0:
-		melee_cd = 0.42; melee_hit = 0.1; melee_t = 0.4
+		melee_cd = 0.42; melee_hit = 0.1; melee_t = 0.4; Snd.play("melee_swing", -3)
 		var nt: Node3D = combat.nearest_target(global_position, 3.2)
 		if nt:
 			var d: Vector3 = nt.center() - global_position
@@ -273,6 +283,8 @@ func _combat(dt: float, wish: Vector3) -> void:
 			combat.melee(global_position, Vector3(sin(face_yaw), 0, cos(face_yaw)))
 
 func _post(dt: float) -> void:
+	Snd.loop("grind_loop", riding, -6)
+	Snd.loop("glide", not grounded and not riding and velocity.y < 0.0 and jumps == 2 and Input.is_action_pressed("jump"), -8)
 	cam.update(dt, self)
 	_face(dt)
 	_animate(dt)

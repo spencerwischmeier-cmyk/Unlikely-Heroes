@@ -10,6 +10,7 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 [autoload]
 Shot="*res://scripts/shot.gd"
 FX="*res://scripts/fx.gd"
+Snd="*res://scripts/snd.gd"
 
 [display]
 window/size/viewport_width=1600

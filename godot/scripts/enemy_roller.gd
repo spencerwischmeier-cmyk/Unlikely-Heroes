@@ -28,7 +28,7 @@ func _physics_process(dt: float) -> void:
 			var want := to.normalized() * 4.4
 			velocity.x = lerpf(velocity.x, want.x, 1.0 - exp(-2.5 * dt))
 			velocity.z = lerpf(velocity.z, want.z, 1.0 - exp(-2.5 * dt))
-		if dist < 1.4 and is_on_floor(): fuse = 0.55
+		if dist < 1.4 and is_on_floor(): fuse = 0.55; Snd.at("roller_fuse", global_position, -2, 0.0)
 	else:
 		velocity.x *= exp(-6.0 * dt); velocity.z *= exp(-6.0 * dt)
 		fuse -= dt
