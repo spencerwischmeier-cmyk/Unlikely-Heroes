@@ -75,6 +75,8 @@ var rail_off := 0.0
 var rail_dir := 1.0
 var rail_speed := 0.0
 var rail_cool := 0.0
+var last_rail = null   # the rail just left: not re-caught for a moment (stops riding back up from the end)
+var last_rail_t := 0.0
 var swing_hook: Node3D = null
 var swing_t := 0.0
 var swing_L := 0.0
@@ -165,7 +167,7 @@ func _physics_process(dt: float) -> void:
 			_post(dt); return
 
 	# --- grind rails ---
-	rail_cool -= dt
+	rail_cool -= dt; last_rail_t -= dt
 	if riding:
 		if jump_buf > 0.0:
 			jump_buf = 0.0; riding = false; rail_cool = 0.45
@@ -329,6 +331,7 @@ func _catch_rail(p: Vector3) -> bool:
 	for i in level.rails.size():
 		var r: Dictionary = level.rails[i]
 		if r.locked: continue
+		if r == last_rail and last_rail_t > 0.0: continue
 		var local: Vector3 = r.path.to_local(p)
 		var off: float = r.curve.get_closest_offset(local)
 		var q: Vector3 = r.path.to_global(r.curve.sample_baked(off))
@@ -337,9 +340,12 @@ func _catch_rail(p: Vector3) -> bool:
 		if dy < (-0.8 if falling else -0.55) or dy > (1.0 if falling else 0.75): continue
 		if Vector2(p.x - q.x, p.z - q.z).length() > (1.4 if not grounded else 1.0): continue
 		if velocity.y > 2.0 and p.y < q.y: continue
+		var t0: Vector3 = r.curve.sample_baked(clampf(off - 0.3, 0, r.length))
+		var t1: Vector3 = r.curve.sample_baked(clampf(off + 0.3, 0, r.length))
+		var along := velocity.dot((r.path.global_transform.basis * (t1 - t0)).normalized())
+		# standing near an end with no clear direction: don't snap on and get carried back along it
+		if absf(along) <= 1.0 and grounded and (off < 2.0 or off > r.length - 2.0): continue
 		riding = true; rail = r; rail_off = off
-		var tan := _rail_tangent()
-		var along := velocity.dot(tan)
 		rail_dir = signf(along) if absf(along) > 1.0 else (1.0 if off < r.length * 0.5 else -1.0)
 		rail_speed = maxf(12.0, absf(along))
 		jumps = 0; grounded = true
@@ -363,6 +369,7 @@ func _step_rail(dt: float) -> void:
 	if Vector2(velocity.x, velocity.z).length() > 2.0:
 		cam.yaw += angle_difference(cam.yaw, atan2(velocity.x, velocity.z)) * (1.0 - exp(-1.1 * dt))
 	if done:
+		last_rail = rail; last_rail_t = 1.2
 		riding = false; rail_cool = 0.45; velocity.y += 3.0; grounded = false; jumps = 1
 
 # ---------- swing hooks ----------
