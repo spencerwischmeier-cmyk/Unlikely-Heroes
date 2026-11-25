@@ -15,6 +15,8 @@ var bouncers: Array = []       # { pos: Vector3, power: float, node: Node3D, squ
 var movers: Array = []         # { body: AnimatableBody3D, a: Vector3, b: Vector3, period: float }
 var checkpoints: Array = []    # { pos: Vector3, r: float }
 var islands := {}
+## Story zones in play order (read by story.gd; see the key list at the top of that script).
+var zones: Array = []
 var t := 0.0
 
 var mat_white := M.std(Color(0.93, 0.95, 0.97), 0.6, 0.3)
@@ -340,6 +342,27 @@ func _build() -> void:
 	label("CRANE YARD", Vector3(c.x, 0, y.end.y - 2.5), 8, Color(1, 0.78, 0.85))
 
 	_build_city()
+	_define_zones()
+
+func _define_zones() -> void:
+	zones = [
+		{ id = "dock", name = "SKYHARBOR DOCKS", rect = islands.dock, objective = "Clear the bots off the dock",
+			enter_lines = ["dock_intro_1", "dock_intro_2"], clear_lines = ["dock_clear_1", "dock_clear_2", "dock_clear_3"],
+			waves = [{ roller = 3 }, { roller = 2, hornet = 1 }] },
+		{ id = "terrace", name = "MARKET TERRACE", rect = islands.terrace, objective = "Cross the sky steps to the Market Terrace",
+			enter_lines = ["terrace_intro"], clear_lines = ["swing_hint"],
+			waves = [{ roller = 3, hornet = 1 }, { hornet = 2 }] },
+		{ id = "cargo", name = "CARGO YARD", rect = islands.cargo, objective = "Swing across to the Cargo Yard",
+			enter_lines = ["cargo_intro"], clear_lines = ["cargo_clear_1", "cargo_clear_2"],
+			waves = [{ roller = 4 }, { roller = 2, hornet = 2 }], unlock_rails = [0] },
+		{ id = "mast", name = "SIGNAL MAST", kind = "relay", rect = rect(12, -96, 14, 14), y = 8.0,
+			objective = "Ride the rail up the Signal Mast", relay_pos = Vector3(15, 8.0, -100),
+			enter_lines = ["mast_intro"], clear_lines = ["mast_clear_1", "mast_clear_2", "mast_clear_3"], unlock_rails = [1] },
+		{ id = "gardens", name = "FAN GARDENS", rect = islands.gardens, objective = "Grind down to the Fan Gardens",
+			enter_lines = ["gardens_intro"], waves = [{ roller = 3, hornet = 1 }, { roller = 2, hornet = 2 }] },
+		{ id = "yard", name = "CRANE YARD", kind = "boss", rect = islands.yard, objective = "Take on whatever is in the Crane Yard",
+			enter_lines = ["yard_intro_1", "yard_intro_2", "yard_intro_3"], boss_pos = Vector3(-58, 0, -136) },
+	]
 
 ## the sky city far below and around: towers poking through the haze
 func _build_city() -> void:

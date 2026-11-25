@@ -236,11 +236,12 @@ func _physics_process(dt: float) -> void:
 	# --- fell off ---
 	if global_position.y < -25.0:
 		respawn()
+		Game.player_fell.emit()
 		if combat: combat.hurt_player(1, null, true)
 	if grounded and level:
 		for c in level.checkpoints:
 			if Vector2(global_position.x - c.pos.x, global_position.z - c.pos.z).length() < c.r and absf(global_position.y - c.pos.y) < 0.7:
-				if respawn_pos.distance_to(c.pos) > 0.5: Snd.play("checkpoint", -4)
+				if respawn_pos.distance_to(c.pos) > 0.5: Snd.play("checkpoint", -4); Game.checkpoint_reached.emit(c.pos)
 				respawn_pos = c.pos
 	# footsteps and held loops
 	var hs2 := Vector2(velocity.x, velocity.z).length()
@@ -251,6 +252,7 @@ func _physics_process(dt: float) -> void:
 
 func respawn() -> void:
 	global_position = respawn_pos; velocity = Vector3.ZERO; riding = false; swing_hook = null; rope.visible = false
+	Game.player_respawned.emit(respawn_pos)
 
 func _muzzle() -> Vector3:
 	var i := skel.find_bone("gun")

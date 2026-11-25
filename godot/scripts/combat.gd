@@ -31,6 +31,7 @@ var nut_mat: StandardMaterial3D
 var cell_mat: StandardMaterial3D
 
 func _ready() -> void:
+	Game.nuts_changed.connect(func(n): nuts = n; nuts_changed.emit(n))
 	bolt_mesh = CapsuleMesh.new(); bolt_mesh.radius = 0.05; bolt_mesh.height = 1.0
 	bolt_mat = _glow(Color(0.6, 0.98, 1.0), 8.0)
 	shot_mat = _glow(Color(1.0, 0.25, 0.15), 8.0)
@@ -106,7 +107,7 @@ func enemy_shot(from: Vector3, to: Vector3) -> void:
 
 func hurt_player(n: int, from = null, force := false) -> void:
 	if (invuln > 0.0 and not force) or hull <= 0: return
-	hull -= n; invuln = 0.9; Snd.play("hurt", -2)
+	hull -= n; invuln = 0.9; Snd.play("hurt", -2); Game.player_hurt.emit(hull)
 	if hull <= 2: Snd.bark("dodger", "low", 0.6)
 	else: Snd.bark("vesk", "hurt", 0.35)
 	FX.shake(1.0)
@@ -216,7 +217,7 @@ func _physics_process(dt: float) -> void:
 			p.node.global_position = pos
 			p.node.rotation += p.spin * dt
 			if d < 0.75:
-				if p.kind == "nut": nuts += 10; nuts_changed.emit(nuts); Snd.play("nut_pickup", -8, 0.15, 0.04)
+				if p.kind == "nut": Game.add_nuts(10); Snd.play("nut_pickup", -8, 0.15, 0.04)
 				else: heal(1); Snd.play("cell_pickup", -3)
 				p.node.queue_free(); pickups.remove_at(i); continue
 			if p.t > 25.0 or pos.y < -40.0: p.node.queue_free(); pickups.remove_at(i)

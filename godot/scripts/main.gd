@@ -8,6 +8,8 @@ const Combat := preload("res://scripts/combat.gd")
 const Hud := preload("res://scripts/hud.gd")
 const Roller := preload("res://scripts/enemy_roller.gd")
 const Hornet := preload("res://scripts/enemy_hornet.gd")
+const Story := preload("res://scripts/story.gd")
+var story: Node
 var combat: Node3D
 var hud: CanvasLayer
 
@@ -37,8 +39,10 @@ func _ready() -> void:
 	player.combat = combat
 	hud = Hud.new(); hud.combat = combat; hud.player = player
 	add_child(hud)
-	_spawn_test_bots()
-	if not OS.get_cmdline_user_args().has("--no-bots"): Snd.voice("dock_intro_1"); Snd.voice("dock_intro_2")
+	Game.main = self; Game.player = player; Game.cam = cam; Game.combat = combat; Game.level = level; Game.hud = hud
+	Game.add_nuts(0)
+	story = Story.new(); story.name = "Story"; add_child(story); Game.story = story
+	if not OS.get_cmdline_user_args().has("--no-bots"): story.start()
 	Snd.music("skyharbor", 3.0)
 	Snd.loop("wind_loop", true, -16)
 	Snd.loop("city_loop", true, -20)
@@ -121,11 +125,9 @@ func spawn_bot(kind: String, pos: Vector3, zone := Rect2()) -> Node3D:
 	Snd.at("bot_spawn", pos, -2)
 	return b
 
-func _spawn_test_bots() -> void:
-	if OS.get_cmdline_user_args().has("--no-bots"): return
-	var z: Rect2 = level.islands.dock
-	for p in [Vector3(-6, 0, 58), Vector3(6, 0, 56), Vector3(0, 0, 54)]: spawn_bot("roller", p, z)
-	spawn_bot("hornet", Vector3(4, 0, 60))
+## Cutscene support hook: return true once a cutscene player is installed (story waits for it).
+func has_cutscenes() -> bool:
+	return false
 
 func _process(dt: float) -> void:
 	# hit-stop and camera shake requested by effects

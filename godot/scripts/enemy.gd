@@ -75,6 +75,7 @@ func die(self_destruct := false) -> void:
 		combat.drop_nuts(c, nuts)
 		if randf() < 0.15: combat.drop_cell(c + Vector3(0, 0.3, 0))
 	died.emit(self)
+	Game.bot_killed.emit(self, c, get_script().resource_path.get_file().get_basename().trim_prefix("enemy_"))
 	queue_free()
 
 func tick_common(dt: float) -> void:

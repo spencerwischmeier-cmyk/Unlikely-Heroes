@@ -23,6 +23,7 @@ var banner_t := 0.0
 var font: Font
 
 var sub_label: Label
+var obj_label := Label.new()
 var sub_t := 0.0
 const SPEAKER_NAMES := {"vesk": "VESK", "dodger": "DODGER", "grudd": "FOREMAN GRUDD", "gizmart": "GIZMART", "narrator": ""}
 const SPEAKER_COLORS := {"vesk": Color(1, 0.62, 0.25), "dodger": Color(0.5, 0.9, 1), "grudd": Color(1, 0.35, 0.3), "gizmart": Color(0.6, 1, 0.5), "narrator": Color(1, 1, 1)}
@@ -41,6 +42,14 @@ func _ready() -> void:
 	sub_label.add_theme_constant_override("outline_size", 8); sub_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	add_child(sub_label); sub_label.modulate.a = 0.0
 	Snd.line_started.connect(_subtitle)
+	Game.boss_started.connect(func(n): set_boss(n, 1.0))
+	Game.boss_health.connect(func(n, f): set_boss(n, f))
+	Game.boss_defeated.connect(func(_n): set_boss("", 0.0))
+	obj_label.position = Vector2(28, 66); obj_label.add_theme_font_size_override("font_size", 20)
+	obj_label.add_theme_constant_override("outline_size", 6); obj_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	obj_label.add_theme_color_override("font_color", Color(1, 0.92, 0.6))
+	add_child(obj_label)
+	Game.objective_set.connect(func(_id, text): obj_label.text = "> " + text; _pop(obj_label))
 	font = SystemFont.new()
 	(font as SystemFont).font_names = PackedStringArray(["Inter", "Segoe UI", "Arial", "sans-serif"])
 	(font as SystemFont).font_weight = 900

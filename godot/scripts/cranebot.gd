@@ -138,6 +138,7 @@ func damage(amount: float, _point: Vector3, _dir: Vector3) -> bool:
 	if dead or state == "intro" or state == "dying": return false
 	var was_angry := hp < BOSS_HP * 0.5
 	hp -= amount; flash = 1.0
+	Game.boss_health.emit("CRANE BOT", maxf(0.0, hp / BOSS_HP))
 	if not was_angry and hp < BOSS_HP * 0.5 and hp > 0: half_hit = true
 	if hp <= 0:
 		hp = 0; state = "dying"; st_t = 2.4; warn.visible = false
