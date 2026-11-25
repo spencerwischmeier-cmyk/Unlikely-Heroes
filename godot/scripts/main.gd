@@ -137,7 +137,7 @@ func _install_systems() -> void:
 
 ## Cutscene support hook: return true once a cutscene player is installed (story waits for it).
 func has_cutscenes() -> bool:
-	return false
+	return true
 
 func _process(dt: float) -> void:
 	# hit-stop and camera shake requested by effects
