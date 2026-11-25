@@ -29,6 +29,26 @@ var cur_anim := "idle"
 var melee_t := 0.0
 var land_play := 0.0
 var jets: Array = []
+# weapons in hand (the Arc Lancer is part of the hero mesh; the others are attached at the "gun" bone)
+var gun_bone := -1
+var gun_up_axis := Vector3(0, 0, -1)   # which gun-bone axis points up on the model
+var weapon_models := {}                # id -> Node3D (top-level, follows the gun bone)
+var held_weapon := "arc_lancer"
+var lancer_fx: Node3D
+var weapon_kick := 0.0
+# jetpack flames
+var chest_bone := -1
+var jet_offsets: Array = []            # nozzle transforms relative to the chest bone
+var flames: Array = []                 # { pivot: Node3D, core: MeshInstance3D, outer: MeshInstance3D, sparks: CPUParticles3D }
+var flame_mat_core: StandardMaterial3D
+var flame_mat_outer: StandardMaterial3D
+var jet_power := 0.0
+var jet_burst := 0.0
+var jet_tilt := 0.0
+var _prev_jumps := 0
+var _prev_dash := 0.0
+var _prev_long := false
+var force_jets := -1.0               # debug: hold the flames at this power (--jets=0.8)
 
 var grounded := false
 var jumps := 0
@@ -95,6 +115,8 @@ func _ready() -> void:
 		var l := OmniLight3D.new(); l.light_color = Color(0.3, 0.9, 1); l.light_energy = 0.0; l.omni_range = 2.5
 		l.position = Vector3(0.15 * sx, 0.66, -0.3)
 		body.add_child(l); jets.append(l)
+	_build_weapons()
+	_build_flames()
 	rope = MeshInstance3D.new()
 	var rm := CylinderMesh.new(); rm.top_radius = 0.035; rm.bottom_radius = 0.035; rm.height = 1.0
 	rope.mesh = rm
@@ -255,6 +277,10 @@ func respawn() -> void:
 	Game.player_respawned.emit(respawn_pos)
 
 func _muzzle() -> Vector3:
+	var wm: Node3D = weapon_models.get(held_weapon)
+	if wm and wm.visible:
+		var mz: Node3D = wm.get_meta("muzzle")
+		if mz: return mz.global_position
 	var i := skel.find_bone("gun")
 	var t := skel.global_transform * skel.get_bone_global_pose(i)
 	return t.origin + t.basis.y.normalized() * 0.42
@@ -268,11 +294,11 @@ func _combat(dt: float, wish: Vector3) -> void:
 	q.collision_mask = 1 | 4; q.exclude = [get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	aim_point = hit.position if hit else from + dir * 150.0
-	if combat.try_fire(dt, Input.is_action_pressed("fire") and swing_hook == null, _muzzle(), aim_point, dir):
-		pass
+	if combat.try_fire(dt, Input.is_action_pressed("fire") and swing_hook == null and not Game.input_locked, _muzzle(), aim_point, dir):
+		weapon_kick = 1.0
 	# melee: a wide swing with a small lunge toward the nearest bot
 	melee_cd -= dt
-	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0:
+	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked:
 		melee_cd = 0.42; melee_hit = 0.1; melee_t = 0.4; Snd.play("melee_swing", -3)
 		var nt: Node3D = combat.nearest_target(global_position, 3.2)
 		if nt:
@@ -293,7 +319,13 @@ func _post(dt: float) -> void:
 
 # ---------- rails ----------
 func _try_rail() -> void:
-	var p := global_position
+	# test where Vesk is now and half a step back along his motion, so a fast drop or a jump across
+	# the rail can't slip between two physics frames; the catch box is a little generous on purpose
+	var dt := get_physics_process_delta_time()
+	for p in [global_position, global_position - velocity * dt * 0.5]:
+		if _catch_rail(p): return
+
+func _catch_rail(p: Vector3) -> bool:
 	for i in level.rails.size():
 		var r: Dictionary = level.rails[i]
 		if r.locked: continue
@@ -301,8 +333,9 @@ func _try_rail() -> void:
 		var off: float = r.curve.get_closest_offset(local)
 		var q: Vector3 = r.path.to_global(r.curve.sample_baked(off))
 		var dy := p.y - q.y
-		if dy < -0.55 or dy > 0.7: continue
-		if Vector2(p.x - q.x, p.z - q.z).length() > 1.0: continue
+		var falling := velocity.y < -1.0
+		if dy < (-0.8 if falling else -0.55) or dy > (1.0 if falling else 0.75): continue
+		if Vector2(p.x - q.x, p.z - q.z).length() > (1.4 if not grounded else 1.0): continue
 		if velocity.y > 2.0 and p.y < q.y: continue
 		riding = true; rail = r; rail_off = off
 		var tan := _rail_tangent()
@@ -310,7 +343,8 @@ func _try_rail() -> void:
 		rail_dir = signf(along) if absf(along) > 1.0 else (1.0 if off < r.length * 0.5 else -1.0)
 		rail_speed = maxf(12.0, absf(along))
 		jumps = 0; grounded = true
-		return
+		return true
+	return false
 
 func _rail_tangent() -> Vector3:
 	var a: Vector3 = rail.curve.sample_baked(clampf(rail_off - 0.3, 0, rail.length))
@@ -429,5 +463,165 @@ func _animate(dt: float) -> void:
 	if riding or swing_hook: lean = lerpf(lean, 0.0, 1.0 - exp(-12.0 * dt))
 	body.rotation = Vector3(0, 0, lean)
 	body.scale = Vector3(1 + land_t * 0.08, 1 - land_t * 0.1, 1 + land_t * 0.08)
-	var jetting := jet_t > 0.0 or (not grounded and jumps == 2 and vy > -3.0)
-	for j in jets: j.light_energy = (2.5 + randf()) if jetting else 0.3
+	_update_weapon(dt)
+	_update_jets(dt)
+
+# ---------- weapons in hand ----------
+const WEAPON_MODELS := { scatter_bloom = "res://models/wpn_scatter.glb", thump_lobber = "res://models/wpn_lobber.glb",
+	seeker_hive = "res://models/wpn_seeker.glb" }
+
+func _build_weapons() -> void:
+	gun_bone = skel.find_bone("gun")
+	if gun_bone < 0: return
+	# find which axis of the gun bone points up on the model, so attached guns sit upright
+	var rest := skel.get_bone_global_rest(gun_bone)
+	var up_s := (skel.global_transform.basis.inverse() * Vector3.UP).normalized()
+	var best := -2.0
+	for ax in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
+		var d: float = (rest.basis * ax).normalized().dot(up_s)
+		if d > best: best = d; gun_up_axis = ax
+	for id in WEAPON_MODELS:
+		if not ResourceLoader.exists(WEAPON_MODELS[id]): continue
+		var holder := Node3D.new(); holder.name = "Wpn_" + id; holder.top_level = true; holder.visible = false
+		body.add_child(holder)
+		var m: Node3D = load(WEAPON_MODELS[id]).instantiate()
+		holder.add_child(m)
+		_shadows(m)
+		holder.set_meta("muzzle", m.find_child("muzzle_*", true, false))
+		holder.set_meta("lv", 0)
+		weapon_models[id] = holder
+	# Arc Lancer level glow: coils that brighten with each level (gold and crackling at V5)
+	lancer_fx = Node3D.new(); lancer_fx.top_level = true; lancer_fx.visible = false; body.add_child(lancer_fx)
+	for i in 2:
+		var tm := TorusMesh.new(); tm.inner_radius = 0.06; tm.outer_radius = 0.085; tm.rings = 16; tm.ring_segments = 8
+		var mi := MeshInstance3D.new(); mi.mesh = tm; mi.position = Vector3(0, 0.02, 0.3 + i * 0.16); mi.rotation.x = PI / 2
+		var mat := StandardMaterial3D.new(); mat.albedo_color = Color.BLACK; mat.emission_enabled = true
+		mat.emission = Color(0.45, 0.95, 1.0); mat.emission_energy_multiplier = 3.0
+		mi.material_override = mat; mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		lancer_fx.add_child(mi)
+
+## Paints a weapon for its level: glow parts brighten V1-V4, V5 turns them gold and the gun grows.
+func _weapon_look(holder: Node3D, id: String, lv: int) -> void:
+	holder.set_meta("lv", lv)
+	var c: Color = combat.weapon_color(id)
+	var m := StandardMaterial3D.new(); m.albedo_color = Color.BLACK; m.emission_enabled = true
+	m.emission = c; m.emission_energy_multiplier = 2.0 + lv * 1.2
+	for mi in holder.find_children("*", "MeshInstance3D", true, false):
+		var n := String(mi.name)
+		if n.contains("glow") or n.begins_with("petal") or n.begins_with("tip_") or n.begins_with("bomb_") or (lv >= 5 and (n.begins_with("shell") or n == "drum_band" or n == "pod_ring")):
+			mi.material_override = m
+	holder.set_meta("scale", 1.0 + 0.03 * (lv - 1) + (0.08 if lv >= 5 else 0.0))
+
+func _update_weapon(dt: float) -> void:
+	if gun_bone < 0 or combat == null: return
+	held_weapon = combat.current
+	weapon_kick = maxf(0.0, weapon_kick - dt * 9.0)
+	var t := skel.global_transform * skel.get_bone_global_pose(gun_bone)
+	var f := t.basis.y.normalized()
+	var up := (t.basis * gun_up_axis).normalized()
+	var right := up.cross(f).normalized()
+	up = f.cross(right).normalized()
+	var b := Basis(right, up, f)
+	var origin := t.origin - f * 0.07 * weapon_kick
+	for id in weapon_models:
+		var h: Node3D = weapon_models[id]
+		h.visible = id == held_weapon
+		if not h.visible: continue
+		var lv: int = combat.level(id)
+		if int(h.get_meta("lv")) != lv: _weapon_look(h, id, lv)
+		h.global_transform = Transform3D(b.scaled(Vector3.ONE * float(h.get_meta("scale", 1.0))), origin)
+	# the Arc Lancer is skinned into the hero mesh: fold it away while another gun is out
+	skel.set_bone_pose_scale(gun_bone, Vector3.ONE if held_weapon == "arc_lancer" else Vector3.ONE * 0.001)
+	var llv: int = combat.level("arc_lancer")
+	lancer_fx.visible = held_weapon == "arc_lancer" and llv >= 2
+	if lancer_fx.visible:
+		lancer_fx.global_transform = Transform3D(b, t.origin)
+		var hot: float = combat.heat
+		for c in lancer_fx.get_children():
+			var mat: StandardMaterial3D = c.material_override
+			mat.emission = combat.weapon_color("arc_lancer").lerp(Color(1, 0.35, 0.2), hot * hot)
+			mat.emission_energy_multiplier = 1.5 + llv * 1.0 + (randf() * 4.0 if llv >= 5 else 0.0)
+
+# ---------- jetpack flames ----------
+func _build_flames() -> void:
+	chest_bone = skel.find_bone("chest")
+	if chest_bone < 0: return
+	var rest_chest := skel.get_bone_global_rest(chest_bone)
+	var skel_in_body := body.global_transform.affine_inverse() * skel.global_transform
+	flame_mat_core = _flame_mat(Color(0.85, 0.97, 1.0), 6.0)
+	flame_mat_outer = _flame_mat(Color(0.25, 0.8, 1.0), 3.5)
+	flame_mat_outer.albedo_color.a = 0.55
+	var spark_mat := _flame_mat(Color(0.5, 0.95, 1.0), 4.0)
+	spark_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	spark_mat.vertex_color_use_as_albedo = true
+	var g := GradientTexture2D.new(); g.fill = GradientTexture2D.FILL_RADIAL; g.fill_from = Vector2(0.5, 0.5); g.fill_to = Vector2(1, 0.5)
+	var gr := Gradient.new(); gr.set_color(0, Color.WHITE); gr.set_color(1, Color(1, 1, 1, 0)); g.gradient = gr
+	spark_mat.albedo_texture = g
+	for sx in [-1, 1]:
+		var nozzle_body := Transform3D(Basis(), Vector3(0.15 * sx, 0.68, -0.3))
+		jet_offsets.append(rest_chest.affine_inverse() * skel_in_body.affine_inverse() * nozzle_body)
+		var pivot := Node3D.new(); pivot.top_level = true; body.add_child(pivot)
+		var core := MeshInstance3D.new(); var cm := CylinderMesh.new()
+		cm.top_radius = 0.05; cm.bottom_radius = 0.0; cm.height = 0.5; cm.radial_segments = 12; cm.rings = 1
+		core.mesh = cm; core.position.y = -0.25; core.material_override = flame_mat_core
+		var outer := MeshInstance3D.new(); var om := CylinderMesh.new()
+		om.top_radius = 0.08; om.bottom_radius = 0.012; om.height = 0.75; om.radial_segments = 12; om.rings = 1
+		outer.mesh = om; outer.position.y = -0.37; outer.material_override = flame_mat_outer
+		for mi in [core, outer]:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			pivot.add_child(mi)
+		var p := CPUParticles3D.new()
+		var q := QuadMesh.new(); q.size = Vector2(0.09, 0.09); p.mesh = q; p.material_override = spark_mat
+		p.amount = 28; p.lifetime = 0.32; p.local_coords = false; p.emitting = false
+		p.direction = Vector3(0, -1, 0); p.spread = 14.0
+		p.initial_velocity_min = 5.0; p.initial_velocity_max = 9.0
+		p.gravity = Vector3(0, 2.0, 0); p.damping_min = 4.0; p.damping_max = 8.0
+		p.scale_amount_min = 0.6; p.scale_amount_max = 1.5
+		var cr := Curve.new(); cr.add_point(Vector2(0, 1)); cr.add_point(Vector2(1, 0)); p.scale_amount_curve = cr
+		var ramp := Gradient.new(); ramp.set_color(0, Color(1, 1, 1, 1)); ramp.set_color(1, Color(0.2, 0.6, 1.0, 0.0)); p.color_ramp = ramp
+		pivot.add_child(p)
+		pivot.scale = Vector3.ONE * 0.01
+		flames.append({ pivot = pivot, core = core, outer = outer, sparks = p })
+
+func _flame_mat(c: Color, e: float) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.albedo_color = Color(c.r * e * 0.25, c.g * e * 0.25, c.b * e * 0.25, 1.0)
+	return m
+
+## Flames fire on jumps (a puff), the double jump and long jump (big bursts), the dash (a burst
+## angled back) and burn steady while gliding.
+func _update_jets(dt: float) -> void:
+	var vy := velocity.y
+	if jumps >= 1 and _prev_jumps == 0 and vy > 4.0 and vy < 11.5 and not riding and swing_hook == null:
+		jet_burst = maxf(jet_burst, 0.6)
+	if jumps == 2 and _prev_jumps < 2: jet_burst = 1.15
+	if dash_t > _prev_dash + 0.05: jet_burst = 1.0
+	if long_jump and not _prev_long: jet_burst = 1.2
+	_prev_jumps = jumps; _prev_dash = dash_t; _prev_long = long_jump
+	jet_burst = maxf(0.0, jet_burst - dt * 3.2)
+	var gliding := not grounded and not riding and swing_hook == null and vy < 0.0 and jumps == 2 and Input.is_action_pressed("jump")
+	var steady := 0.0
+	if gliding: steady = 0.55
+	if jet_t > 0.0: steady = maxf(steady, 0.9)
+	if force_jets >= 0.0: steady = force_jets
+	var target := maxf(steady, jet_burst)
+	jet_power = lerpf(jet_power, target, 1.0 - exp(-(30.0 if target > jet_power else 10.0) * dt))
+	var tilt_to := 1.05 if dash_t > 0.0 else (0.75 if long_jump and not grounded else 0.0)
+	jet_tilt = lerpf(jet_tilt, tilt_to, 1.0 - exp(-14.0 * dt))
+	for j in jets: j.light_energy = 0.3 + jet_power * (3.0 + randf())
+	if chest_bone < 0: return
+	var chest := skel.global_transform * skel.get_bone_global_pose(chest_bone)
+	for i in flames.size():
+		var fl: Dictionary = flames[i]
+		var pv: Node3D = fl.pivot
+		var on := jet_power > 0.04
+		var flick := 0.85 + randf() * 0.3
+		var xf: Transform3D = chest * jet_offsets[i]
+		xf.basis = xf.basis.orthonormalized() * Basis(Vector3.RIGHT, jet_tilt)
+		pv.global_transform = xf
+		pv.scale = Vector3(0.6 + jet_power * 0.6, maxf(0.01, jet_power * flick * 1.3), 0.6 + jet_power * 0.6) if on else Vector3.ONE * 0.01
+		(fl.sparks as CPUParticles3D).emitting = jet_power > 0.3
