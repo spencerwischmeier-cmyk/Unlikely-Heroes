@@ -4,6 +4,12 @@ extends Node3D
 const Level := preload("res://scripts/level_skyharbor.gd")
 const Player := preload("res://scripts/player.gd")
 const CameraRig := preload("res://scripts/camera_rig.gd")
+const Combat := preload("res://scripts/combat.gd")
+const Hud := preload("res://scripts/hud.gd")
+const Roller := preload("res://scripts/enemy_roller.gd")
+const Hornet := preload("res://scripts/enemy_hornet.gd")
+var combat: Node3D
+var hud: CanvasLayer
 
 var env: Environment
 var sun: DirectionalLight3D
@@ -26,6 +32,12 @@ func _ready() -> void:
 	cam.target = player
 	add_child(cam)
 	player.cam = cam
+	combat = Combat.new(); combat.name = "Combat"; combat.player = player
+	add_child(combat)
+	player.combat = combat
+	hud = Hud.new(); hud.combat = combat; hud.player = player
+	add_child(hud)
+	_spawn_test_bots()
 	cam.yaw = level.start_yaw
 	player.face_yaw = level.start_yaw
 	if not OS.get_cmdline_user_args().has("--no-capture"):
@@ -95,3 +107,26 @@ func _build_environment() -> void:
 	sun.light_volumetric_fog_energy = 1.4
 	sun.rotation_degrees = Vector3(-38, 155, 0)
 	add_child(sun)
+
+func spawn_bot(kind: String, pos: Vector3, zone := Rect2()) -> Node3D:
+	var b: Node3D = (Roller if kind == "roller" else Hornet).new()
+	b.combat = combat; b.player = player; b.zone = zone
+	add_child(b)
+	b.global_position = pos + (Vector3(0, 6, 0) if kind == "roller" else Vector3(0, 12, 0))
+	FX.ring(pos + Vector3(0, 0.05, 0), Color(1, 0.35, 0.25))
+	return b
+
+func _spawn_test_bots() -> void:
+	if OS.get_cmdline_user_args().has("--no-bots"): return
+	var z: Rect2 = level.islands.dock
+	for p in [Vector3(-6, 0, 58), Vector3(6, 0, 56), Vector3(0, 0, 54)]: spawn_bot("roller", p, z)
+	spawn_bot("hornet", Vector3(4, 0, 60))
+
+func _process(dt: float) -> void:
+	# hit-stop and camera shake requested by effects
+	if FX.hitstop > 0.0:
+		Engine.time_scale = 0.06
+		FX.hitstop -= dt / maxf(Engine.time_scale, 0.01)
+		if FX.hitstop <= 0.0: Engine.time_scale = 1.0
+	if FX.shake_request > 0.0:
+		cam.shake = maxf(cam.shake, FX.shake_request); FX.shake_request = 0.0

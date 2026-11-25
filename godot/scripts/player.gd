@@ -14,6 +14,10 @@ const SWING_T := 1.05
 const RELEASE := 0.8
 
 var cam: Node3D
+var combat: Node3D
+var melee_cd := 0.0
+var melee_hit := 0.0
+var aim_point := Vector3.ZERO
 var level: Node3D
 var respawn_pos := Vector3.ZERO
 var model: Node3D
@@ -121,6 +125,7 @@ func _physics_process(dt: float) -> void:
 	if Input.is_action_just_pressed("jump"): jump_buf = 0.14
 	jump_buf -= dt
 	aim_hold = 0.9 if Input.is_action_pressed("fire") else aim_hold - dt
+	_combat(dt, wish)
 	land_t = maxf(0.0, land_t - dt * 4.0)
 
 	# --- swing hooks ---
@@ -226,12 +231,46 @@ func _physics_process(dt: float) -> void:
 
 	# --- fell off ---
 	if global_position.y < -25.0:
-		global_position = respawn_pos; velocity = Vector3.ZERO
+		respawn()
+		if combat: combat.hurt_player(1, null, true)
 	if grounded and level:
 		for c in level.checkpoints:
 			if Vector2(global_position.x - c.pos.x, global_position.z - c.pos.z).length() < c.r and absf(global_position.y - c.pos.y) < 0.7:
 				respawn_pos = c.pos
 	_post(dt)
+
+func respawn() -> void:
+	global_position = respawn_pos; velocity = Vector3.ZERO; riding = false; swing_hook = null; rope.visible = false
+
+func _muzzle() -> Vector3:
+	var i := skel.find_bone("gun")
+	var t := skel.global_transform * skel.get_bone_global_pose(i)
+	return t.origin + t.basis.y.normalized() * 0.42
+
+func _combat(dt: float, wish: Vector3) -> void:
+	if combat == null: return
+	# what's under the crosshair
+	var from: Vector3 = cam.camera.global_position
+	var dir: Vector3 = cam.aim_dir()
+	var q := PhysicsRayQueryParameters3D.create(from + dir * 1.0, from + dir * 150.0)
+	q.collision_mask = 1 | 4; q.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	aim_point = hit.position if hit else from + dir * 150.0
+	if combat.try_fire(dt, Input.is_action_pressed("fire") and swing_hook == null, _muzzle(), aim_point, dir):
+		pass
+	# melee: a wide swing with a small lunge toward the nearest bot
+	melee_cd -= dt
+	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0:
+		melee_cd = 0.42; melee_hit = 0.1; melee_t = 0.4
+		var nt: Node3D = combat.nearest_target(global_position, 3.2)
+		if nt:
+			var d: Vector3 = nt.center() - global_position
+			face_yaw = atan2(d.x, d.z)
+		velocity += Vector3(sin(face_yaw), 0, cos(face_yaw)) * 5.0
+	if melee_hit > 0.0:
+		melee_hit -= dt
+		if melee_hit <= 0.0:
+			combat.melee(global_position, Vector3(sin(face_yaw), 0, cos(face_yaw)))
 
 func _post(dt: float) -> void:
 	cam.update(dt, self)
@@ -326,7 +365,9 @@ func _face(dt: float) -> void:
 	var hv := Vector2(velocity.x, velocity.z)
 	var target := face_yaw
 	var aiming := aim_hold > 0.0
-	if aiming: target = cam.yaw
+	if aiming:
+		var ad := aim_point - global_position
+		target = atan2(ad.x, ad.z) - asin(clampf(0.3 / maxf(Vector2(ad.x, ad.z).length(), 0.8), -0.6, 0.6)) if Vector2(ad.x, ad.z).length() > 0.8 else cam.yaw
 	elif hv.length() > 0.8: target = atan2(hv.x, hv.y)
 	var prev := face_yaw
 	face_yaw += angle_difference(face_yaw, target) * (1.0 - exp(-(20.0 if aiming else 13.0) * dt))
