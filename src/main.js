@@ -12,6 +12,7 @@ import { createDrone } from './drone.js';
 import { createEnemies, pushOut } from './enemies.js';
 import { createFx } from './fx.js';
 import { createTouch } from './touch.js';
+import { loadModels } from './models.js';
 
 const params = new URLSearchParams(location.search);
 // phones and tablets get touch controls and the lighter graphics mode by default
@@ -33,9 +34,13 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 3000);
 const world = createWorld(renderer, scene, { lq: LQ });
 const fx = createFx(scene);
-const hero = createHero(scene);
-const drone = createDrone(scene);
-const enemies = createEnemies(scene, fx);
+// character models from Blender; ?basic=1 uses the original basic shapes instead
+$('go').textContent = 'Loading…';
+const models = params.get('basic') === '1' ? {} : await loadModels(p => { $('go').textContent = `Loading… ${Math.round(p * 100)}%`; });
+$('go').textContent = 'Click to play';
+const hero = createHero(scene, models.hero);
+const drone = createDrone(scene, models.drone);
+const enemies = createEnemies(scene, fx, models);
 
 // ---------- post ----------
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: LQ ? 0 : 4 }));

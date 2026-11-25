@@ -4,9 +4,40 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { V, std, glow, mesh, limb, glowSprite } from './util.js';
+import { mergeByMaterial } from './models.js';
 
-export function createHero(scene) {
-  const root = new THREE.Group(); scene.add(root);           // position + facing (yaw)
+// Blender model (public/models/hero.glb, built by art/hero.py) with named pivots: hip_L/R, knee_L/R, upper, gun,
+// muzzle, jet_L/R.
+function buildFromModel(model) {
+  const root = new THREE.Group();
+  const body = new THREE.Group(); root.add(body);
+  body.add(model);
+  const get = n => model.getObjectByName(n);
+  const legs = [['L', 1], ['R', -1]].map(([n, side]) => ({ hip: get('hip_' + n), knee: get('knee_' + n), side }));
+  const upper = get('upper'), gun = get('gun'), muzzle = get('muzzle');
+  const jets = ['jet_L', 'jet_R'].map(n => { const sp = glowSprite(0x50e8ff, 0.32, 0.7); get(n).add(sp); return sp; });
+  // the coils get their own material so they can turn red on overheat without recolouring the jet nozzles
+  const coilMat = model.getObjectByName('gun_coil_0').material.clone();
+  const coils = [];
+  model.traverse(o => { if (o.isMesh && o.name.startsWith('gun_coil')) { o.material = coilMat; coils.push(o); } });
+  mergeByMaterial(model);
+  return { root, body, upper, legs, jets, coils: coils.length ? [{ material: coilMat }] : [], gun, muzzle };
+}
+
+export function createHero(scene, model) {
+  const parts = model ? buildFromModel(model) : buildBasic();
+  const { root, body, upper, legs, jets, coils, gun, muzzle } = parts;
+  scene.add(root);
+  const flash = glowSprite(0x80f8ff, 0.9, 0); muzzle.add(flash);
+  const flashCore = glowSprite(0xffffff, 0.35, 0); muzzle.add(flashCore);
+  const mLight = new THREE.PointLight(0x60f0ff, 0, 5, 2); muzzle.add(mLight);
+  const gunZ = gun.position.z;
+  return animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash, flashCore, mLight, gunZ });
+}
+
+// the original basic-shape hero, used if the model can't load
+function buildBasic() {
+  const root = new THREE.Group();                            // position + facing (yaw)
   const body = new THREE.Group(); root.add(body);            // bob / lean
   const upper = new THREE.Group(); upper.position.y = 0.72; body.add(upper); // pitches with aim
 
@@ -105,9 +136,6 @@ export function createHero(scene) {
   const grip = mesh(new RoundedBoxGeometry(0.08, 0.18, 0.09, 2, 0.03), metalDark); grip.position.set(0, -0.14, -0.1); grip.rotation.x = 0.3; gun.add(grip);
   const stock = mesh(new RoundedBoxGeometry(0.1, 0.12, 0.2, 3, 0.03), std(0xff6a1a, 0.3, 0.4)); stock.position.set(0, -0.02, -0.28); gun.add(stock);
   const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.02, 0.72); gun.add(muzzle);
-  const flash = glowSprite(0x80f8ff, 0.9, 0); flash.position.copy(muzzle.position); gun.add(flash);
-  const flashCore = glowSprite(0xffffff, 0.35, 0); flashCore.position.copy(muzzle.position); gun.add(flashCore);
-  const mLight = new THREE.PointLight(0x60f0ff, 0, 5, 2); mLight.position.copy(muzzle.position); gun.add(mLight);
   // arms reaching the grip and the barrel
   const gp = gun.position;
   const handGrip = gp.clone().add(V(0, -0.13, -0.08)), handFore = gp.clone().add(V(-0.02, -0.04, 0.2));
@@ -118,6 +146,10 @@ export function createHero(scene) {
     const fist = mesh(new THREE.SphereGeometry(0.08, 20, 14), gloveMat); fist.position.copy(h); fist.scale.set(1, 0.9, 1.1); upper.add(fist);
   }
   const wrist = mesh(new RoundedBoxGeometry(0.07, 0.04, 0.09, 2, 0.01), glow(0x50ff90, 2.5)); wrist.position.copy(elbR.clone().lerp(handFore, 0.78)).add(V(0, 0.07, 0)); upper.add(wrist);
+  return { root, body, upper, legs, jets, coils, gun, muzzle };
+}
+
+function animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash, flashCore, mLight, gunZ }) {
 
   // collect materials so the whole hero can flash when hit
   const flashables = [];
@@ -152,7 +184,7 @@ export function createHero(scene) {
     flash.material.opacity = flashT; flashCore.material.opacity = flashT;
     flash.scale.setScalar(0.6 + flashT * 0.5);
     mLight.intensity = flashT * 8;
-    gun.position.z = gp.z - flashT * 0.04; // recoil
+    gun.position.z = gunZ - flashT * 0.04; // recoil
     // coils dim as the cell heats up / drains
     coils.forEach((c, i) => { c.material.emissiveIntensity = heat ? 1.5 : 7; c.material.emissive.setHex(heat ? 0xff5030 : 0x40f0ff); });
     // hurt flash

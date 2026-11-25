@@ -57,11 +57,13 @@ URL switches: `?lq=1` for a lighter mode on slow machines, `?bloom=0` to turn of
 ## Code layout
 - `src/main.js`: game loop, input, hero movement and camera, blaster, waves, pickups, HUD.
 - `src/world.js`: sky, lights, the sky city and the arena deck with its crates and pads.
-- `src/hero.js`, `src/drone.js`, `src/enemies.js`: characters, built from basic shapes for now.
+- `src/hero.js`, `src/drone.js`, `src/enemies.js`: characters. They load the Blender models from `public/models/`
+  (made by the scripts in `art/`) and fall back to basic shapes if a model fails to load (`?basic=1` forces that).
+- `src/models.js`: model loading and draw-call merging.
 - `src/touch.js`: phone controls.
 - `src/fx.js`: sparks, explosions, smoke and debris.
 - `src/hud.css`: HUD and menu styles.
 - `public/`: home-screen app files (manifest, icons, offline service worker).
 
 ## Next steps
-Real models from Blender to replace the basic-shape characters, more weapons and a weapon wheel, sound, and then traversal (grind rails, grapple) and the first full planet.
+More weapons and a weapon wheel, sound, and then traversal (grind rails, grapple) and the first full planet.

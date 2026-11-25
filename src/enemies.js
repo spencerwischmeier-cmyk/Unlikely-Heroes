@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { V, std, glow, mesh, glowSprite, rand, clamp, UP } from './util.js';
 import { ARENA } from './world.js';
+import { ownMaterials, mergeByMaterial } from './models.js';
 
 const shellMat = std(0x2d333d, 0.85, 0.32);
 const accentMat = std(0x9b1f2a, 0.5, 0.4);
@@ -52,7 +53,26 @@ function makeRoller() {
   return { g, ball, cap, eyeMat, eg, hitMats: [core.material] };
 }
 
-export function createEnemies(scene, fx) {
+// Blender versions (art/bots.py). Each bot gets its own copies of the materials that flash or glow.
+function hornetFromModel(tpl) {
+  const g = new THREE.Group(); const m = tpl.clone(true); g.add(m);
+  const mats = ownMaterials(m, ['hornet_shell', 'hornet_accent', 'hornet_eye']);
+  const eg = glowSprite(0xff3030, 1.4, 0.8, true); m.getObjectByName('hornet_eye_point').add(eg);
+  const thrusters = ['hornet_jet_L', 'hornet_jet_R'].map(n => { const t = glowSprite(0xff7030, 0.8, 0.8, true); m.getObjectByName(n).add(t); return t; });
+  return { g, inner: m.getObjectByName('inner'), eyeMat: mats.get('hornet_eye'), eg, thrusters, hitMats: [mats.get('hornet_shell'), mats.get('hornet_accent')] };
+}
+function rollerFromModel(tpl) {
+  const g = new THREE.Group(); const m = tpl.clone(true); g.add(m);
+  const mats = ownMaterials(m, ['roller_core', 'roller_plate', 'roller_eye']);
+  const eg = glowSprite(0xff3030, 0.6, 0.6, true); m.getObjectByName('roller_eye').add(eg);
+  return { g, ball: m.getObjectByName('ball'), cap: m.getObjectByName('cap'), eyeMat: mats.get('roller_eye'), eg, hitMats: [mats.get('roller_core'), mats.get('roller_plate')] };
+}
+
+export function createEnemies(scene, fx, models = {}) {
+  if (models.hornet) mergeByMaterial(models.hornet);
+  if (models.roller) mergeByMaterial(models.roller);
+  const makeH = () => (models.hornet ? hornetFromModel(models.hornet) : makeHornet());
+  const makeR = () => (models.roller ? rollerFromModel(models.roller) : makeRoller());
   const list = [];
   const shots = [];
   const shotGeo = new THREE.CapsuleGeometry(0.07, 0.6, 4, 8);
@@ -61,10 +81,10 @@ export function createEnemies(scene, fx) {
   function spawn(type, x, z) {
     const e = { type, dead: false, t: 0, flash: 0, vel: V(0, 0, 0), spawnT: 1.0 };
     if (type === 'hornet') {
-      Object.assign(e, makeHornet(), { hp: 4, maxHp: 4, radius: 0.85, fireT: rand(1.5, 2.8), charge: 0, orbitA: rand(0, Math.PI * 2), orbitR: rand(8, 12), height: rand(3, 5.5), nuts: 8 });
+      Object.assign(e, makeH(), { hp: 4, maxHp: 4, radius: 0.85, fireT: rand(1.5, 2.8), charge: 0, orbitA: rand(0, Math.PI * 2), orbitR: rand(8, 12), height: rand(3, 5.5), nuts: 8 });
       e.pos = V(x, 14, z);
     } else {
-      Object.assign(e, makeRoller(), { hp: 2, maxHp: 2, radius: 0.6, fuse: -1, nuts: 4, hop: 0, vy: 0 });
+      Object.assign(e, makeR(), { hp: 2, maxHp: 2, radius: 0.6, fuse: -1, nuts: 4, hop: 0, vy: 0 });
       e.pos = V(x, 10, z);
     }
     e.g.position.copy(e.pos);
