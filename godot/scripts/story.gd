@@ -155,7 +155,7 @@ func _switched(z: Dictionary, sw: Node3D) -> void:
 
 func _spawn_in(r: Rect2, y: float, w: Dictionary) -> void:
 	var n := 0
-	for kind in ["roller", "hornet"]:
+	for kind in ["roller", "hornet", "crew"]:
 		for i in int(w.get(kind, 0)):
 			var a := TAU * float(n) / 5.0 + randf() * 0.6
 			var c := r.get_center() + Vector2(cos(a), sin(a)) * minf(r.size.x, r.size.y) * 0.3

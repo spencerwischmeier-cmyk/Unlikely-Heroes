@@ -719,7 +719,7 @@ func _define_zones() -> void:
 			unlock_rails = [R_YARD], open_gates = ["causeway_gate", "yard_gate"], grants = ["shard_1"] },
 		{ id = "yard_gate", name = "CRANE YARD GATE", rect = islands.yard_gate, objective = "Ride the rail down to the Crane Yard",
 			enter_lines = ["sky_yard_gate_1"], clear_lines = ["sky_yard_gate_clear_1", "sky_yard_gate_clear_2"],
-			waves = [{ roller = 3 }, { roller = 3, hornet = 1 }, { roller = 2, hornet = 2 }] },
+			waves = [{ roller = 3 }, { crew = 1, hornet = 1 }, { roller = 2, hornet = 2 }] },
 		{ id = "yard", name = "CRANE YARD", kind = "boss", rect = islands.arena, objective = "Take on whatever is in the Crane Yard",
 			enter_lines = ["yard_intro_1", "yard_intro_2", "yard_intro_3"], boss_pos = Vector3(0, 0, -102) },
 	]
