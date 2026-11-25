@@ -87,7 +87,7 @@ body.touch .wslot .wk,body.pad .wslot .wk{display:none}
 
 /* menus */
 body.menu-open #hud{display:none}
-.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;background:radial-gradient(#04182499,#020a10dd);text-align:center;z-index:10;overflow:auto;padding:16px;box-sizing:border-box}
+.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:safe center;color:#fff;background:radial-gradient(#04182499,#020a10dd);text-align:center;z-index:10;overflow:auto;padding:16px;box-sizing:border-box}
 .overlay.hidden{display:none}
 #title{background:linear-gradient(90deg,#020a10ee 0,#020a10aa 45%,#020a1022 75%);align-items:flex-start;text-align:left;padding-left:7vw}
 .logo h1{margin:0;font-weight:900;font-style:italic;font-size:64px;letter-spacing:4px;line-height:1;text-shadow:0 4px 24px #3ef8}
@@ -164,3 +164,104 @@ body.touch:not(.pad) .wpn.swap{animation:none}
   .panel{margin:8px 0}.srow{padding:6px 12px}
   body.pad .wpn,body.desktop .wpn{bottom:14px;right:16px;transform:scale(.75);transform-origin:bottom right}
 }
+
+/* ---------- story: Dodger's speech bubble, combo meter, rating stamp, boss bar ---------- */
+#talk{position:absolute;left:var(--edge);top:96px;display:flex;align-items:flex-start;gap:10px;max-width:min(400px,34vw);opacity:0;transform:translateX(-14px);transition:opacity .25s,transform .25s}
+#talk.on{opacity:1;transform:none}
+#talk .face{flex:none;width:46px;height:46px;border-radius:50%;border:3px solid #5ff2ff;background:radial-gradient(circle at 50% 50%,#3ff6ff 0 18%,#062028 20% 34%,#e9edf1 36%);box-shadow:0 0 12px #3ef8}
+#talk .face.vesk{border-color:#c88cff;background:radial-gradient(circle at 35% 45%,#ffd27a 0 9%,transparent 10%),radial-gradient(circle at 65% 45%,#ffd27a 0 9%,transparent 10%),linear-gradient(#7a4dd6 0 22%,#2fb5a8 22%);box-shadow:0 0 12px #a7f8}
+#talk .face.giz{border-color:#ff5ab0;background:radial-gradient(circle at 35% 45%,#5ff2ff 0 10%,transparent 11%),radial-gradient(circle at 65% 45%,#5ff2ff 0 10%,transparent 11%),#23262e;border-radius:12px;box-shadow:0 0 12px #f5a8}
+#talk .bubble{position:relative;background:#fff;color:#14202a;border-radius:14px;padding:8px 13px 9px;font:700 15px/1.3 "Inter",system-ui,sans-serif;box-shadow:0 3px 12px #0007}
+#talk .bubble::before{content:"";position:absolute;left:-8px;top:14px;border:8px solid transparent;border-left:0;border-right-color:#fff}
+#talk .bubble b{display:block;font:900 italic 11px "Inter",system-ui,sans-serif;letter-spacing:1.5px;color:#0b8fa8}
+#talk .face.vesk + .bubble b{color:#7a4dd6}
+#talk .face.giz + .bubble b{color:#d0307a}
+#combo{position:absolute;left:var(--edge);top:178px;display:none;align-items:center;gap:8px;font-weight:900;font-style:italic;text-shadow:0 2px 8px #000a}
+#combo.on{display:flex}
+#combo b{font-size:14px;letter-spacing:2px;color:#ffd040}
+#combo span{font-size:30px;color:#fff}
+#combo i{display:block;width:90px;height:6px;border-radius:3px;background:#0008;overflow:hidden}
+#combo u{display:block;height:100%;background:linear-gradient(90deg,#ff8a1f,#ffd040);text-decoration:none}
+#stamp{position:absolute;left:50%;top:21%;transform:translate(-50%,-50%) rotate(-8deg);font:900 italic 54px "Inter",system-ui,sans-serif;color:#fff;-webkit-text-stroke:2px #0b8fa8;text-shadow:0 4px 0 #0b8fa8,0 0 24px #3ef;opacity:0;pointer-events:none}
+#stamp.on{animation:stamp 1.6s forwards}
+#stamp.hi{color:#ffe36a;-webkit-text-stroke-color:#c86a00;text-shadow:0 4px 0 #c86a00,0 0 26px #ffb020}
+@keyframes stamp{0%{opacity:0;transform:translate(-50%,-50%) rotate(-8deg) scale(2.2)}12%{opacity:1;transform:translate(-50%,-50%) rotate(-8deg) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) rotate(-8deg) scale(.96)}}
+#bossbar{position:absolute;left:50%;top:22px;transform:translateX(-50%);width:min(460px,36vw);display:none;text-align:center}
+#hud.bossfight .wave,#hud.bossfight .left{display:none}
+#bossbar.on{display:block}
+#bossbar b{display:block;font:900 italic 16px "Inter",system-ui,sans-serif;letter-spacing:3px;text-shadow:0 2px 8px #000a;margin-bottom:4px;color:#ffd0c0}
+#bossbar div{position:relative;height:14px;border-radius:7px;background:#000a;border:2px solid #ffffff60;overflow:hidden}
+#bossbar i,#bossbar u{position:absolute;left:0;top:0;bottom:0}
+#bossbar u{background:#fff8;transition:none}
+#bossbar i{z-index:1;background:linear-gradient(90deg,#ff3a20,#ffb040);box-shadow:0 0 10px #f53}
+.offarrow.big{border-left-width:34px;border-top-width:18px;border-bottom-width:18px;border-left-color:#ff2a1a}
+.slot.locked{opacity:.3}
+.slot.locked svg{filter:grayscale(1)}
+.wslot.locked{opacity:.35;filter:grayscale(1)}
+@media (max-height:500px){
+  #talk{top:56px;transform-origin:top left;max-width:52vw}
+  #talk .face{width:34px;height:34px}
+  #talk .bubble{font-size:13px;padding:6px 10px}
+  #combo{top:118px}#combo span{font-size:22px}
+  #stamp{font-size:38px;top:36%}
+  #bossbar{top:8px}
+}
+body.touch:not(.pad) #talk{max-width:44vw}
+
+/* ---------- Gizmart shop ---------- */
+#shopMenu{background:radial-gradient(#2a0f2ecc,#0a0410ee)}
+.shophead{display:flex;align-items:center;gap:16px;width:min(620px,92vw);text-align:left}
+.gizface{width:76px;height:76px;flex:none;filter:drop-shadow(0 0 12px #ff5ab0)}
+.shophead h1{margin:0;font:900 italic 40px "Inter",system-ui,sans-serif;letter-spacing:3px;color:#ffe36a;text-shadow:0 0 18px #ff5ab0}
+.shophead p{margin:4px 0 0;font-weight:700;font-size:15px;min-height:20px}
+.shophead > div:nth-child(2){flex:1}
+.shopnuts{display:flex;align-items:center;gap:8px;font:900 italic 28px "Inter",system-ui,sans-serif}
+.shopnuts svg{width:30px;height:30px}
+.shoplist{width:min(620px,92vw)}
+.mbtn.shop{display:flex;align-items:center;gap:14px;border-color:color-mix(in srgb,var(--c) 45%,transparent)}
+.mbtn.shop svg{width:48px;height:48px;flex:none;color:var(--c);filter:drop-shadow(0 0 6px var(--c))}
+.mbtn.shop .sico{width:48px;flex:none;text-align:center;font:900 36px system-ui;color:var(--c)}
+.mbtn.shop .sname{flex:1}
+.mbtn.shop .sprice{font:900 italic 22px "Inter",system-ui,sans-serif;color:#ffd040}
+.mbtn.shop.owned{opacity:.5}
+.mbtn.shop.owned .sprice{color:#7dff9a;font-size:15px}
+.mbtn.shop.poor .sprice{color:#ff7a6a}
+#shopList .mbtn.primary{text-align:center}
+@media (max-height:500px){ .shophead h1{font-size:28px}.gizface{width:54px;height:54px}.mbtn.shop svg{width:34px;height:34px}.mbtn.shop{padding:6px 14px}.mbtn.shop .sprice{font-size:17px} }
+
+/* ---------- level complete ---------- */
+.stats{margin:18px 0 6px;border-collapse:collapse;font-size:17px}
+.stats td{padding:5px 14px;border-bottom:1px solid #ffffff20}
+.stats td:first-child{text-align:left;opacity:.8}
+.stats td:last-child{text-align:right;font-weight:900;font-style:italic;color:#ffd040}
+#done .mbtn{text-align:center}
+
+/* ---------- comic panels ---------- */
+#comic{position:fixed;inset:0;z-index:15;background:#0b0f16;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px;box-sizing:border-box;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#comic.hidden{display:none}
+body.comic-open #hud,body.comic-open #touch{display:none!important}
+.cpanel{position:relative;width:min(92vw,calc((100vh - 80px) * 1.6));aspect-ratio:16/10;border:6px solid #fff;border-radius:6px;overflow:hidden;box-shadow:0 0 0 3px #000,0 10px 40px #000}
+.cpanel.in{animation:cin .5s ease-out}
+@keyframes cin{0%{opacity:0;transform:scale(.96) rotate(-.6deg)}100%{opacity:1;transform:none}}
+.cimg{position:absolute;inset:0;background-size:cover;background-position:center}
+.cpanel.in .cimg{animation:kb 9s ease-out forwards}
+@keyframes kb{0%{transform:scale(1.06)}100%{transform:scale(1)}}
+.cimg::after{content:"";position:absolute;inset:0;background:radial-gradient(#0000 1px,#0000 0) 0 0/5px 5px,radial-gradient(circle at 50% 50%,transparent 55%,#0006);mix-blend-mode:multiply}
+.ccap{position:absolute;left:0;top:0;max-width:62%;background:#ffe36a;color:#1a1200;font:800 italic clamp(12px,1.9vw,19px)/1.3 "Inter",system-ui,sans-serif;padding:8px 14px;border-right:4px solid #000;border-bottom:4px solid #000}
+.cb{position:absolute;max-width:36%;background:#fff;color:#111;border:3px solid #000;border-radius:22px;padding:8px 14px;font:800 clamp(12px,1.9vw,19px)/1.3 "Comic Neue","Inter",system-ui,sans-serif;opacity:0;animation:bpop .3s forwards;box-shadow:3px 4px 0 #0005}
+.cb b{display:block;font:900 italic clamp(9px,1.2vw,12px) "Inter",system-ui,sans-serif;letter-spacing:1.5px;color:#0b8fa8}
+.cb.vesk b{color:#7a4dd6}
+.cb.bot{background:#ff3a2a;color:#fff;border-radius:6px;font-family:ui-monospace,monospace;font-weight:900;letter-spacing:1px}
+.cb.grudd{background:#1a0606;color:#ff6a4a;border-color:#ff3a2a;border-radius:6px;font-family:ui-monospace,monospace;font-weight:900;letter-spacing:1px;box-shadow:0 0 18px #f308}
+.cb.grudd b{color:#ffb040}
+.cb::after{content:"";position:absolute;border:12px solid transparent}
+.cb.t-down::after{left:24px;bottom:-24px;border-top-color:#000}
+.cb.t-up::after{left:24px;top:-24px;border-bottom-color:#000}
+.cb.t-left::after{left:-24px;top:14px;border-right-color:#000}
+.cb.t-right::after{right:-24px;top:14px;border-left-color:#000}
+@keyframes bpop{0%{opacity:0;transform:scale(.6)}70%{transform:scale(1.06)}100%{opacity:1;transform:none}}
+.cend{position:absolute;left:0;right:0;bottom:8%;text-align:center;font:900 italic clamp(22px,4.5vw,48px) "Inter",system-ui,sans-serif;letter-spacing:3px;color:#ffe36a;-webkit-text-stroke:2px #000;text-shadow:0 5px 0 #000;animation:bpop .4s 1.2s both}
+.cbar{display:flex;align-items:center;gap:18px;color:#fff;font-weight:800;font-size:14px;width:min(92vw,calc((100vh - 80px) * 1.6));justify-content:space-between}
+.cdots{display:flex;gap:6px}.cdots i{width:9px;height:9px;border-radius:50%;background:#ffffff40}.cdots i.on{background:#ffe36a}
+.chint{opacity:.7}
+.cskip{appearance:none;background:#ffffff18;color:#fff;border:2px solid #ffffff50;border-radius:10px;padding:6px 16px;font:800 14px system-ui;cursor:pointer}

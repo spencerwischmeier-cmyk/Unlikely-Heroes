@@ -7,6 +7,9 @@ The game's characters are built by Python scripts that run in Blender 5.3 and ex
   `muzzle`, `jet_L`, ...).
 - `hero.py`: the hero. `bots.py`: the sidekick drone, Scrap Roller and Rivet Hornet. `weapons.py`: Scatter Bloom,
   Thump Lobber and Seeker Hive, built around the same hand positions as the hero's Arc Lancer.
+- `comic.py`: the story's comic panels (`public/comic/*.jpg`), rendered with Cycles and Freestyle ink lines using
+  the game's models, plus sets and Foreman Grudd built from primitives. Pass panel names after `--` to render only
+  those, and set `SAMPLES=8` for quick test renders.
 
 Run them with Blender's Python (the `bpy` module from PyPI works too):
 ```

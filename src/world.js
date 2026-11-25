@@ -4,16 +4,27 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { rnd, R, V, UP, std, glow, mesh, canvasTex, glowSprite } from './util.js';
 import { mergeStatic } from './models.js';
+import { buildSkyharbor } from './skyharbor.js';
 
-export const ARENA = { minX: -36, maxX: 36, minZ: -40, maxZ: 30 };
-// is (x, z) over the deck?
-export const onDeck = (x, z, m = 0.5) => x > ARENA.minX - m && x < ARENA.maxX + m && z > ARENA.minZ - m && z < ARENA.maxZ + m;
+// ARENA is the box the hero and bots are kept inside for the current level; DECKS are the walkable floor
+// areas at height 0 (the test area is one big deck; Skyharbor is several islands with open sky between them).
+const ARENA_BOUNDS = { minX: -36, maxX: 36, minZ: -40, maxZ: 30 };
+export const ARENA = { ...ARENA_BOUNDS };
+let DECKS = [{ ...ARENA_BOUNDS }];
+// is (x, z) over a deck?
+export const onDeck = (x, z, m = 0.5) => {
+  for (const d of DECKS) if (x > d.minX - m && x < d.maxX + m && z > d.minZ - m && z < d.maxZ + m) return true;
+  return false;
+};
 
 export function createWorld(renderer, scene, { lq = false } = {}) {
   const FOG = new THREE.Color().setRGB(0.33, 0.6, 0.76);
   scene.fog = new THREE.FogExp2(FOG, 0.0042);
-  const colliders = []; // axis-aligned boxes: { min: Vector3, max: Vector3 }
-  const addCollider = (cx, cy, cz, sx, sy, sz) => colliders.push({ min: V(cx - sx / 2, cy - sy / 2, cz - sz / 2), max: V(cx + sx / 2, cy + sy / 2, cz + sz / 2) });
+  const colliders = []; // the current level's axis-aligned boxes: { min: Vector3, max: Vector3 }
+  const arenaG = new THREE.Group(), arenaCol = [];
+  let G = arenaG, COL = arenaCol; // where the level helpers below put meshes and colliders
+  scene.add(arenaG);
+  const addCollider = (cx, cy, cz, sx, sy, sz) => COL.push({ min: V(cx - sx / 2, cy - sy / 2, cz - sz / 2), max: V(cx + sx / 2, cy + sy / 2, cz + sz / 2) });
 
   // ---------- sky ----------
   const SUN_DIR = V(-0.32, 0.42, -1).normalize();
@@ -177,7 +188,7 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   const spots = [];
   const towerCount = lq ? 90 : 170;
   for (let i = 0; i < towerCount; i++) {
-    const ang = R(0, Math.PI * 2), dist = 60 + Math.pow(rnd(), 0.8) * 560;
+    const ang = R(0, Math.PI * 2), dist = 70 + Math.pow(rnd(), 0.8) * 550; // clear of both levels
     const x = Math.sin(ang) * dist, z = -Math.cos(ang) * dist;
     if (Math.hypot(x + 37, z + 118) < 32) continue; // keep the landmark clear
     spots.push([x, z, dist]);
@@ -233,13 +244,13 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
 
   // grind rail looping behind the arena (scenery for now)
   const railCurve = new THREE.CatmullRomCurve3([V(-46, 2, -40), V(-26, 3.6, -47), V(0, 5.6, -49), V(22, 6, -48), V(42, 4.8, -42), V(50, 5, -26)]);
-  scene.add(mesh(new THREE.TubeGeometry(railCurve, 200, 0.16, 12), std(0xd8e2ea, 0.95, 0.18)));
+  G.add(mesh(new THREE.TubeGeometry(railCurve, 200, 0.16, 12), std(0xd8e2ea, 0.95, 0.18)));
   const railGlowCurve = new THREE.CatmullRomCurve3(railCurve.points.map(p => p.clone().add(V(0, -0.22, 0))));
-  scene.add(mesh(new THREE.TubeGeometry(railGlowCurve, 200, 0.04, 8), glow(0xffb43a, 2.5), false, false));
+  G.add(mesh(new THREE.TubeGeometry(railGlowCurve, 200, 0.04, 8), glow(0xffb43a, 2.5), false, false));
   for (let t = 0.05; t < 1; t += 0.1) {
     const p = railCurve.getPoint(t);
-    const post = mesh(new THREE.CylinderGeometry(0.12, 0.2, 40, 10), metalDark); post.position.set(p.x, p.y - 20.2, p.z); scene.add(post);
-    const clampM = mesh(new RoundedBoxGeometry(0.6, 0.35, 0.6, 2, 0.08), brass); clampM.position.set(p.x, p.y - 0.3, p.z); scene.add(clampM);
+    const post = mesh(new THREE.CylinderGeometry(0.12, 0.2, 40, 10), metalDark); post.position.set(p.x, p.y - 20.2, p.z); G.add(post);
+    const clampM = mesh(new RoundedBoxGeometry(0.6, 0.35, 0.6, 2, 0.08), brass); clampM.position.set(p.x, p.y - 0.3, p.z); G.add(clampM);
   }
 
   // ---------- arena deck ----------
@@ -248,10 +259,10 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   const W = ARENA.maxX - ARENA.minX + 1, D = ARENA.maxZ - ARENA.minZ + 1;
   const deckTex = panelTex.clone(); deckTex.needsUpdate = true; deckTex.repeat.set(W / 3.6, D / 3.6);
   const deck = mesh(new RoundedBoxGeometry(W, 1.2, D, 4, 0.2), std(0xffffff, 0.75, 0.38, { map: deckTex }), false, true);
-  deck.position.set(0, -0.6, 0); scene.add(deck);
+  deck.position.set(0, -0.6, 0); G.add(deck);
   for (const [x, z, r] of [[0, -5, 16], [-24, -22, 8], [24, 16, 8], [24, -22, 8], [-24, 16, 8]]) {
-    const underside = mesh(new THREE.CylinderGeometry(r, r * 0.25, r * 1.8, 32), metalDark, false, false); underside.position.set(x, -1.2 - r * 0.9, z); scene.add(underside);
-    const coreGlow = mesh(new THREE.CylinderGeometry(r * 0.24, r * 0.24, 0.6, 24), glow(0x40f0ff, 4), false, false); coreGlow.position.set(x, -1.2 - r * 1.8, z); scene.add(coreGlow);
+    const underside = mesh(new THREE.CylinderGeometry(r, r * 0.25, r * 1.8, 32), metalDark, false, false); underside.position.set(x, -1.2 - r * 0.9, z); G.add(underside);
+    const coreGlow = mesh(new THREE.CylinderGeometry(r * 0.24, r * 0.24, 0.6, 24), glow(0x40f0ff, 4), false, false); coreGlow.position.set(x, -1.2 - r * 1.8, z); G.add(coreGlow);
   }
   // hazard edging and railings on all four sides (posts are one instanced mesh to keep draw calls down)
   const postGeo = new THREE.CylinderGeometry(0.05, 0.06, 1, 8);
@@ -259,9 +270,9 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   const edge = (len, x, z, rotY) => {
     const t = hazardTex.clone(); t.needsUpdate = true; t.repeat.set(len / 2, 1);
     const hz = mesh(new THREE.BoxGeometry(len, 0.22, 0.3), std(0xffffff, 0.3, 0.5, { map: t }), false, true);
-    hz.position.set(x, -0.08, z); hz.rotation.y = rotY; scene.add(hz);
-    const top = mesh(new THREE.CylinderGeometry(0.06, 0.06, len, 8), metalWhite, false, false); top.rotation.z = Math.PI / 2; top.rotation.y = rotY; top.position.set(x, 1.0, z); scene.add(top);
-    const light = mesh(new THREE.BoxGeometry(len, 0.03, 0.03), glow(0x40f0ff, 2.2), false, false); light.position.set(x, 0.9, z); light.rotation.y = rotY; scene.add(light);
+    hz.position.set(x, -0.08, z); hz.rotation.y = rotY; G.add(hz);
+    const top = mesh(new THREE.CylinderGeometry(0.06, 0.06, len, 8), metalWhite, false, false); top.rotation.z = Math.PI / 2; top.rotation.y = rotY; top.position.set(x, 1.0, z); G.add(top);
+    const light = mesh(new THREE.BoxGeometry(len, 0.03, 0.03), glow(0x40f0ff, 2.2), false, false); light.position.set(x, 0.9, z); light.rotation.y = rotY; G.add(light);
     const n = Math.round(len / 2.4);
     for (let i = 0; i <= n; i++) { const u = -len / 2 + i * len / n; postSpots.push([x + Math.cos(rotY) * u, z - Math.sin(rotY) * u]); }
   };
@@ -269,10 +280,10 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   edge(D - 0.4, ARENA.minX - 0.3, 0, Math.PI / 2); edge(D - 0.4, ARENA.maxX + 0.3, 0, Math.PI / 2);
   const posts = new THREE.InstancedMesh(postGeo, metalWhite, postSpots.length);
   postSpots.forEach(([x, z], i) => posts.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.5, z)));
-  scene.add(posts);
+  G.add(posts);
   // glowing lines on the floor: the old arena border and the zone dividers
   const lineMat = glow(0x4ff2ff, 2.5), warmLine = glow(0xffa030, 2.2);
-  const floorLine = (x, z, sx, sz, m = lineMat) => { const s = mesh(new THREE.BoxGeometry(sx, 0.02, sz), m, false, false); s.position.set(x, 0.012, z); scene.add(s); };
+  const floorLine = (x, z, sx, sz, m = lineMat) => { const s = mesh(new THREE.BoxGeometry(sx, 0.02, sz), m, false, false); s.position.set(x, 0.012, z); G.add(s); };
   for (const z of [-6, 0, 6]) floorLine(0, z, 24, 0.07);
   floorLine(0, -11.5, 29, 0.12, warmLine); floorLine(0, 11.5, 29, 0.12, warmLine);
   floorLine(-14.5, 0, 0.12, 23, warmLine); floorLine(14.5, 0, 0.12, 23, warmLine);
@@ -287,7 +298,7 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   };
   const label = (text, x, z, rotY = 0, size = 9, color = '#ffffff') => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.1875), labelMat(text, color));
-    m.rotation.x = -Math.PI / 2; m.rotation.z = rotY; m.position.set(x, 0.02, z); scene.add(m); return m;
+    m.rotation.x = -Math.PI / 2; m.rotation.z = rotY; m.position.set(x, 0.02, z); G.add(m); return m;
   };
   label('TARGET RANGE', 0, -13.6, 0, 10, '#ffe7a0');
   label('JUMP COURSE', 17.4, 0, Math.PI / 2, 10, '#bff9ff');
@@ -296,16 +307,16 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   const padMat = std(0x9fb2c2, 0.7, 0.35, { map: deckTex });
   const lipMat = glow(0xffa030, 2.2);
   const block = (x, z, sx, sz, h, y0 = 0, mat = padMat, lip = true) => {
-    const p = mesh(new RoundedBoxGeometry(sx, h, sz, 2, Math.min(0.1, h / 3)), mat); p.position.set(x, y0 + h / 2, z); scene.add(p);
-    if (lip) { const l = mesh(new THREE.BoxGeometry(sx + 0.02, 0.05, sz + 0.02), lipMat, false, false); l.position.set(x, y0 + h - 0.05, z); scene.add(l); }
+    const p = mesh(new RoundedBoxGeometry(sx, h, sz, 2, Math.min(0.1, h / 3)), mat); p.position.set(x, y0 + h / 2, z); G.add(p);
+    if (lip) { const l = mesh(new THREE.BoxGeometry(sx + 0.02, 0.05, sz + 0.02), lipMat, false, false); l.position.set(x, y0 + h - 0.05, z); G.add(l); }
     addCollider(x, y0 + h / 2, z, sx, h, sz); return p;
   };
 
   // ---- centre: the original combat deck ----
   for (const [x, z, sx, sz, h] of [[-8.5, -6, 4.2, 4.2, 1.3], [8.5, 5.5, 4.2, 4.2, 1.3], [0, -8.4, 6, 2.6, 2.2]]) block(x, z, sx, sz, h);
   for (const [x, z] of [[-4.6, 3.6], [5, -3.6]]) {
-    const vent = mesh(new RoundedBoxGeometry(1.6, 0.5, 1.2, 3, 0.1), metalBlue); vent.position.set(x, 0.25, z); scene.add(vent);
-    const vg = mesh(new THREE.BoxGeometry(1.2, 0.04, 0.8), glow(0xff8a30, 2), false, false); vg.position.set(x, 0.51, z); scene.add(vg);
+    const vent = mesh(new RoundedBoxGeometry(1.6, 0.5, 1.2, 3, 0.1), metalBlue); vent.position.set(x, 0.25, z); G.add(vent);
+    const vg = mesh(new THREE.BoxGeometry(1.2, 0.04, 0.8), glow(0xff8a30, 2), false, false); vg.position.set(x, 0.51, z); G.add(vg);
     addCollider(x, 0.25, z, 1.6, 0.5, 1.2);
   }
   // crates (cover)
@@ -322,7 +333,7 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
       const icon = new THREE.Mesh(iconGeo, iconMat);
       icon.rotation.y = k * Math.PI / 2; icon.position.set(Math.sin(k * Math.PI / 2) * 0.405, 0, Math.cos(k * Math.PI / 2) * 0.405); g.add(icon);
     }
-    scene.add(g); addCollider(x, y + s * 0.4, z, 0.8 * s, 0.8 * s, 0.8 * s); return g;
+    G.add(g); addCollider(x, y + s * 0.4, z, 0.8 * s, 0.8 * s, 0.8 * s); return g;
   }
   crate(-3.2, 0, -3.2, 1.2); crate(-2.2, 0, -3.4, 1.2); crate(-2.7, 0.96, -3.3, 1.0);
   crate(3.2, 0, 2.8, 1.3); crate(10.5, 0, -6.5, 1.3); crate(11.6, 0, -6.2, 1.1);
@@ -343,8 +354,8 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   block(28.5, 6.5, 2.2, 2.2, 0.5, 4.6, jc);
   block(24, 10.5, 2.2, 2.2, 0.5, 5.2, jc);
   block(18.5, 10.5, 4.0, 4.0, 6.0, 0, jc);                  // the summit
-  const flag = mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4, 8), metalWhite); flag.position.set(18.5, 7.2, 10.5); scene.add(flag);
-  const flagCloth = mesh(new THREE.PlaneGeometry(1.1, 0.6), new THREE.MeshStandardMaterial({ color: 0xffb020, side: THREE.DoubleSide, emissive: 0x6a3a00, emissiveIntensity: 0.5 })); flagCloth.position.set(19.05, 8.05, 10.5); scene.add(flagCloth);
+  const flag = mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4, 8), metalWhite); flag.position.set(18.5, 7.2, 10.5); G.add(flag);
+  const flagCloth = mesh(new THREE.PlaneGeometry(1.1, 0.6), new THREE.MeshStandardMaterial({ color: 0xffb020, side: THREE.DoubleSide, emissive: 0x6a3a00, emissiveIntensity: 0.5 })); flagCloth.position.set(19.05, 8.05, 10.5); G.add(flagCloth);
   block(31, 16, 3, 3, 1.5, 0, jc); block(27, 19, 3, 3, 2.5, 0, jc); block(23, 22, 3, 3, 3.5, 0, jc); // a second, easier hop line
   for (const [x, z] of [[33, -14], [27, -15], [21, -14]]) block(x, z, 1.4, 1.4, 2.6, 0, std(0xdfe8ee, 0.65, 0.28)); // pillars
 
@@ -359,9 +370,28 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
 
   // dust motes near the arena
   const motes = [];
-  for (let i = 0; i < 70; i++) { const s = glowSprite(0xfff4d8, R(0.015, 0.04), R(0.2, 0.45)); s.position.set(R(-30, 30), R(0.2, 4), R(-26, 26)); scene.add(s); motes.push(s); }
+  for (let i = 0; i < 70; i++) { const s = glowSprite(0xfff4d8, R(0.015, 0.04), R(0.2, 0.45)); s.position.set(R(-30, 30), R(0.2, 4), R(-26, 26)); G.add(s); motes.push(s); }
 
   scene.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; ms.forEach(m => { if ('roughness' in m) m.roughness = Math.max(m.roughness, 0.12); }); });
+
+  // ---------- Skyharbor (story level 1) ----------
+  const skyG = new THREE.Group(), skyCol = []; scene.add(skyG);
+  G = skyG; COL = skyCol;
+  const sky1 = buildSkyharbor({ G: skyG, block, crate, label, addCollider, deckTex, padMat, lipMat, hazardTex, crateMat,
+    mats: { metalWhite, metalBlue, metalTeal, metalDark, brass, domeGlass, cyanGlow, warmGlow, jc, wallMat }, lq });
+  G = arenaG; COL = arenaCol;
+
+  const levels = {
+    arena: { group: arenaG, colliders: arenaCol, bounds: ARENA_BOUNDS, decks: [ARENA_BOUNDS] },
+    skyharbor: { group: skyG, colliders: skyCol, bounds: sky1.bounds, decks: sky1.decks, data: sky1 },
+  };
+  function setLevel(name) {
+    const L = levels[name];
+    for (const k in levels) levels[k].group.visible = k === name;
+    colliders.length = 0; colliders.push(...L.colliders);
+    Object.assign(ARENA, L.bounds); DECKS = L.decks;
+    return L;
+  }
 
   let t = 0;
   function update(dt, focus) {
@@ -375,6 +405,9 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   update(0, V(0, 0, 0));
 
   // bake all the static scenery into a few big meshes (hundreds fewer draw calls, which matters on phones)
-  const merged = mergeStatic(scene, o => o !== sky, 180);
-  return { colliders, update, sun, merged };
+  const inLevel = o => { for (let p = o; p; p = p.parent) if (p === arenaG || p === skyG) return true; return false; };
+  const m1 = mergeStatic(scene, o => o !== sky && !inLevel(o), 180), m2 = mergeStatic(arenaG, () => true, 180), m3 = mergeStatic(skyG, o => !o.userData.dynamic, 180);
+  const merged = { removed: m1.removed + m2.removed + m3.removed, added: m1.added + m2.added + m3.added };
+  setLevel('arena');
+  return { colliders, update, sun, merged, setLevel, levels, arenaG, skyG };
 }

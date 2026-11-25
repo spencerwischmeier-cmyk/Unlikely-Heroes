@@ -78,8 +78,9 @@ export function createEnemies(scene, fx, models = {}) {
   const shotGeo = new THREE.CapsuleGeometry(0.07, 0.6, 4, 8);
   const shotMat = glow(0xff3a2a, 12);
 
-  function spawn(type, x, z) {
-    const e = { type, dead: false, t: 0, flash: 0, vel: V(0, 0, 0), spawnT: 1.0 };
+  // opts.zone keeps a roller on its island; opts.y is the floor height it lands on
+  function spawn(type, x, z, opts = {}) {
+    const e = { type, dead: false, t: 0, flash: 0, vel: V(0, 0, 0), spawnT: 1.0, zone: opts.zone || null, tag: opts.tag };
     if (type === 'hornet') {
       Object.assign(e, makeH(), { hp: 4, maxHp: 4, radius: 0.85, fireT: rand(1.5, 2.8), charge: 0, orbitA: rand(0, Math.PI * 2), orbitR: rand(8, 12), height: rand(3, 5.5), nuts: 8 });
       e.pos = V(x, 14, z);
@@ -144,7 +145,7 @@ export function createEnemies(scene, fx, models = {}) {
       if (e.type === 'hornet') {
         // orbit the hero, slowly drifting around them
         e.orbitA += dt * 0.35;
-        const want = V(hp.x + Math.cos(e.orbitA) * e.orbitR, e.height + Math.sin(e.t * 1.3) * 0.5, hp.z + Math.sin(e.orbitA) * e.orbitR);
+        const want = V(hp.x + Math.cos(e.orbitA) * e.orbitR, (ctx.groundY || 0) + e.height + Math.sin(e.t * 1.3) * 0.5, hp.z + Math.sin(e.orbitA) * e.orbitR);
         want.x = clamp(want.x, ARENA.minX - 4, ARENA.maxX + 4); want.z = clamp(want.z, ARENA.minZ - 4, ARENA.maxZ + 4);
         const steer = want.sub(e.pos).multiplyScalar(e.spawnT > 0 ? 3 : 1.4);
         // keep some personal space so they never fly into the camera
@@ -192,7 +193,8 @@ export function createEnemies(scene, fx, models = {}) {
         }
         e.pos.addScaledVector(e.vel, dt);
         // stay on the deck and out of solid props
-        e.pos.x = clamp(e.pos.x, ARENA.minX + 0.5, ARENA.maxX - 0.5); e.pos.z = clamp(e.pos.z, ARENA.minZ + 0.5, ARENA.maxZ - 0.5);
+        const Z = e.zone || ARENA;
+        e.pos.x = clamp(e.pos.x, Z.minX + 0.5, Z.maxX - 0.5); e.pos.z = clamp(e.pos.z, Z.minZ + 0.5, Z.maxZ - 0.5);
         for (const c of ctx.colliders) pushOut(e.pos, 0.55, c);
         // separate from other rollers
         for (const o of list) if (o !== e && !o.dead && o.type === 'roller') { const d = e.pos.distanceTo(o.pos); if (d < 1.1 && d > 0.001) e.pos.add(e.pos.clone().sub(o.pos).multiplyScalar((1.1 - d) * 0.5 / d)); }
@@ -235,7 +237,7 @@ export function createEnemies(scene, fx, models = {}) {
     shots.forEach(s => scene.remove(s.m)); shots.length = 0;
   }
 
-  return { list, spawn, damage, kill, segmentHit, update, clear };
+  return { list, spawn, damage, kill, segmentHit, update, clear, fireShot };
 }
 
 // push a point (on the floor plane, with radius r) out of a box

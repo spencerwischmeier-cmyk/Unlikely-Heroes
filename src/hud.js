@@ -1,5 +1,5 @@
 // Heads-up display: hull, hex nuts, wave, the weapon panel and slots, crosshair with heat ring,
-// floating damage numbers, health bars over damaged bots and arrows pointing at bots off screen.
+// floating damage numbers, a boss health bar and arrows pointing at bots off screen.
 import * as THREE from 'three';
 import { ICONS, LEVELS } from './weapons.js';
 
@@ -19,7 +19,9 @@ export function createHud({ maxHull, weapons }) {
   // pools for floating numbers, health bars and off-screen arrows
   const pool = (cls, n) => Array.from({ length: n }, () => { const d = document.createElement('div'); d.className = cls; hud.append(d); return d; });
   const nums = pool('dmg', 28).map(el => ({ el, t: 0, pos: new THREE.Vector3(), vy: 0 }));
-  const bars = pool('hbar', 16); bars.forEach(b => (b.innerHTML = '<i></i>'));
+  // boss (and objective target) health bar at the top of the screen; regular bots show no health
+  const bossEl = document.createElement('div'); bossEl.id = 'bossbar'; bossEl.innerHTML = '<b></b><div><i></i><u></u></div>'; hud.append(bossEl);
+  let bossShown = -1;
   const arrows = pool('offarrow', 12);
   const v = new THREE.Vector3();
 
@@ -38,6 +40,15 @@ export function createHud({ maxHull, weapons }) {
     toast(text) { const t = $('toast'); t.textContent = text; t.classList.remove('on'); void t.offsetWidth; t.classList.add('on'); clearTimeout(api._tt); api._tt = setTimeout(() => t.classList.remove('on'), 1400); },
     hit(kill) { hitT = 0.12; if (kill) killT = 0.3; },
     hurt() { hurtT = 1; },
+    boss(name, frac = 1) {
+      if (!name) { bossEl.classList.remove('on'); hud.classList.remove('bossfight'); bossShown = -1; return; }
+      bossEl.classList.add('on'); hud.classList.add('bossfight'); bossEl.querySelector('b').textContent = name;
+      const f = Math.max(0, Math.min(1, frac));
+      bossEl.querySelector('i').style.width = `${(f * 100).toFixed(1)}%`;
+      // the trailing bar shows the chunk you just knocked off
+      if (bossShown < 0 || f > bossShown) bossShown = f; else bossShown += (f - bossShown) * 0.05;
+      bossEl.querySelector('u').style.width = `${(bossShown * 100).toFixed(1)}%`;
+    },
     weapon(state, cur) {
       const w = state[cur];
       if (cur !== lastWeapon) {
@@ -55,6 +66,7 @@ export function createHud({ maxHull, weapons }) {
       $('ring').classList.toggle('hot', w.hot);
       slots.forEach((s, i) => {
         s.classList.toggle('sel', i === cur);
+        s.classList.toggle('locked', state[i].owned === false);
         s.querySelector('i').style.width = `${(100 * state[i].ammo / state[i].max).toFixed(0)}%`;
       });
       // heat ring around the crosshair: shows the lancer's charge, or the reload of the slower weapons
@@ -88,28 +100,23 @@ export function createHud({ maxHull, weapons }) {
         n.el.style.transform = `translate(${((v.x + 1) / 2 * W + n.x).toFixed(1)}px, ${((1 - v.y) / 2 * H).toFixed(1)}px) translate(-50%,-50%) scale(${(0.8 + Math.min(n.t, 0.6)).toFixed(2)})`;
         n.el.style.opacity = Math.min(1, n.t * 3).toFixed(2);
       }
-      // health bars over hurt bots, and edge arrows for bots you cannot see
-      let bi = 0, ai = 0;
+      // edge arrows for bots you cannot see
+      let ai = 0;
       for (const t of targets) {
         if (t.dead) continue;
         const c = v.copy(t.pos); if (t.type === 'roller') c.y += 1.35; else c.y += t.type === 'dummy' ? 0.85 : 1.1;
         c.project(camera);
         const onScreen = c.z < 1 && Math.abs(c.x) < 1 && Math.abs(c.y) < 1;
-        if (onScreen && t.hp < t.maxHp && bi < bars.length) {
-          const b = bars[bi++]; b.style.display = 'block';
-          b.style.transform = `translate(${((c.x + 1) / 2 * W).toFixed(1)}px, ${((1 - c.y) / 2 * H).toFixed(1)}px) translate(-50%,-50%)`;
-          b.firstChild.style.width = `${Math.max(0, 100 * t.hp / t.maxHp).toFixed(0)}%`;
-        } else if (!onScreen && t.type !== 'dummy' && ai < arrows.length) {
+        if (!onScreen && t.type !== 'dummy' && t.type !== 'relay' && ai < arrows.length) {
           // point from the screen centre toward the bot, pinned to an ellipse inside the screen edge
           let x = c.x, y = c.y; if (c.z > 1) { x = -x; y = -y; }
           const a = Math.atan2(y, x);
           const ax = W / 2 + Math.cos(a) * (W / 2 - 46), ay = H / 2 - Math.sin(a) * (H / 2 - 46);
           const el = arrows[ai++]; el.style.display = 'block';
           el.style.transform = `translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) translate(-50%,-50%) rotate(${(-a).toFixed(3)}rad)`;
-          el.classList.toggle('air', t.type === 'hornet');
+          el.classList.toggle('air', t.type === 'hornet'); el.classList.toggle('big', t.type === 'boss');
         }
       }
-      for (; bi < bars.length; bi++) bars[bi].style.display = 'none';
       for (; ai < arrows.length; ai++) arrows[ai].style.display = 'none';
     },
   };

@@ -93,6 +93,7 @@ export const sfx = {
   hurt() { tone({ type: 'sawtooth', f0: 220, f1: 70, dur: 0.3, vol: 0.25, filter: { f: 900 } }); noise({ dur: 0.2, vol: 0.2, type: 'lowpass', f0: 1500 }); },
   jump() { tone({ type: 'sine', f0: 280, f1: 620, dur: 0.12, vol: 0.12 }); noise({ dur: 0.08, vol: 0.04, f0: 1200 }); },
   boost() { noise({ dur: 0.4, vol: 0.18, f0: 500, f1: 2500, q: 0.8 }); tone({ type: 'triangle', f0: 300, f1: 700, dur: 0.25, vol: 0.07 }); },
+  grind() { if (ok('grind', 70)) noise({ dur: 0.09, vol: 0.07, type: 'bandpass', f0: rnd(2600, 3400), q: 3 }); },
   dash() { noise({ dur: 0.22, vol: 0.2, f0: 2500, f1: 600, q: 0.7 }); },
   land() { if (ok('land', 150)) { tone({ type: 'sine', f0: 140, f1: 60, dur: 0.1, vol: 0.18 }); noise({ dur: 0.08, vol: 0.06, type: 'lowpass', f0: 800 }); } },
   nut() { if (!ok('nut', 30)) return; const s = sfx._nutStep = ((sfx._nutStep || 0) + 1) % 8; tone({ type: 'sine', f0: 1300 * Math.pow(1.06, s), dur: 0.08, vol: 0.07 }); tone({ type: 'triangle', f0: 2600 * Math.pow(1.06, s), dur: 0.05, vol: 0.03 }); },

@@ -1,9 +1,12 @@
 # Unlikely Heroes
 
-An original 3D action-platformer shooter for the browser and phone: a hero with a big arsenal of weapons, a robot
-sidekick drone, and planets to explore. Built with Three.js.
+An original 3D action-platformer shooter for the browser and phone. Built with Three.js.
 
-This repo holds a **first playable prototype** (`index.html`) and the original still **look test** (`look.html`).
+**The story so far:** every bot on every planet went haywire at the same moment. Vesk, a grumpy retired junkyard
+mechanic, and Dodger, his sarcastic one-eyed drone, follow the strange signal behind it. It leads to Foreman Grudd,
+a giant factory robot who wants to turn every planet into one big factory. Episode 1 is **Skyharbor**.
+
+This repo holds the game (`index.html`) and the original still **look test** (`look.html`).
 
 ![Playable prototype](docs/play.jpg)
 
@@ -29,7 +32,13 @@ address and use **Add to Home Screen**: it gets its own icon, opens full screen,
 
 ## How to play
 Pick a mode on the title screen:
-- **Play waves:** fight off waves of bots. Each wave adds more bots and makes them a little more aggressive. Clearing
+- **Story: Skyharbor:** a comic intro, then the first level. Walk into each area to start its fight; clearing it opens
+  the next **grind rail** (walk or jump onto it to ride, jump to hop off, keep shooting while you slide). Dockside ->
+  Cargo Yard -> the Signal Mast (shoot the red relay eye) -> the Crane Yard, where the **Crane Bot** boss waits
+  (dodge the red ring before its magnet drops; shoot the cab). Fall off and you are back at the last area, one hull
+  cell lighter. You start with the Arc Lancer and 100 hex nuts; **Gizmart**, a vending-machine robot on the docks and
+  in the Cargo Yard, sells the other blasters, ammo and hull patches (step on the glowing SHOP mat).
+- **Bot waves:** fight off waves of bots. Each wave adds more bots and makes them a little more aggressive. Clearing
   a wave pays bonus nuts and repairs two hull segments. Lose all eight hull segments and it is game over.
 - **Test range:** no waves and no game over, unlimited ammo. Practice targets to the north (5, 10 and 20 m, some
   sliding), a jump course to the east, a cover yard to the west, and a **CALL BOTS** pad to the south that brings
@@ -67,10 +76,15 @@ Each weapon levels up from V1 to V5 with the bots it wrecks (more damage, faster
 The three heavy weapons use ammo. Wrecked bots sometimes drop purple ammo capsules, and holstered weapons slowly
 refill on their own.
 
+### Dodger
+Dodger talks in the bubble at the top left. He heckles the bots, runs the **combo meter** (wreck bots within three
+seconds of each other; a combo of three or more pays bonus nuts when it ends) and rates your best shots out of ten:
+air kills, rail kills, long shots and multi-kills score higher.
+
 ### Bots and pickups
 - *Scrap Rollers* are spiked balls that roll at you and pop when they get close. *Rivet Hornets* are flying gunships
   that circle you, charge their red visor, then fire a laser bolt. Red arrows at the screen edge point at bots you
-  cannot see.
+  cannot see. Regular bots show no health bar; bosses and objectives get a bar at the top of the screen.
 - The sidekick drone follows you and zaps the nearest bot every couple of seconds.
 - Hex nuts (currency) fly to you, green repair cells restore one hull segment, purple capsules refill ammo.
 
@@ -91,8 +105,12 @@ URL switches: `?lq=1` for a lighter mode on slow machines, `?bloom=0` to turn of
 - `src/models.js`: model loading and draw-call merging.
 - `src/touch.js`: phone controls.
 - `src/fx.js`: sparks, explosions, smoke and debris.
+- Story mode: `src/story.js` (the Skyharbor script: areas, fights, checkpoints, relay, boss), `src/skyharbor.js`
+  (the level), `src/rails.js` (grind rails), `src/cranebot.js` (the boss), `src/gizmart.js` (shop robot and stock),
+  `src/dodger.js` (speech bubble, combo meter, shot ratings), `src/comic.js` (comic panels; pictures rendered by
+  `art/comic.py` into `public/comic/`).
 - `src/hud.css`: HUD and menu styles.
 - `public/`: home-screen app files (manifest, icons, offline service worker).
 
 ## Next steps
-Traversal (grind rails, grapple) and the first full planet.
+Planet 2 (following Grudd's signal off-world), a galaxy map, saving progress, and more Gizmart stock.

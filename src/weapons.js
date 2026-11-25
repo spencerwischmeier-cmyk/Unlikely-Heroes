@@ -53,7 +53,7 @@ export function createArsenal({ scene, fx, hero, models, colliders, floorAt, hit
   const burst = []; // queued seeker launches
 
   function select(i) {
-    if (i === cur || i < 0 || i >= state.length) return false;
+    if (i === cur || i < 0 || i >= state.length || state[i].owned === false) return false;
     cur = i;
     const id = state[i].id;
     held.lancer.meshes.forEach(m => { m.visible = id === 'lancer' || !held[id].group; });
@@ -215,7 +215,7 @@ export function createArsenal({ scene, fx, hero, models, colliders, floorAt, hit
   function reset() {
     projectiles.forEach(p => scene.remove(p.m)); projectiles.length = 0; burst.length = 0;
     state.forEach(w => Object.assign(w, { ammo: w.max, level: 1, xp: 0, cool: 0, hot: false, sinceShot: 9 }));
-    select(0);
+    cur = -1; select(0);
   }
 
   return {

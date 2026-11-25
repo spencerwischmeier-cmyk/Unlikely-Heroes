@@ -9,7 +9,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<title>Unlikely Heroes: blaster prototype</title>
+<title>Unlikely Heroes</title>
 <link rel="stylesheet" href="./src/hud.css">
 </head><body>
 <div id="hud">
@@ -32,10 +32,11 @@
 </div>
 
 <div class="overlay" id="title">
-  <div class="logo"><h1>UNLIKELY HEROES</h1><h2>blaster prototype</h2></div>
+  <div class="logo"><h1>UNLIKELY HEROES</h1><h2>starring Vesk and Dodger</h2></div>
   <p class="status" id="go">Loading…</p>
   <div class="menu" id="mainMenu">
-    <button class="mbtn primary" data-act="waves">Play waves<small>Survive as many waves of bots as you can</small></button>
+    <button class="mbtn primary" data-act="story">Story: Skyharbor<small>Follow the signal across the docks, ride the rails, beat the Crane Bot</small></button>
+    <button class="mbtn" data-act="waves">Bot waves<small>Survive as many waves of bots as you can</small></button>
     <button class="mbtn" data-act="range">Test range<small>Try every weapon on targets, no waves, no game over</small></button>
     <button class="mbtn" data-act="settings">Settings</button>
   </div>
@@ -82,6 +83,23 @@
   <p id="summary"></p>
   <div class="menu">
     <button class="mbtn primary" data-act="again">Try again</button>
+    <button class="mbtn" data-act="quit">Quit to title</button>
+  </div>
+</div>
+<div class="overlay hidden" id="shopMenu">
+  <div class="shophead">
+    <svg viewBox="0 0 80 80" class="gizface"><rect x="6" y="10" width="68" height="52" rx="14" fill="#f4f6f8"/><rect x="13" y="17" width="54" height="38" rx="8" fill="#23262e"/><ellipse cx="29" cy="33" rx="5" ry="7" fill="#5ff2ff"/><ellipse cx="51" cy="33" rx="5" ry="7" fill="#5ff2ff"/><path d="M30 44 q10 8 20 0" stroke="#5ff2ff" stroke-width="3" fill="none" stroke-linecap="round"/><line x1="58" y1="10" x2="62" y2="2" stroke="#23262e" stroke-width="3"/><circle cx="62" cy="2" r="3" fill="#ff5ab0"/></svg>
+    <div><h1>GIZMART</h1><p id="shopLine"></p></div>
+    <div class="shopnuts"><svg viewBox="0 0 40 40"><polygon points="20,2 36,11 36,29 20,38 4,29 4,11" fill="#ffc23d" stroke="#fff3c4" stroke-width="2"/><circle cx="20" cy="20" r="7" fill="#6b3d00"/></svg><span id="shopNuts">0</span></div>
+  </div>
+  <div class="menu shoplist" id="shopList"></div>
+</div>
+
+<div class="overlay hidden" id="done">
+  <div class="logo"><h1>SKYHARBOR CLEAR</h1><h2>Episode 1 complete. The signal leads off-world...</h2></div>
+  <table class="stats" id="doneStats"></table>
+  <div class="menu">
+    <button class="mbtn primary" data-act="story">Play again</button>
     <button class="mbtn" data-act="quit">Quit to title</button>
   </div>
 </div>

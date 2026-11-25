@@ -22,6 +22,12 @@ import { createMenu } from './menu.js';
 import { createGamepad } from './gamepad.js';
 import { settings } from './settings.js';
 import { sfx, music, audioState } from './audio.js';
+import { createRails } from './rails.js';
+import { createGizmart, SHOP, GIZ_LINES } from './gizmart.js';
+import { createDodger } from './dodger.js';
+import { createCraneBot } from './cranebot.js';
+import { createStory } from './story.js';
+import { playComic, comicPad, INTRO, OUTRO } from './comic.js';
 
 const params = new URLSearchParams(location.search);
 // phones and tablets get touch controls and the lighter graphics mode by default
@@ -53,7 +59,12 @@ document.querySelectorAll('#mainMenu .mbtn').forEach(b => (b.disabled = false));
 const hero = createHero(scene, models.hero);
 const drone = createDrone(scene, models.drone);
 const enemies = createEnemies(scene, fx, models);
-const range = createRange(scene, fx);
+const range = createRange(world.arenaG, fx);
+const sky1 = world.levels.skyharbor.data;
+const rails = createRails(world.skyG, sky1.rails);
+const gizmarts = sky1.gizmarts.map(g => createGizmart(world.skyG, g.pos, g.yaw));
+const boss = createCraneBot(scene, fx);
+const extraTargets = []; // story targets: the signal relay and the boss
 
 // ---------- post ----------
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: LQ ? 0 : 4 }));
@@ -87,7 +98,7 @@ let state = 'title', mode = 'waves';
 const MAX_HULL = 8;
 const player = {
   pos: V(0, 0, 4), vel: V(0, 0, 0), yaw: Math.PI, pitch: -0.05, grounded: true, jumps: 0, coyote: 0,
-  hull: MAX_HULL, invuln: 0, dashT: 0, dashCd: 0, jetT: 0, regenT: 0,
+  hull: MAX_HULL, invuln: 0, dashT: 0, dashCd: 0, jetT: 0, regenT: 0, groundY: 0, sparkT: 0,
 };
 const stats = { nuts: 0, kills: 0, wave: 0, shots: 0, hits: 0 };
 let waveState = { toSpawn: [], spawnT: 0, clearT: -1 };
@@ -98,7 +109,13 @@ const near = p => 1 / (1 + p.distanceTo(player.pos) / 14); // sounds get quieter
 
 // ---------- targets (bots + practice targets) shared by every weapon ----------
 const centerOf = t => (t.type === 'roller' ? t.pos.clone().add(V(0, 0.55, 0)) : t.pos.clone());
-const liveTargets = () => { const out = []; for (const e of enemies.list) if (!e.dead) out.push(e); for (const t of range.targets) if (!t.dead) out.push(t); return out; };
+const liveTargets = () => {
+  const out = [];
+  for (const e of enemies.list) if (!e.dead) out.push(e);
+  if (mode !== 'story') for (const t of range.targets) if (!t.dead) out.push(t);
+  for (const t of extraTargets) if (!t.dead) out.push(t);
+  return out;
+};
 const hits = {
   center: centerOf,
   segment(a, b, pad = 0.15) {
@@ -130,6 +147,8 @@ function deal(t, amount, point, wid) {
   stats.hits++;
   let kill;
   if (t.type === 'dummy') kill = range.damage(t, amount);
+  else if (t.type === 'relay') kill = story.damageRelay(amount);
+  else if (t.type === 'boss') kill = boss.damage(amount);
   else { enemies.damage(t, amount, point, ctx); kill = t.dead; }
   hud.hit(kill);
   if (t.type === 'dummy') { if (kill) sfx.targetDown(); else sfx.targetHit(); } else if (!kill) sfx.hit(near(point));
@@ -144,16 +163,99 @@ const arsenal = createArsenal({
   onLevel(w) { hud.banner(`${w.name} V${w.level}`, 'Weapon upgraded: more damage, faster fire', w.color); fx.ring(player.pos.clone().add(V(0, 1, 0)), 0xffc23d); buzz(30); sfx.levelUp(); },
 });
 function selectWeapon(i) {
+  if (arsenal.state[i] && arsenal.state[i].owned === false) { hud.toast(`${WEAPONS[i].name}: buy it at Gizmart`); sfx.empty(); return; }
   if (arsenal.select(i)) { hud.toast(WEAPONS[i].name); buzz(12); sfx.switchWeapon(); }
+}
+// next/previous weapon you own
+function cycleWeapon(dir) {
+  for (let k = 1; k < WEAPONS.length; k++) {
+    const i = (arsenal.index + dir * k + WEAPONS.length * 2) % WEAPONS.length;
+    if (arsenal.state[i].owned !== false) { selectWeapon(i); return; }
+  }
 }
 const wheel = createWheel(WEAPONS, i => selectWeapon(i));
 const openWheel = () => { if (state === 'playing' && !wheel.open) { wheel.show(arsenal.state, arsenal.index); input.fire = false; sfx.wheelOpen(); } };
 const menu = createMenu(a => {
-  if (a === 'waves' || a === 'range') { mode = a; reset(); begin(); }
-  else if (a === 'resume') begin();
+  if (a === 'story') { mode = 'story'; reset(); startStory(); }
+  else if (a === 'waves' || a === 'range') { mode = a; reset(); begin(); }
+  else if (a === 'resume' || a === 'leave') { if (a === 'leave') dodger.say(pick(GIZ_LINES.bye), 1, 'giz'); begin(); }
+  else if (a.startsWith('buy:')) buy(a.slice(4));
   else if (a === 'restart' || a === 'again') { reset(); begin(); }
   else if (a === 'quit') { reset(); state = 'title'; touch?.show(false); menu.show('title'); music.intensity = 0.3; }
 });
+
+// ---------- story mode: Dodger, Gizmart, the Skyharbor script ----------
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const dodger = createDodger({ isPlaying: () => state === 'playing' });
+dodger.onComboEnd = n => { const b = n * 15; stats.nuts += b; hud.nuts(stats.nuts); hud.toast(`Combo x${n}: +${b} nuts`); sfx.cell(); };
+// a random open spot inside an area, away from the hero and from props on the floor
+function spawnIn(r, minDist = 6) {
+  for (let k = 0; k < 50; k++) {
+    const x = rand(r.minX + 1.5, r.maxX - 1.5), z = rand(r.minZ + 1.5, r.maxZ - 1.5);
+    if (Math.hypot(x - player.pos.x, z - player.pos.z) < minDist) continue;
+    if (world.colliders.some(c => c.min.y > -0.5 && c.max.y < 5 && x > c.min.x - 0.8 && x < c.max.x + 0.8 && z > c.min.z - 0.8 && z < c.max.z + 0.8)) continue;
+    return [x, z];
+  }
+  return [(r.minX + r.maxX) / 2, (r.minZ + r.maxZ) / 2];
+}
+const story = createStory({
+  player, enemies, rails, dodger, hud, sfx, fx, boss, gizmarts, relay: sky1.relay, extraTargets, spawnIn, start: sky1.start, bossPos: sky1.bossPos,
+  hurtHero: (n, from, force) => ctx.hurtHero(n, from, force),
+  heal: n => { player.hull = Math.min(MAX_HULL, player.hull + n); hud.hull(player.hull, true); },
+  dropNuts: (p, n) => dropNuts(p, n), shake: n => { shake = Math.max(shake, n); },
+  openShop, onComplete: storyComplete,
+});
+function startStory() {
+  state = 'comic'; menu.hide(); music.start(); music.intensity = 0.3;
+  playComic(INTRO, () => { state = 'title'; begin(); });
+}
+function storyComplete() {
+  state = 'comic'; input.fire = false; touch?.show(false); wheel.close(false);
+  if (document.pointerLockElement) document.exitPointerLock();
+  music.intensity = 0.3;
+  playComic(OUTRO, () => {
+    const t = Math.round(story.time), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, '0');
+    const acc = stats.shots ? Math.round(100 * Math.min(1, stats.hits / stats.shots)) : 0;
+    $('doneStats').innerHTML = `<tr><td>Time</td><td>${mm}:${ss}</td></tr><tr><td>Bots wrecked</td><td>${stats.kills}</td></tr>
+      <tr><td>Hex nuts</td><td>${stats.nuts.toLocaleString()}</td></tr><tr><td>Falls</td><td>${story.deaths}</td></tr>
+      <tr><td>Hit rate</td><td>${acc}%</td></tr><tr><td>Dodger's best rating</td><td>${dodger.best || '-'}/10</td></tr>`;
+    state = 'dead'; menu.show('done');
+  });
+}
+// Gizmart's shop screen
+let shopGiz = null;
+function renderShop() {
+  $('shopNuts').textContent = stats.nuts.toLocaleString();
+  $('shopList').innerHTML = SHOP.map(it => {
+    const w = it.kind === 'weapon' ? arsenal.state.find(x => x.id === it.id) : null;
+    const owned = w?.owned, full = (it.kind === 'repair' && player.hull >= MAX_HULL) || (it.kind === 'ammo' && arsenal.state.every(x => !x.owned || x.regen || x.ammo >= x.max));
+    const cant = !owned && !full && stats.nuts < it.price;
+    const c = w ? WEAPONS.find(x => x.id === it.id).color : it.kind === 'repair' ? '#7dff9a' : '#d070ff';
+    return `<button class="mbtn shop ${owned || full ? 'owned' : ''} ${cant ? 'poor' : ''}" data-act="buy:${it.id}" style="--c:${c}">
+      ${w ? `<svg viewBox="0 0 60 60">${ICONS[it.id]}</svg>` : `<span class="sico">${it.kind === 'repair' ? '+' : '&#8801;'}</span>`}
+      <span class="sname">${it.name}<small>${it.blurb}</small></span><span class="sprice">${owned ? 'OWNED' : full ? 'FULL' : it.price}</span></button>`;
+  }).join('') + '<button class="mbtn primary" data-act="leave">Leave shop</button>';
+  menu.refresh();
+}
+function openShop(g) {
+  if (state !== 'playing') return;
+  shopGiz = g; state = 'paused'; input.fire = false; wheel.close(false); touch?.show(false);
+  if (document.pointerLockElement) document.exitPointerLock();
+  $('shopLine').textContent = pick(GIZ_LINES.hello);
+  menu.show('shopMenu'); renderShop();
+}
+function buy(id) {
+  const it = SHOP.find(x => x.id === id); if (!it) return;
+  const w = it.kind === 'weapon' ? arsenal.state.find(x => x.id === id) : null;
+  if (w?.owned) return;
+  if ((it.kind === 'repair' && player.hull >= MAX_HULL)) { $('shopLine').textContent = 'You look fine to me! Shiny, even!'; return; }
+  if (stats.nuts < it.price) { $('shopLine').textContent = pick(GIZ_LINES.broke); sfx.empty(); return; }
+  stats.nuts -= it.price; hud.nuts(stats.nuts); sfx.levelUp(); shopGiz?.talk();
+  if (w) { w.owned = true; w.ammo = w.max; arsenal.select(arsenal.state.indexOf(w)); $('shopLine').textContent = `${it.name}! ` + pick(GIZ_LINES.buy); }
+  else if (it.kind === 'ammo') { arsenal.refill(1); $('shopLine').textContent = pick(GIZ_LINES.buy); }
+  else { player.hull = Math.min(MAX_HULL, player.hull + 4); hud.hull(player.hull, true); $('shopLine').textContent = pick(GIZ_LINES.buy); }
+  renderShop();
+}
 
 // ---------- input ----------
 const keys = new Set();
@@ -181,7 +283,7 @@ addEventListener('mousedown', e => {
   if (e.button === 2) input.dashPressed = true;
 });
 addEventListener('mouseup', e => { if (realMouse(e) && e.button === 0) input.fire = false; });
-addEventListener('wheel', e => { if (state === 'playing' && !wheel.open) selectWeapon((arsenal.index + (e.deltaY > 0 ? 1 : -1) + WEAPONS.length) % WEAPONS.length); }, { passive: true });
+addEventListener('wheel', e => { if (state === 'playing' && !wheel.open) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
 let ignoreMouseUntil = 0;
 addEventListener('pointermove', e => {
   if (!realMouse(e)) return;
@@ -212,7 +314,10 @@ const touch = TOUCH ? createTouch({
 }) : null;
 
 function reset() {
-  enemies.clear(); arsenal.reset();
+  world.setLevel(mode === 'story' ? 'skyharbor' : 'arena');
+  if (mode === 'story') world.colliders.push(boss.collider);
+  enemies.clear(); arsenal.reset(); rails.detach(0); boss.hide(); extraTargets.length = 0; hud.boss(null); dodger.reset(); callQueue.length = 0;
+  arsenal.state.forEach((w, i) => { w.owned = mode !== 'story' || i === 0; });
   pickups.forEach(p => scene.remove(p.m)); pickups.length = 0;
   Object.assign(player, { hull: MAX_HULL, invuln: 0, dashT: 0, dashCd: 0, jumps: 0 });
   player.pos.set(0, 0, 4); player.vel.set(0, 0, 0); player.yaw = Math.PI; player.pitch = -0.05;
@@ -220,7 +325,9 @@ function reset() {
   waveState = { toSpawn: [], spawnT: 0, clearT: mode === 'waves' ? 1.2 : -1 };
   arsenal.infinite = mode === 'range';
   if (mode === 'range') player.pos.set(5.5, 0, -12.5);
-  hud.hull(player.hull); hud.nuts(stats.nuts);
+  if (mode === 'story') { player.pos.copy(sky1.start.pos); player.yaw = sky1.start.yaw; stats.nuts = 100; story.reset(); } else story.stop();
+  player.groundY = player.pos.y; camPivot.copy(player.pos);
+  hud.hull(player.hull); hud.nuts(stats.nuts); hud.weapon(arsenal.state, arsenal.index);
 }
 function begin() {
   music.start(); music.intensity = 1;
@@ -246,7 +353,10 @@ function pause() {
 function gameOver() {
   state = 'dead'; input.fire = false; touch?.show(false); wheel.close(false); sfx.gameOver(); music.intensity = 0.3;
   if (document.pointerLockElement) document.exitPointerLock();
-  $('summary').innerHTML = `You reached wave <b>${stats.wave}</b>, wrecked <b>${stats.kills}</b> bots and banked <b>${stats.nuts.toLocaleString()}</b> hex nuts.`;
+  $('summary').innerHTML = mode === 'story'
+    ? `Wrecked <b>${stats.kills}</b> bots before the hull gave out. Dodger says: "I believe in you. Mostly."`
+    : `You reached wave <b>${stats.wave}</b>, wrecked <b>${stats.kills}</b> bots and banked <b>${stats.nuts.toLocaleString()}</b> hex nuts.`;
+  story.stop();
   setTimeout(() => { if (state === 'dead') menu.show('over'); }, 1200);
 }
 
@@ -308,7 +418,7 @@ function updateCalls(dt) {
 // ---------- hero physics ----------
 const GRAV = 26, RUN = 6.8, JUMP = 8.6, BOOST = 7.8, RADIUS = 0.38;
 function floorAt(p) {
-  let f = 0;
+  let f = onDeck(p.x, p.z, 0.15) ? 0 : -Infinity; // open sky between Skyharbor's islands
   for (const c of world.colliders) {
     if (p.x > c.min.x - RADIUS * 0.6 && p.x < c.max.x + RADIUS * 0.6 && p.z > c.min.z - RADIUS * 0.6 && p.z < c.max.z + RADIUS * 0.6 && p.y >= c.max.y - 0.3) f = Math.max(f, c.max.y);
   }
@@ -353,6 +463,24 @@ function updatePlayer(dt, p) {
   const right = V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));
   const wish = fwd.multiplyScalar(mz).addScaledVector(right, mx).multiplyScalar(RUN);
 
+  // riding a grind rail: the rail moves you; jump hops off with the rail's momentum
+  if (rails.riding) {
+    if (input.jumpPressed) {
+      rails.detach(); player.vel.y = Math.max(player.vel.y, 0) + JUMP; player.grounded = false; player.jumps = 1; sfx.jump();
+    } else {
+      rails.step(dt, player.pos, player.vel);
+      player.grounded = !rails.riding ? false : true; player.jumps = rails.riding ? 0 : 1;
+      player.sparkT -= dt;
+      if (rails.riding && player.sparkT <= 0) { player.sparkT = 0.05; fx.sparks(player.pos.clone(), 0xffc060, 3, 2.5); sfx.grind(); }
+      input.jumpPressed = input.dashPressed = false;
+      if (rails.riding) {
+        // gently turn the view to look along the rail
+        if (Math.hypot(player.vel.x, player.vel.z) > 2) player.yaw += angleDiff(player.yaw, Math.atan2(player.vel.x, player.vel.z)) * (1 - Math.exp(-1.1 * dt));
+        player.coyote = 0.12; return;
+      }
+    }
+  }
+
   player.dashCd -= dt;
   if (input.dashPressed && player.dashCd <= 0) {
     const dir = ml > 0.1 ? wish.clone().normalize() : V(Math.sin(player.yaw), 0, Math.cos(player.yaw));
@@ -390,10 +518,12 @@ function updatePlayer(dt, p) {
   const f = floorAt(pp);
   if (pp.y <= f) {
     if (!player.grounded && player.vel.y < -6) { fx.puff(pp.clone().add(V(0, 0.05, 0))); sfx.land(); }
-    pp.y = f; player.vel.y = 0; player.grounded = true; player.jumps = 0; player.coyote = 0.1;
+    pp.y = f; player.vel.y = 0; player.grounded = true; player.jumps = 0; player.coyote = 0.1; player.groundY = f;
   } else if (player.grounded && pp.y > f) {
     player.grounded = false; player.jumps = 1; // walked off a ledge
   }
+  // land on (or walk into) a grind rail
+  if (mode === 'story' && rails.tryAttach(pp, player.vel, dt)) { player.grounded = true; player.jumps = 0; dodger.line('grind'); sfx.land(); }
   player.invuln -= dt;
   // test range: the hull slowly repairs itself
   if (mode === 'range' && player.hull < MAX_HULL) { player.regenT += dt; if (player.regenT > 2) { player.regenT = 0; player.hull++; hud.hull(player.hull, true); } }
@@ -493,10 +623,12 @@ const ctx = {
   heroPos: player.pos, heroVel: player.vel, colliders: world.colliders,
   get alive() { return state === 'playing' && player.hull > 0; },
   get aggression() { return aggression(); },
-  hurtHero(n, from) {
-    if (player.invuln > 0 || player.hull <= 0) return;
+  get groundY() { return player.groundY; },
+  hurtHero(n, from, force = false) {
+    if ((player.invuln > 0 && !force) || player.hull <= 0) return;
     player.hull -= n; player.invuln = 0.9; shake = 1;
     hero.hurt(); hud.hurt(); hud.hull(player.hull); buzz(60); sfx.hurt();
+    if (player.hull > 0) dodger.line(player.hull <= 2 ? 'low' : 'hurt');
     if (from) { const k = player.pos.clone().sub(from).setY(0).normalize().multiplyScalar(6); player.vel.x += k.x; player.vel.z += k.z; }
     if (player.hull <= 0) {
       if (mode === 'range') { player.hull = MAX_HULL; hud.hull(player.hull); hud.toast('Hull restored (test range)'); }
@@ -506,14 +638,29 @@ const ctx = {
   sound(name, pos) { sfx[name]?.(pos ? near(pos) : 1); },
   onKill(e) {
     sfx.explosion(near(e.pos), e.type === 'hornet' ? 1.2 : 0.9);
+    if (e.tag === 'boss') boss.crewDown();
     if (e.selfDestruct) return; // a roller that blew itself up earns nothing
     stats.kills++;
+    dodger.kill({ airborne: !player.grounded, grinding: rails.riding, dist: e.pos.distanceTo(player.pos) });
     dropNuts(e.pos.clone().add(V(0, 0.6, 0)), e.nuts);
     if (Math.random() < (player.hull <= 3 ? 0.35 : 0.12)) dropItem('cell', e.pos.clone().add(V(0, 0.8, 0)));
     else if (mode === 'waves' && Math.random() < 0.3) dropItem('ammo', e.pos.clone().add(V(0, 0.8, 0)));
     arsenal.addXp(lastWid, e.type === 'hornet' ? 40 : 20);
     shake = Math.max(shake, 0.5);
   },
+};
+
+// the boss uses the same hero, shots and rollers as the regular bots
+const bossCtx = {
+  get heroPos() { return player.pos; }, get alive() { return state === 'playing' && player.hull > 0; },
+  hurtHero: (n, from) => ctx.hurtHero(n, from),
+  fireShot: (from, to) => enemies.fireShot(from, to),
+  spawnRoller: (x, z) => { enemies.spawn('roller', x, z, { zone: world.levels.skyharbor.data.decks[2], tag: 'boss' }); sfx.spawn(0.8); },
+  sound: (name, pos) => ctx.sound(name, pos),
+  shake: n => { shake = Math.max(shake, n); },
+  onDead: at => story.bossDead(at),
+  // halfway: the cab spits out two repair cells and gets angry
+  onHalf: at => { dropItem('cell', at.clone()); dropItem('cell', at.clone()); dodger.story('dodger', 'It dropped repair cells! Grab them! Also, it looks angrier.'); },
 };
 
 // ---------- main loop ----------
@@ -527,7 +674,7 @@ function readPad(dt) {
     if (p.pressed(B.A)) input.jumpPressed = true;
     if (p.pressed(B.B) || p.pressed(B.LT)) input.dashPressed = true;
     if (p.pressed(B.START) || p.pressed(B.SELECT)) pause();
-    if (p.pressed(B.RB) || p.pressed(B.Y) || p.pressed(B.X)) selectWeapon((arsenal.index + 1) % WEAPONS.length);
+    if (p.pressed(B.RB) || p.pressed(B.Y) || p.pressed(B.X)) cycleWeapon(1);
     [B.UP, B.RIGHT, B.DOWN, B.LEFT].forEach((b, i) => { if (p.pressed(b)) selectWeapon(i); });
     if (p.held(B.LB)) {
       if (!padWheel) { padWheel = true; openWheel(); }
@@ -535,7 +682,8 @@ function readPad(dt) {
       const sx = Math.abs(p.lx) + Math.abs(p.ly) > 0.3 ? p.lx : p.mx, sy = Math.abs(p.lx) + Math.abs(p.ly) > 0.3 ? p.ly : -p.mz;
       wheel.point(sx, sy, true);
     } else if (padWheel) { padWheel = false; wheel.close(true); }
-  } else menu.pad(p, dt);
+  } else if (state === 'comic') comicPad(p);
+  else menu.pad(p, dt);
   return p;
 }
 function frame(dtRaw, render = true) {
@@ -547,6 +695,7 @@ function frame(dtRaw, render = true) {
   if (playing) {
     updatePlayer(dt, padWheel ? { ...p, lx: 0, ly: 0, mx: 0, mz: 0 } : p);
     updateWaves(dt); updateCalls(dt);
+    if (mode === 'story') story.update(dt);
   } else {
     input.jumpPressed = input.dashPressed = false; input.look.dx = input.look.dy = 0;
     if (state === 'title') player.yaw += dt * 0.08; // slow orbit behind the title card
@@ -556,9 +705,11 @@ function frame(dtRaw, render = true) {
     const wantFire = !wheel.open && (input.fire || (p && p.fire) || (touch && settings.autoFire && onTarget));
     if (arsenal.update(dt, { wantFire, aimPoint, aimDir, canFire: playing })) stats.shots++;
     enemies.update(dt, ctx);
+    boss.update(dt, bossCtx);
+    dodger.update(dt);
     range.update(dt, { heroPos: player.pos, active: mode === 'range' && playing, onCall: callBots });
     updatePickups(dt);
-    drone.update(dt, player.pos, player.yaw, enemies.list, e => { deal(e, 0.75, centerOf(e), arsenal.current.id); fx.sparks(centerOf(e), 0x8ffcff, 6, 3); sfx.zap(); });
+    drone.update(dt, player.pos, player.yaw, liveTargets().filter(t => t.type !== 'dummy'), e => { deal(e, 0.75, centerOf(e), arsenal.current.id); fx.sparks(centerOf(e), 0x8ffcff, 6, 3); sfx.zap(); });
     fx.update(dt);
   }
 
@@ -573,7 +724,7 @@ function frame(dtRaw, render = true) {
   else hero.root.rotation.x = 0;
   const w = arsenal.current;
   hero.animate(dt, {
-    speed: Math.hypot(player.vel.x, player.vel.z), grounded: player.grounded, vy: player.vel.y,
+    speed: rails.riding ? 0 : Math.hypot(player.vel.x, player.vel.z), grounded: player.grounded, vy: player.vel.y,
     aimPitch: gunPitch, heat: w.hot, jetting: player.jetT > 0 || (!player.grounded && player.jumps === 2 && player.vel.y > -3),
   });
 
@@ -582,8 +733,8 @@ function frame(dtRaw, render = true) {
   const left = enemies.list.length + waveState.toSpawn.length, out = enemies.list.length;
   hud.frame(dt, {
     camera, onTarget, targets: liveTargets(),
-    waveText: mode === 'range' ? 'TEST RANGE' : stats.wave ? `WAVE ${stats.wave}` : '',
-    leftText: mode === 'range' ? (out ? `${out} bot${out === 1 ? '' : 's'} out` : '') : stats.wave && waveState.clearT < 0 ? `${left} bot${left === 1 ? '' : 's'} left` : '',
+    waveText: mode === 'story' ? 'SKYHARBOR' : mode === 'range' ? 'TEST RANGE' : stats.wave ? `WAVE ${stats.wave}` : '',
+    leftText: mode === 'story' ? story.goal : mode === 'range' ? (out ? `${out} bot${out === 1 ? '' : 's'} out` : '') : stats.wave && waveState.clearT < 0 ? `${left} bot${left === 1 ? '' : 's'} left` : '',
   });
   if (wheel.open) wheel.refresh(arsenal.state, arsenal.index);
   if (touch) { touch.setDash(Math.max(0, player.dashCd) / 0.75); touch.setWeapon(ICONS[w.id], w.color); }
@@ -607,7 +758,8 @@ window.__game = {
   merged: world.merged, info() { renderer.info.autoReset = false; renderer.info.reset(); composer.render(); const r = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; renderer.info.autoReset = true; return r; },
   begin(m) { if (m) { mode = m; reset(); } begin(); }, reset, frame, render: () => composer.render(), set autoLoop(v) { autoLoop = v; },
   look(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; },
-  selectWeapon, callBots, openWheel, audioState,
+  selectWeapon, callBots, openWheel, audioState, story, rails, boss, dodger, gizmarts, world, extraTargets, buy, openShop,
+  aimAt(p) { const d = p.clone().sub(camPivot); player.yaw = Math.atan2(d.x, d.z); player.pitch = Math.atan2(d.y, Math.hypot(d.x, d.z)); },
   aimAtNearest() {
     const e = enemies.list.find(x => !x.dead); if (!e) return false;
     const d = centerOf(e).sub(camPivot);

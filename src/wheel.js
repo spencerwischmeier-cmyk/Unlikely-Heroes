@@ -24,8 +24,8 @@ export function createWheel(weapons, onPick) {
   function refresh(state, cur) {
     slots.forEach((s, k) => {
       const w = state[k];
-      s.querySelector('.wa').textContent = w.regen ? `V${w.level}` : `${Math.floor(w.ammo)}/${w.max} · V${w.level}`;
-      s.classList.toggle('sel', k === cur);
+      s.querySelector('.wa').textContent = w.owned === false ? 'LOCKED' : w.regen ? `V${w.level}` : `${Math.floor(w.ammo)}/${w.max} · V${w.level}`;
+      s.classList.toggle('sel', k === cur); s.classList.toggle('locked', w.owned === false);
     });
   }
   // direction from the centre (screen space, y down) picks the closest slot

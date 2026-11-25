@@ -4,7 +4,7 @@ import { buildSettings } from './settings.js';
 import { sfx, music } from './audio.js';
 
 const $ = id => document.getElementById(id);
-const SCREENS = ['title', 'pauseMenu', 'settingsMenu', 'over'];
+const SCREENS = ['title', 'pauseMenu', 'settingsMenu', 'over', 'shopMenu', 'done'];
 
 export function createMenu(onAction) {
   let current = 'title', back = 'title', focus = 0;
@@ -40,6 +40,7 @@ export function createMenu(onAction) {
   function cancel() {
     if (current === 'settingsMenu') show(back);
     else if (current === 'pauseMenu') onAction('resume');
+    else if (current === 'shopMenu') { sfx.uiSelect(); onAction('leave'); }
   }
   addEventListener('keydown', e => {
     if (!current) return;
@@ -70,5 +71,7 @@ export function createMenu(onAction) {
     if (p.pressed(B.B)) cancel();
     if (p.pressed(B.START) && current === 'pauseMenu') onAction('resume');
   }
-  return { show, hide, pad, get current() { return current; } };
+  // after a screen's buttons are rebuilt, keep the focus where it was
+  const refresh = () => { if (current) setFocus(focus); };
+  return { show, hide, pad, refresh, get current() { return current; } };
 }
