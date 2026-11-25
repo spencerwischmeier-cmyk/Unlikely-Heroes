@@ -1,5 +1,6 @@
 extends Node3D
-## Particle effects: sparks, explosions with flying scrap, dust puffs, shock rings, muzzle flashes.
+## Particle effects: sparks, explosions with flying scrap, dust puffs, shock rings, muzzle flashes,
+## death bursts, and telegraphs (ground warning rings that fill up before an attack lands).
 ## Autoloaded as FX. Everything is pooled-light: short-lived CPUParticles3D that free themselves.
 
 var shake_request := 0.0
@@ -114,3 +115,48 @@ func shake(n: float) -> void:
 
 func stop(t: float) -> void:
 	hitstop = maxf(hitstop, t)
+
+## Directional spark spray (hit reactions): sparks fly back along `dir` (the way the hit came from).
+func hit_sparks(pos: Vector3, dir: Vector3, color := Color(1, 0.85, 0.5), n := 10) -> void:
+	var d := -dir.normalized() if dir.length() > 0.01 else Vector3.UP
+	_emit(pos, _spark_mesh, _bill(color, 3.0), n, 0.3, Vector2(3, 8), Vector3(0, -14, 0), Vector2(0.5, 1.2), 45, (d + Vector3(0, 0.4, 0)).normalized())
+
+## A bot's death: a bright flash, a fireball, scrap chunks in its own colours, a second ring of sparks
+## in `color` and a couple of small pops just after.
+func death_burst(pos: Vector3, scale := 1.0, chunk_mats: Array = [], color := Color(1, 0.55, 0.2)) -> void:
+	explosion(pos, scale, chunk_mats)
+	_emit(pos, _fire_mesh, _bill(Color(1, 1, 1), 5.0), 1, 0.1, Vector2.ZERO, Vector3.ZERO, Vector2(4.0, 4.0) * scale)
+	_emit(pos, _spark_mesh, _bill(color, 4.0), 30, 0.5, Vector2(6, 14) * scale, Vector3(0, -6, 0), Vector2(0.8, 1.8), 100, Vector3.UP)
+	ring(pos + Vector3(0, -0.3, 0), color, scale * 1.4)
+	for i in 2:
+		var off := Vector3(randf_range(-0.6, 0.6), randf_range(0.1, 0.7), randf_range(-0.6, 0.6)) * scale
+		get_tree().create_timer(0.12 + i * 0.13).timeout.connect(func(): sparks(pos + off, Color(1, 0.7, 0.3), 10, 5.0 * scale))
+
+## A trail puff for something falling in flames.
+func smoke_trail(pos: Vector3, scale := 1.0) -> void:
+	var m := _bill(Color(0.3, 0.3, 0.34), 1.0); m.blend_mode = BaseMaterial3D.BLEND_MODE_MIX; m.albedo_color.a = 0.6
+	_emit(pos, _smoke_mesh, m, 2, 0.9, Vector2(0.2, 0.8), Vector3(0, 1.0, 0), Vector2(0.5, 1.1) * scale, 60)
+	_emit(pos, _fire_mesh, _bill(Color(1, 0.5, 0.15), 2.5), 1, 0.2, Vector2.ZERO, Vector3.ZERO, Vector2(0.5, 0.8) * scale)
+
+## Telegraph: a flat ring on the ground with a disc that fills it over `time` seconds, then vanishes.
+## Read it as "this circle gets hit when the disc is full". Returns the node (free it to cancel early).
+func warn_ring(pos: Vector3, radius: float, time: float, color := Color(1, 0.2, 0.12)) -> Node3D:
+	var root := Node3D.new()
+	add_child(root); root.global_position = pos + Vector3(0, 0.06, 0)
+	var rm := StandardMaterial3D.new(); rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; rm.albedo_color = Color(color.r, color.g, color.b, 0.85)
+	rm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var tr := TorusMesh.new(); tr.inner_radius = radius - 0.12; tr.outer_radius = radius; tr.rings = 48; tr.ring_segments = 4
+	var ring_mi := MeshInstance3D.new(); ring_mi.mesh = tr; ring_mi.material_override = rm; ring_mi.scale = Vector3(1, 0.05, 1)
+	ring_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(ring_mi)
+	var dm := rm.duplicate() as StandardMaterial3D; dm.albedo_color = Color(color.r, color.g, color.b, 0.28)
+	var disc := CylinderMesh.new(); disc.top_radius = radius; disc.bottom_radius = radius; disc.height = 0.02; disc.radial_segments = 40; disc.rings = 1
+	var disc_mi := MeshInstance3D.new(); disc_mi.mesh = disc; disc_mi.material_override = dm; disc_mi.scale = Vector3(0.05, 1, 0.05)
+	disc_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(disc_mi)
+	var tw := root.create_tween().set_parallel()
+	tw.tween_property(disc_mi, "scale", Vector3.ONE, time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(dm, "albedo_color:a", 0.5, time)
+	tw.chain().tween_callback(root.queue_free)
+	return root

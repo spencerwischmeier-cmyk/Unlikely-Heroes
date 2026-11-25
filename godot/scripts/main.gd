@@ -118,6 +118,7 @@ func _build_environment() -> void:
 	add_child(sun)
 
 func spawn_bot(kind: String, pos: Vector3, zone := Rect2()) -> Node3D:
+	if kind == "crew": return load("res://scripts/enemy_crew.gd").spawn(self, combat, player, pos, zone)
 	var b: Node3D = (Roller if kind == "roller" else Hornet).new()
 	b.combat = combat; b.player = player; b.zone = zone
 	add_child(b)
