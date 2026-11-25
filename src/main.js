@@ -162,20 +162,27 @@ addEventListener('keydown', e => {
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.dashPressed = true;
   if (e.code === 'KeyQ' || e.code === 'Tab') { openWheel(); e.preventDefault(); }
   if (/^Digit[1-4]$/.test(e.code)) selectWeapon(+e.code.slice(5) - 1);
-  if (e.code === 'KeyP') pause();
+  if (e.code === 'KeyP' || (e.code === 'Escape' && !document.pointerLockElement)) pause();
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') input.jumpPressed = true; // controllers in keyboard mode send Enter for A
 });
 addEventListener('keyup', e => {
   keys.delete(e.code);
   if ((e.code === 'KeyQ' || e.code === 'Tab') && wheel.open) wheel.close(true);
 });
 addEventListener('blur', () => { keys.clear(); input.fire = false; });
-addEventListener('mousedown', e => { if (e.button === 0 && state === 'playing' && !wheel.open && !TOUCH) input.fire = true; });
-addEventListener('mouseup', e => { if (e.button === 0) input.fire = false; });
+const realMouse = e => (e.pointerType ? e.pointerType === 'mouse' : true) && !e.sourceCapabilities?.firesTouchEvents;
+addEventListener('mousedown', e => {
+  if (!realMouse(e) || state !== 'playing' || wheel.open) return;
+  if (e.button === 0) input.fire = true;
+  if (e.button === 2) input.dashPressed = true;
+});
+addEventListener('mouseup', e => { if (realMouse(e) && e.button === 0) input.fire = false; });
 addEventListener('wheel', e => { if (state === 'playing' && !wheel.open) selectWeapon((arsenal.index + (e.deltaY > 0 ? 1 : -1) + WEAPONS.length) % WEAPONS.length); }, { passive: true });
 let ignoreMouseUntil = 0;
-addEventListener('mousemove', e => {
+addEventListener('pointermove', e => {
+  if (!realMouse(e)) return;
   // browsers can report one huge jump when the pointer gets locked; skip it
-  if (state !== 'playing' || performance.now() < ignoreMouseUntil || TOUCH) return;
+  if (state !== 'playing' || performance.now() < ignoreMouseUntil) return;
   if (Math.abs(e.movementX) > 250 || Math.abs(e.movementY) > 250) return;
   if (wheel.open) { wheel.point(e.movementX, e.movementY); return; }
   input.look.dx += e.movementX * settings.sens; input.look.dy += e.movementY * settings.sens;
