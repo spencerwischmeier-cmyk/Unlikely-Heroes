@@ -14,6 +14,10 @@ Open this `godot/` folder in **Godot 4.7** (Project Manager > Import > pick `pro
 | Swing from a hook | E | Y |
 | Melee | F | X |
 | Fire | left click | RT |
+| Weapon wheel (hold) | Q | LB |
+| Pick a weapon | 1-4 or mouse wheel | D-pad left/right |
+| Talk to Gizmart | E | Y |
+| Pause | Esc | Start |
 
 ## Layout
 
