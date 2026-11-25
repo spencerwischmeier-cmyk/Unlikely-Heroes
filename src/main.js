@@ -570,3 +570,8 @@ window.__game = {
     return true;
   },
 };
+
+// offline / home-screen support (only in the built game, so the dev server always serves fresh code)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}

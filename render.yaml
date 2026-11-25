@@ -1,0 +1,15 @@
+# Render blueprint: hosts the game as a free static site.
+# In Render: New + > Blueprint > pick this repo > Apply.
+services:
+  - type: web
+    name: unlikely-heroes
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache

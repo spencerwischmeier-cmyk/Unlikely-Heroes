@@ -22,6 +22,11 @@ Then open the address Vite prints (usually http://localhost:5173). The look test
 2. On a phone connected to the same Wi-Fi, open that address in Chrome or Safari and turn the phone sideways.
 3. Tap to play. Phones get touch controls and a lighter graphics mode automatically.
 
+### Put it online (Render)
+`render.yaml` sets the game up as a free Render static site. In the Render dashboard choose **New + > Blueprint**,
+pick this repo and click **Apply**. Every push then rebuilds and publishes the game. On a phone, open the Render
+address and use **Add to Home Screen**: it gets its own icon, opens full screen, and works offline after the first load.
+
 ## How to play
 Fight off waves of bots on a floating deck above the sky city.
 
@@ -56,6 +61,7 @@ URL switches: `?lq=1` for a lighter mode on slow machines, `?bloom=0` to turn of
 - `src/touch.js`: phone controls.
 - `src/fx.js`: sparks, explosions, smoke and debris.
 - `src/hud.css`: HUD and menu styles.
+- `public/`: home-screen app files (manifest, icons, offline service worker).
 
 ## Next steps
 Real models from Blender to replace the basic-shape characters, more weapons and a weapon wheel, sound, and then traversal (grind rails, grapple) and the first full planet.
