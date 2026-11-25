@@ -11,9 +11,12 @@ import { createHero } from './hero.js';
 import { createDrone } from './drone.js';
 import { createEnemies, pushOut } from './enemies.js';
 import { createFx } from './fx.js';
+import { createTouch } from './touch.js';
 
 const params = new URLSearchParams(location.search);
-const LQ = params.get('lq') === '1';
+// phones and tablets get touch controls and the lighter graphics mode by default
+const TOUCH = params.get('touch') === '1' || (params.get('touch') !== '0' && matchMedia('(pointer: coarse)').matches);
+const LQ = params.has('lq') ? params.get('lq') === '1' : TOUCH;
 const $ = id => document.getElementById(id);
 
 // ---------- renderer ----------
@@ -100,6 +103,8 @@ function readGamepad() {
   };
 }
 let padPrev = {};
+const touch = TOUCH ? createTouch({ input, isPlaying: () => state === 'playing', onPause: () => pause() }) : null;
+if (TOUCH) { $('go').textContent = 'Tap to play'; document.querySelector('#over .go').textContent = 'Tap to try again'; }
 
 // ---------- game state ----------
 let state = 'title';
@@ -134,7 +139,12 @@ function reset() {
   hud.full();
 }
 function begin() {
-  lock();
+  if (touch) {
+    // go full screen and sideways where the browser allows it
+    const de = document.documentElement;
+    if (!document.fullscreenElement && de.requestFullscreen) de.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+    touch.reset(); touch.show(true);
+  } else lock();
   $('title').classList.add('hidden'); $('over').classList.add('hidden');
   if (stats.wave === 0 && waveState.clearT < 0) waveState.clearT = 1.2;
   state = 'playing';
@@ -142,10 +152,11 @@ function begin() {
 }
 function pause() {
   state = 'paused'; input.fire = false;
-  $('title').classList.remove('hidden'); $('go').textContent = 'Paused: click to resume';
+  touch?.show(false);
+  $('title').classList.remove('hidden'); $('go').textContent = touch ? 'Paused: tap to resume' : 'Paused: click to resume';
 }
 function gameOver() {
-  state = 'dead'; input.fire = false;
+  state = 'dead'; input.fire = false; touch?.show(false);
   if (document.pointerLockElement) document.exitPointerLock();
   $('summary').innerHTML = `You reached wave <b>${stats.wave}</b>, wrecked <b>${stats.kills}</b> bots and banked <b>${stats.nuts.toLocaleString()}</b> hex nuts.`;
   setTimeout(() => $('over').classList.remove('hidden'), 1200);
@@ -206,6 +217,20 @@ function updatePlayer(dt, pad) {
   player.yaw -= input.look.dx * sens; player.pitch -= input.look.dy * sens;
   input.look.dx = input.look.dy = 0;
   if (pad) { player.yaw -= pad.lx * 3.2 * dt; player.pitch -= pad.ly * 2.2 * dt; }
+  // gentle aim assist on touch screens: while firing, drift toward the bot nearest the crosshair
+  if (touch && input.fire) {
+    let best = null, bestA = 0.16;
+    for (const e of enemies.list) {
+      const d = e.pos.clone().add(V(0, e.type === 'roller' ? 0.55 : 0, 0)).sub(camPivot);
+      const a = d.clone().normalize().angleTo(aimDir);
+      if (a < bestA && d.length() < 30) { bestA = a; best = d; }
+    }
+    if (best) {
+      const k = 1 - Math.exp(-5 * dt);
+      player.yaw += angleDiff(player.yaw, Math.atan2(best.x, best.z)) * k;
+      player.pitch += (Math.atan2(best.y, Math.hypot(best.x, best.z)) - player.pitch) * k;
+    }
+  }
   player.pitch = clamp(player.pitch, -0.65, 0.5);
 
   // move relative to the camera
@@ -215,6 +240,7 @@ function updatePlayer(dt, pad) {
   if (keys.has('KeyD') || keys.has('ArrowRight')) mx += 1;
   if (keys.has('KeyA') || keys.has('ArrowLeft')) mx -= 1;
   if (pad) { mx += pad.mx; mz += pad.mz; }
+  if (input.touchMove) { mx += input.touchMove.x; mz += input.touchMove.z; }
   const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
   const fwd = V(Math.sin(player.yaw), 0, Math.cos(player.yaw));
   const right = V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));
@@ -244,7 +270,7 @@ function updatePlayer(dt, pad) {
   input.jumpPressed = false;
   player.jetT -= dt;
   // holding jump while falling glides a little
-  const gliding = !player.grounded && player.vel.y < 0 && (keys.has('Space') || pad?.jump) && player.jumps === 2;
+  const gliding = !player.grounded && player.vel.y < 0 && (keys.has('Space') || pad?.jump || input.jumpHeld) && player.jumps === 2;
   player.vel.y -= GRAV * dt * (gliding ? 0.35 : 1);
   if (gliding) player.vel.y = Math.max(player.vel.y, -3);
 

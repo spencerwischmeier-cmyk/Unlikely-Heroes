@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#04182a">
 <title>Unlikely Heroes: blaster prototype</title>
 <link rel="stylesheet" href="./src/hud.css">
 </head><body>
@@ -24,6 +27,13 @@
   <h1>UNLIKELY HEROES</h1>
   <h2>blaster prototype</h2>
   <p class="go" id="go">Click to play</p>
+  <table class="keys touchhelp">
+    <tr><td>Left thumb</td><td>move (stick appears where you touch)</td></tr>
+    <tr><td>Right thumb</td><td>drag to aim</td></tr>
+    <tr><td>FIRE</td><td>hold to shoot, slide to aim</td></tr>
+    <tr><td>JUMP</td><td>tap again in the air to jet-boost</td></tr>
+    <tr><td>DASH</td><td>quick dodge</td></tr>
+  </table>
   <table class="keys">
     <tr><td>WASD</td><td>move</td></tr>
     <tr><td>Mouse</td><td>aim</td></tr>
@@ -32,8 +42,9 @@
     <tr><td>Shift</td><td>dash</td></tr>
     <tr><td>Esc</td><td>pause</td></tr>
   </table>
-  <p class="small">Gamepad works too: left stick move, right stick aim, RT fire, A jump, B dash.</p>
+  <p class="small padhelp">Gamepad works too: left stick move, right stick aim, RT fire, A jump, B dash.</p>
 </div>
+<div class="rotate">Turn your phone sideways to play</div>
 <div class="overlay hidden" id="over">
   <h1>HULL BREACHED</h1>
   <p id="summary"></p>

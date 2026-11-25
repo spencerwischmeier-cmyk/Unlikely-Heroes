@@ -42,3 +42,36 @@ canvas{display:block}
 .keys{margin:10px auto;border-collapse:collapse;font-size:16px}
 .keys td{padding:3px 10px}.keys td:first-child{text-align:right;font-weight:900;color:#5ff2ff}.keys td:last-child{text-align:left}
 @keyframes pulse{50%{opacity:.5}}
+
+/* ---------- phone controls ---------- */
+body.touch{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none}
+#touch{position:fixed;inset:0;display:none;z-index:5}
+#touch.on{display:block}
+.tzone{position:absolute;top:0;bottom:0}
+.tzone.left{left:0;width:45%}
+.tzone.right{right:0;width:55%}
+.stick{position:absolute;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;border:3px solid #5ff2ff99;background:radial-gradient(#0d3a4c66,#05141d55);display:none;pointer-events:none}
+.stick.on{display:block}
+.stick .knob{position:absolute;left:50%;top:50%;width:52px;height:52px;border-radius:50%;background:radial-gradient(#bff9ff,#3fc8e0);box-shadow:0 0 14px #3ef;transform:translate(-50%,-50%)}
+.tbtn{position:absolute;border-radius:50%;border:3px solid #ffffffaa;color:#fff;font:900 italic 15px "Inter",system-ui,sans-serif;letter-spacing:1px;background:radial-gradient(#ffffff33,#ffffff11);text-shadow:0 1px 4px #000a;padding:0;-webkit-tap-highlight-color:transparent}
+.tbtn.down{background:radial-gradient(#ffffff88,#ffffff33);transform:scale(.94)}
+.tbtn.fire{right:calc(22px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:104px;height:104px;border-color:#5ff2ff;background:radial-gradient(#3ef6ff55,#0d3a4c55);font-size:18px}
+.tbtn.jump{right:calc(138px + env(safe-area-inset-right));bottom:calc(22px + env(safe-area-inset-bottom));width:72px;height:72px}
+.tbtn.dash{right:calc(40px + env(safe-area-inset-right));bottom:calc(146px + env(safe-area-inset-bottom));width:64px;height:64px;font-size:13px}
+.tpause{position:absolute;left:50%;top:78px;transform:translateX(-50%);width:44px;height:36px;border-radius:8px;border:2px solid #ffffff88;background:#0006;color:#fff;font-size:14px;padding:0}
+/* the weapon panel moves up out of the way of the buttons on phones */
+body.touch .wpn{bottom:auto;top:76px;transform:scale(.62);transform-origin:top right}
+body.touch .wpn .ring{display:none}
+.rotate{display:none}
+@media (orientation:portrait){ body.touch .rotate{display:flex;position:fixed;inset:0;z-index:20;align-items:center;justify-content:center;flex-direction:column;background:#020a10f2;color:#fff;font:900 italic 24px "Inter",system-ui,sans-serif;text-align:center} }
+@media (max-height:500px){
+  .hp{left:16px;top:12px;transform:scale(.7);transform-origin:top left}
+  .cur{right:16px;top:10px;font-size:28px}
+  .wave{top:10px;font-size:16px}.left{top:32px;font-size:12px}
+  .tpause{top:52px}
+  .banner{font-size:36px}.banner small{font-size:15px}
+  .overlay h1{font-size:40px}.overlay h2{margin-bottom:12px;font-size:14px}.keys{font-size:13px}
+}
+.touchhelp{display:none}
+body.touch .keys,body.touch .padhelp{display:none}
+body.touch .touchhelp{display:table}
