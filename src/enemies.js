@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { V, std, glow, mesh, glowSprite, rand, clamp, UP } from './util.js';
-import { ARENA } from './world.js';
+import { ARENA, onDeck } from './world.js';
 import { ownMaterials, mergeByMaterial } from './models.js';
 
 const shellMat = std(0x2d333d, 0.85, 0.32);
@@ -220,7 +220,7 @@ export function createEnemies(scene, fx, models = {}) {
       }
       // deck and props
       const p = s.m.position;
-      if (!hit && p.y < 0 && p.x > ARENA.minX - 0.5 && p.x < ARENA.maxX + 0.5 && p.z > ARENA.minZ - 0.5 && p.z < ARENA.maxZ + 0.5) hit = true;
+      if (!hit && p.y < 0 && onDeck(p.x, p.z)) hit = true;
       if (!hit) for (const c of ctx.colliders) if (p.x > c.min.x && p.x < c.max.x && p.y > c.min.y && p.y < c.max.y && p.z > c.min.z && p.z < c.max.z) { hit = true; break; }
       if (hit || s.life <= 0) {
         if (hit) fx.sparks(p.clone(), 0xff6040, 8, 4);

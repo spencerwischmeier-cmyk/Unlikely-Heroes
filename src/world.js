@@ -4,7 +4,9 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { rnd, R, V, UP, std, glow, mesh, canvasTex, glowSprite } from './util.js';
 
-export const ARENA = { minX: -14, maxX: 14, minZ: -11, maxZ: 11 };
+export const ARENA = { minX: -36, maxX: 36, minZ: -40, maxZ: 30 };
+// is (x, z) over the deck?
+export const onDeck = (x, z, m = 0.5) => x > ARENA.minX - m && x < ARENA.maxX + m && z > ARENA.minZ - m && z < ARENA.maxZ + m;
 
 export function createWorld(renderer, scene, { lq = false } = {}) {
   const FOG = new THREE.Color().setRGB(0.33, 0.6, 0.76);
@@ -229,7 +231,7 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   }
 
   // grind rail looping behind the arena (scenery for now)
-  const railCurve = new THREE.CatmullRomCurve3([V(-24, 1.2, -16), V(-12, 2.6, -20), V(0, 4.6, -22), V(12, 5.2, -24), V(22, 3.8, -18), V(30, 4.5, -8)]);
+  const railCurve = new THREE.CatmullRomCurve3([V(-46, 2, -40), V(-26, 3.6, -47), V(0, 5.6, -49), V(22, 6, -48), V(42, 4.8, -42), V(50, 5, -26)]);
   scene.add(mesh(new THREE.TubeGeometry(railCurve, 200, 0.16, 12), std(0xd8e2ea, 0.95, 0.18)));
   const railGlowCurve = new THREE.CatmullRomCurve3(railCurve.points.map(p => p.clone().add(V(0, -0.22, 0))));
   scene.add(mesh(new THREE.TubeGeometry(railGlowCurve, 200, 0.04, 8), glow(0xffb43a, 2.5), false, false));
@@ -240,39 +242,66 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   }
 
   // ---------- arena deck ----------
+  // One big deck split into zones: the original combat deck in the middle, a target range to the north,
+  // a jump course to the east, a cover yard to the west and open ground to the south.
   const W = ARENA.maxX - ARENA.minX + 1, D = ARENA.maxZ - ARENA.minZ + 1;
   const deckTex = panelTex.clone(); deckTex.needsUpdate = true; deckTex.repeat.set(W / 3.6, D / 3.6);
   const deck = mesh(new RoundedBoxGeometry(W, 1.2, D, 4, 0.2), std(0xffffff, 0.75, 0.38, { map: deckTex }), false, true);
   deck.position.set(0, -0.6, 0); scene.add(deck);
-  const underside = mesh(new THREE.CylinderGeometry(9, 2, 16, 40), metalDark, false, false); underside.position.set(0, -9, 0); scene.add(underside);
-  const coreGlow = mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.6, 32), glow(0x40f0ff, 4), false, false); coreGlow.position.set(0, -17, 0); scene.add(coreGlow);
-  // hazard edging and railings on all four sides
+  for (const [x, z, r] of [[0, -5, 16], [-24, -22, 8], [24, 16, 8], [24, -22, 8], [-24, 16, 8]]) {
+    const underside = mesh(new THREE.CylinderGeometry(r, r * 0.25, r * 1.8, 32), metalDark, false, false); underside.position.set(x, -1.2 - r * 0.9, z); scene.add(underside);
+    const coreGlow = mesh(new THREE.CylinderGeometry(r * 0.24, r * 0.24, 0.6, 24), glow(0x40f0ff, 4), false, false); coreGlow.position.set(x, -1.2 - r * 1.8, z); scene.add(coreGlow);
+  }
+  // hazard edging and railings on all four sides (posts are one instanced mesh to keep draw calls down)
+  const postGeo = new THREE.CylinderGeometry(0.05, 0.06, 1, 8);
+  const postSpots = [];
   const edge = (len, x, z, rotY) => {
     const t = hazardTex.clone(); t.needsUpdate = true; t.repeat.set(len / 2, 1);
     const hz = mesh(new THREE.BoxGeometry(len, 0.22, 0.3), std(0xffffff, 0.3, 0.5, { map: t }), false, true);
     hz.position.set(x, -0.08, z); hz.rotation.y = rotY; scene.add(hz);
-    const top = mesh(new THREE.CylinderGeometry(0.06, 0.06, len, 12), metalWhite); top.rotation.z = Math.PI / 2; top.rotation.y = rotY; top.position.set(x, 1.0, z); scene.add(top);
+    const top = mesh(new THREE.CylinderGeometry(0.06, 0.06, len, 8), metalWhite, false, false); top.rotation.z = Math.PI / 2; top.rotation.y = rotY; top.position.set(x, 1.0, z); scene.add(top);
     const light = mesh(new THREE.BoxGeometry(len, 0.03, 0.03), glow(0x40f0ff, 2.2), false, false); light.position.set(x, 0.9, z); light.rotation.y = rotY; scene.add(light);
     const n = Math.round(len / 2.4);
-    for (let i = 0; i <= n; i++) {
-      const u = -len / 2 + i * len / n;
-      const p = mesh(new THREE.CylinderGeometry(0.05, 0.06, 1, 10), metalWhite);
-      p.position.set(x + Math.cos(rotY) * u, 0.5, z - Math.sin(rotY) * u); scene.add(p);
-    }
+    for (let i = 0; i <= n; i++) { const u = -len / 2 + i * len / n; postSpots.push([x + Math.cos(rotY) * u, z - Math.sin(rotY) * u]); }
   };
   edge(W - 0.4, 0, ARENA.minZ - 0.3, 0); edge(W - 0.4, 0, ARENA.maxZ + 0.3, 0);
   edge(D - 0.4, ARENA.minX - 0.3, 0, Math.PI / 2); edge(D - 0.4, ARENA.maxX + 0.3, 0, Math.PI / 2);
-  // floor light strips
-  for (const z of [-6, 0, 6]) { const s = mesh(new THREE.BoxGeometry(W - 4, 0.02, 0.07), glow(0x4ff2ff, 2.5), false, false); s.position.set(0, 0.012, z); scene.add(s); }
+  const posts = new THREE.InstancedMesh(postGeo, metalWhite, postSpots.length);
+  postSpots.forEach(([x, z], i) => posts.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.5, z)));
+  scene.add(posts);
+  // glowing lines on the floor: the old arena border and the zone dividers
+  const lineMat = glow(0x4ff2ff, 2.5), warmLine = glow(0xffa030, 2.2);
+  const floorLine = (x, z, sx, sz, m = lineMat) => { const s = mesh(new THREE.BoxGeometry(sx, 0.02, sz), m, false, false); s.position.set(x, 0.012, z); scene.add(s); };
+  for (const z of [-6, 0, 6]) floorLine(0, z, 24, 0.07);
+  floorLine(0, -11.5, 29, 0.12, warmLine); floorLine(0, 11.5, 29, 0.12, warmLine);
+  floorLine(-14.5, 0, 0.12, 23, warmLine); floorLine(14.5, 0, 0.12, 23, warmLine);
 
-  // raised pads the hero can jump onto
+  // painted zone labels on the deck
+  const labelMat = (text, color) => {
+    const t = canvasTex(1024, 192, (g, w, h) => {
+      g.clearRect(0, 0, w, h); g.font = 'italic 900 120px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = color; g.fillText(text, w / 2, h / 2 + 6);
+    });
+    return new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0.85, toneMapped: false });
+  };
+  const label = (text, x, z, rotY = 0, size = 9, color = '#ffffff') => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.1875), labelMat(text, color));
+    m.rotation.x = -Math.PI / 2; m.rotation.z = rotY; m.position.set(x, 0.02, z); scene.add(m); return m;
+  };
+  label('TARGET RANGE', 0, -13.6, 0, 10, '#ffe7a0');
+  label('JUMP COURSE', 17.4, 0, Math.PI / 2, 10, '#bff9ff');
+  label('COVER YARD', -17.4, 0, -Math.PI / 2, 10, '#ffc7d8');
+
   const padMat = std(0x9fb2c2, 0.7, 0.35, { map: deckTex });
-  for (const [x, z, sx, sz, h] of [[-8.5, -6, 4.2, 4.2, 1.3], [8.5, 5.5, 4.2, 4.2, 1.3], [0, -8.4, 6, 2.6, 2.2]]) {
-    const p = mesh(new RoundedBoxGeometry(sx, h, sz, 3, 0.1), padMat); p.position.set(x, h / 2, z); scene.add(p);
-    const lip = mesh(new THREE.BoxGeometry(sx + 0.02, 0.05, sz + 0.02), glow(0xffa030, 2.2), false, false); lip.position.set(x, h - 0.05, z); scene.add(lip);
-    addCollider(x, h / 2, z, sx, h, sz);
-  }
-  // vents
+  const lipMat = glow(0xffa030, 2.2);
+  const block = (x, z, sx, sz, h, y0 = 0, mat = padMat, lip = true) => {
+    const p = mesh(new RoundedBoxGeometry(sx, h, sz, 2, Math.min(0.1, h / 3)), mat); p.position.set(x, y0 + h / 2, z); scene.add(p);
+    if (lip) { const l = mesh(new THREE.BoxGeometry(sx + 0.02, 0.05, sz + 0.02), lipMat, false, false); l.position.set(x, y0 + h - 0.05, z); scene.add(l); }
+    addCollider(x, y0 + h / 2, z, sx, h, sz); return p;
+  };
+
+  // ---- centre: the original combat deck ----
+  for (const [x, z, sx, sz, h] of [[-8.5, -6, 4.2, 4.2, 1.3], [8.5, 5.5, 4.2, 4.2, 1.3], [0, -8.4, 6, 2.6, 2.2]]) block(x, z, sx, sz, h);
   for (const [x, z] of [[-4.6, 3.6], [5, -3.6]]) {
     const vent = mesh(new RoundedBoxGeometry(1.6, 0.5, 1.2, 3, 0.1), metalBlue); vent.position.set(x, 0.25, z); scene.add(vent);
     const vg = mesh(new THREE.BoxGeometry(1.2, 0.04, 0.8), glow(0xff8a30, 2), false, false); vg.position.set(x, 0.51, z); scene.add(vg);
@@ -283,13 +312,14 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   const crateEdge = std(0x3a3f47, 0.8, 0.35);
   const hexIcon = canvasTex(128, 128, (g, w) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, w); g.strokeStyle = '#fff'; g.lineWidth = 10; g.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; g.lineTo(64 + Math.cos(a) * 40, 64 + Math.sin(a) * 40); } g.closePath(); g.stroke(); g.beginPath(); g.arc(64, 64, 14, 0, 7); g.stroke(); });
   const iconMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xfff0a0, emissiveMap: hexIcon, emissiveIntensity: 1.8, transparent: true, alphaMap: hexIcon });
+  const crateBox = new RoundedBoxGeometry(0.8, 0.8, 0.8, 3, 0.06), crateEdgeGeo = new RoundedBoxGeometry(0.12, 0.84, 0.12, 2, 0.03), iconGeo = new THREE.PlaneGeometry(0.5, 0.5);
   function crate(x, y, z, s = 1) {
-    const g = new THREE.Group(); g.position.set(x, y + s * 0.4, z);
-    g.add(mesh(new RoundedBoxGeometry(0.8 * s, 0.8 * s, 0.8 * s, 3, 0.06 * s), crateMat));
-    for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const e = mesh(new RoundedBoxGeometry(0.12 * s, 0.84 * s, 0.12 * s, 2, 0.03), crateEdge); e.position.set(sx * 0.37 * s, 0, sy * 0.37 * s); g.add(e); }
+    const g = new THREE.Group(); g.position.set(x, y + s * 0.4, z); g.scale.setScalar(s);
+    g.add(mesh(crateBox, crateMat));
+    for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const e = mesh(crateEdgeGeo, crateEdge); e.position.set(sx * 0.37, 0, sy * 0.37); g.add(e); }
     for (let k = 0; k < 4; k++) {
-      const icon = new THREE.Mesh(new THREE.PlaneGeometry(0.5 * s, 0.5 * s), iconMat);
-      icon.rotation.y = k * Math.PI / 2; icon.position.set(Math.sin(k * Math.PI / 2) * 0.405 * s, 0, Math.cos(k * Math.PI / 2) * 0.405 * s); g.add(icon);
+      const icon = new THREE.Mesh(iconGeo, iconMat);
+      icon.rotation.y = k * Math.PI / 2; icon.position.set(Math.sin(k * Math.PI / 2) * 0.405, 0, Math.cos(k * Math.PI / 2) * 0.405); g.add(icon);
     }
     scene.add(g); addCollider(x, y + s * 0.4, z, 0.8 * s, 0.8 * s, 0.8 * s); return g;
   }
@@ -297,9 +327,38 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   crate(3.2, 0, 2.8, 1.3); crate(10.5, 0, -6.5, 1.3); crate(11.6, 0, -6.2, 1.1);
   crate(-10.5, 0, 6.5, 1.3); crate(-11.5, 0, 5.2, 1.1); crate(-0.5, 0, 7.5, 1.2);
 
+  // ---- north: target range (the targets themselves live in range.js) ----
+  // a low counter marks the firing line; numbered lane markers show the distance
+  for (const x of [-9, -3, 3, 9]) block(x, -14.8, 3.6, 0.6, 1.0, 0, std(0x5f8fb0, 0.7, 0.32));
+  for (const d of [5, 10, 20]) label(`${d} m`, -13, -15.1 - d, 0, 3.2, '#ffe7a0');
+  // back wall that catches stray shots
+  block(0, ARENA.minZ + 0.8, 26, 0.6, 3.2, 0, std(0x34404c, 0.75, 0.4));
+
+  // ---- east: jump course ----
+  const jc = std(0x7fb4d0, 0.6, 0.35, { map: deckTex });
+  [[18, -6, 1.0], [20.5, -6, 2.0], [23, -6, 3.0], [25.5, -6, 4.0]].forEach(([x, z, h]) => block(x, z, 2.4, 2.4, h, 0, jc)); // stairs
+  block(28.5, -6, 3.6, 3.6, 4.0, 0, jc);                    // landing
+  block(28.5, 0.5, 2.2, 2.2, 0.5, 4.2, jc);                 // floating stepping stones (jet-boost between them)
+  block(28.5, 6.5, 2.2, 2.2, 0.5, 4.6, jc);
+  block(24, 10.5, 2.2, 2.2, 0.5, 5.2, jc);
+  block(18.5, 10.5, 4.0, 4.0, 6.0, 0, jc);                  // the summit
+  const flag = mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4, 8), metalWhite); flag.position.set(18.5, 7.2, 10.5); scene.add(flag);
+  const flagCloth = mesh(new THREE.PlaneGeometry(1.1, 0.6), new THREE.MeshStandardMaterial({ color: 0xffb020, side: THREE.DoubleSide, emissive: 0x6a3a00, emissiveIntensity: 0.5 })); flagCloth.position.set(19.05, 8.05, 10.5); scene.add(flagCloth);
+  block(31, 16, 3, 3, 1.5, 0, jc); block(27, 19, 3, 3, 2.5, 0, jc); block(23, 22, 3, 3, 3.5, 0, jc); // a second, easier hop line
+  for (const [x, z] of [[33, -14], [27, -15], [21, -14]]) block(x, z, 1.4, 1.4, 2.6, 0, std(0xdfe8ee, 0.65, 0.28)); // pillars
+
+  // ---- west: cover yard ----
+  const wallMat = std(0x5f8fb0, 0.7, 0.32);
+  for (const [x, z, sx, sz] of [[-19, -7, 6, 0.6], [-25, -2, 0.6, 7], [-31, -8, 5, 0.6], [-19, 5, 0.6, 6], [-26, 9, 7, 0.6], [-32, 3, 0.6, 5], [-22, 18, 5, 0.6], [-30, 20, 0.6, 5], [-20, -20, 0.6, 6], [-28, -18, 6, 0.6]]) block(x, z, sx, sz, 2.2, 0, wallMat);
+  for (const [x, z, s] of [[-22, -3, 1.2], [-29, 6, 1.3], [-28.2, 6.3, 1.0], [-23, 13, 1.2], [-33, -14, 1.3], [-17, 12, 1.1], [-25, -12, 1.2]]) crate(x, 0, z, s);
+
+  // ---- south: open ground with a few low cover pieces ----
+  for (const [x, z] of [[-8, 17], [9, 20], [0, 25], [-14, 25], [14, 14]]) block(x, z, 2.6, 1.2, 0.9, 0, std(0x34404c, 0.75, 0.4));
+  crate(5, 0, 16, 1.2); crate(-4, 0, 21, 1.3);
+
   // dust motes near the arena
   const motes = [];
-  for (let i = 0; i < 40; i++) { const s = glowSprite(0xfff4d8, R(0.015, 0.04), R(0.2, 0.45)); s.position.set(R(-14, 14), R(0.2, 4), R(-11, 11)); scene.add(s); motes.push(s); }
+  for (let i = 0; i < 70; i++) { const s = glowSprite(0xfff4d8, R(0.015, 0.04), R(0.2, 0.45)); s.position.set(R(-30, 30), R(0.2, 4), R(-26, 26)); scene.add(s); motes.push(s); }
 
   scene.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; ms.forEach(m => { if ('roughness' in m) m.roughness = Math.max(m.roughness, 0.12); }); });
 

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const NAMES = ['hero', 'drone', 'roller', 'hornet'];
+const NAMES = ['hero', 'drone', 'roller', 'hornet', 'wpn_scatter', 'wpn_lobber', 'wpn_seeker'];
 
 export async function loadModels(onProgress) {
   const loader = new GLTFLoader();

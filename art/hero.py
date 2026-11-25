@@ -119,7 +119,7 @@ for s, n in ((-1, 'R'), (1, 'L')):
     part(f'goggle_lens_{n}', bm_cyl(0.058, 0.058, 0.012, 24), lens, head, at=tuple(gp), rot=(-0.95 + math.pi / 2, 0.25 * s, 0))
 
 # ---------------- blaster ----------------
-GP = Vector((0.14, 1.0, 0.3))
+GP = Vector((0.30, 1.2, 0.32))  # shouldered on the left, so it shows over the hero's shoulder
 gun = empty('gun', up, at=tuple(GP), parent_at=up['game_at'])
 part('gun_body', bm_box(0.17, 0.17, 0.42), gunWhite, gun, at=tuple(GP), rounded=0.051)
 part('gun_top', bm_box(0.1, 0.06, 0.3), suit, gun, at=tuple(GP + Vector((0, 0.1, 0.02))), bevel=0.012)
@@ -135,8 +135,8 @@ part('gun_stock', bm_box(0.1, 0.12, 0.2), suit, gun, at=tuple(GP + Vector((0, -0
 empty('muzzle', gun, at=tuple(GP + Vector((0, 0.02, 0.72))), parent_at=GP)
 
 # ---------------- arms + gloves ----------------
-handGrip = GP + Vector((0, -0.13, -0.08)); handFore = GP + Vector((-0.02, -0.04, 0.2))
-elbL, elbR = Vector((0.34, 0.86, 0.08)), Vector((-0.14, 0.86, 0.2))
+handGrip = GP + Vector((0, -0.13, -0.08)); handFore = GP + Vector((-0.03, -0.08, 0.12))
+elbL, elbR = Vector((0.44, 0.92, 0.1)), Vector((0.0, 0.92, 0.26))
 limb('upperarm_L', shL, elbL, 0.075, suit, up); limb('forearm_L', elbL, handGrip, 0.066, suit, up)
 limb('upperarm_R', shR, elbR, 0.075, suit, up); limb('forearm_R', elbR, handFore, 0.066, suit, up)
 for n, e, h in (('L', elbL, handGrip), ('R', elbR, handFore)):

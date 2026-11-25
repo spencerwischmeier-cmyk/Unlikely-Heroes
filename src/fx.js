@@ -1,6 +1,7 @@
 // Pooled particle effects: sparks, explosions, smoke and debris.
 import * as THREE from 'three';
 import { softDot, canvasTex, rand, V } from './util.js';
+import { onDeck } from './world.js';
 
 const fireTex = canvasTex(128, 128, (g, w) => { const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, 'rgba(255,250,220,1)'); gr.addColorStop(0.25, 'rgba(255,190,60,.95)'); gr.addColorStop(0.6, 'rgba(255,80,10,.5)'); gr.addColorStop(1, 'rgba(120,20,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, w); });
 const smokeTex = canvasTex(128, 128, (g) => { for (let i = 0; i < 40; i++) { const x = 30 + Math.random() * 68, y = 30 + Math.random() * 68, r = 14 + Math.random() * 20; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(60,62,70,.35)'); gr.addColorStop(1, 'rgba(60,62,70,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } });
@@ -58,6 +59,8 @@ export function createFx(scene) {
     ring(pos, color = 0x40f0ff) {
       for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; emit('dot', pos, V(Math.cos(a), 0, Math.sin(a)).multiplyScalar(5), 0.35, 0.18, 0.02, color, 1, 0, 3); }
     },
+    trail(pos, color = 0xffd040, size = 0.25, life = 0.35) { emit('dot', pos, V(rand(-.3, .3), rand(-.3, .3), rand(-.3, .3)), life, size, 0.02, color, 0.8, 0, 1); },
+    smokeTrail(pos) { emit('smoke', pos, V(rand(-.2, .2), rand(0.2, 0.5), rand(-.2, .2)), 0.6, 0.15, 0.6, 0x9aa3b0, 0.35, 0, 1); },
     puff(pos, color = 0xcfe8ff) {
       for (let i = 0; i < 6; i++) emit('smoke', pos.clone().add(V(rand(-.2, .2), 0, rand(-.2, .2))), V(rand(-1.5, 1.5), rand(0.1, 0.5), rand(-1.5, 1.5)), rand(0.4, 0.7), 0.3, 0.9, color, 0.5, 0, 3);
     },
@@ -77,7 +80,7 @@ export function createFx(scene) {
         if (!d.visible) continue;
         const u = d.userData; u.t += dt;
         u.vel.y -= 18 * dt; d.position.addScaledVector(u.vel, dt);
-        if (d.position.y < 0.05 && Math.abs(d.position.x) < 14.5 && Math.abs(d.position.z) < 11.5) { d.position.y = 0.05; u.vel.y *= -0.35; u.vel.x *= 0.6; u.vel.z *= 0.6; }
+        if (d.position.y < 0.05 && onDeck(d.position.x, d.position.z, 0)) { d.position.y = 0.05; u.vel.y *= -0.35; u.vel.x *= 0.6; u.vel.z *= 0.6; }
         d.rotation.x += u.spin.x * dt; d.rotation.y += u.spin.y * dt;
         if (u.t > u.life) d.scale.multiplyScalar(Math.exp(-8 * dt));
         if (u.t > u.life + 0.6) d.visible = false;

@@ -15,45 +15,76 @@
 <div id="hud">
   <div class="hp" id="hull"><b>HULL</b></div>
   <div class="cur"><svg viewBox="0 0 40 40"><polygon points="20,2 36,11 36,29 20,38 4,29 4,11" fill="#ffc23d" stroke="#fff3c4" stroke-width="2"/><circle cx="20" cy="20" r="7" fill="#6b3d00"/></svg><span id="nuts">0</span></div>
-  <div class="wave" id="wave">WAVE 1</div>
+  <div class="wave" id="wave"></div>
   <div class="left" id="left"></div>
-  <div class="wpn">
-    <div class="ring" id="ring"><svg viewBox="0 0 60 60" width="62" height="62"><path d="M6 34h30l6-6h10v8h-6l-4 4H20l-4 8H8l3-8H6z" fill="#bff9ff"/><circle cx="30" cy="30" r="3" fill="#0ff"/><path d="M22 24h18" stroke="#5ff" stroke-width="3"/></svg></div>
-    <div class="name">ARC LANCER<span class="lvl" id="lvl">V1</span></div>
-    <div class="ammo"><span id="ammo">60</span> <span class="max">/ 60</span></div>
+  <div class="wpn" id="wpnPanel">
+    <div class="ring" id="ring"><svg viewBox="0 0 60 60" width="62" height="62" id="ringIcon"></svg></div>
+    <div class="name"><span id="wname">ARC LANCER</span><span class="lvl" id="lvl">V1</span></div>
+    <div class="ammo"><span id="ammo">60</span> <span class="max" id="ammoMax">/ 60</span></div>
     <div class="xp"><div id="xp"></div></div>
+    <div class="slots" id="slots"></div>
   </div>
-  <div class="cross" id="cross"><i></i><i></i><i></i><i></i></div>
+  <div class="cross" id="cross"><i></i><i></i><i></i><i></i><div class="heat" id="heat"></div></div>
   <div class="hitmark" id="hitmark"></div>
   <div class="banner" id="banner"></div>
+  <div class="toast" id="toast"></div>
   <div class="hurt" id="hurt"></div>
 </div>
+
 <div class="overlay" id="title">
-  <h1>UNLIKELY HEROES</h1>
-  <h2>blaster prototype</h2>
-  <p class="go" id="go">Click to play</p>
-  <table class="keys touchhelp">
-    <tr><td>Left thumb</td><td>move (stick appears where you touch)</td></tr>
-    <tr><td>Right thumb</td><td>drag to aim</td></tr>
-    <tr><td>FIRE</td><td>hold to shoot, slide to aim</td></tr>
-    <tr><td>JUMP</td><td>tap again in the air to jet-boost</td></tr>
-    <tr><td>DASH</td><td>quick dodge</td></tr>
-  </table>
-  <table class="keys">
-    <tr><td>WASD</td><td>move</td></tr>
-    <tr><td>Mouse</td><td>aim</td></tr>
-    <tr><td>Left click</td><td>fire (hold)</td></tr>
-    <tr><td>Space</td><td>jump, again in the air to jet-boost</td></tr>
-    <tr><td>Shift</td><td>dash</td></tr>
-    <tr><td>Esc</td><td>pause</td></tr>
-  </table>
-  <p class="small padhelp">Gamepad works too: left stick move, right stick aim, RT fire, A jump, B dash.</p>
+  <div class="logo"><h1>UNLIKELY HEROES</h1><h2>blaster prototype</h2></div>
+  <p class="status" id="go">Loading…</p>
+  <div class="menu" id="mainMenu">
+    <button class="mbtn primary" data-act="waves">Play waves<small>Survive as many waves of bots as you can</small></button>
+    <button class="mbtn" data-act="range">Test range<small>Try every weapon on targets, no waves, no game over</small></button>
+    <button class="mbtn" data-act="settings">Settings</button>
+  </div>
+  <div class="help">
+    <table class="keys kb">
+      <tr><td>WASD</td><td>move</td><td>Mouse</td><td>aim</td></tr>
+      <tr><td>Left click</td><td>fire (hold)</td><td>Space</td><td>jump, again to jet-boost</td></tr>
+      <tr><td>Shift</td><td>dash</td><td>Hold Q</td><td>weapon wheel</td></tr>
+      <tr><td>1-4 / wheel</td><td>switch weapon</td><td>Esc</td><td>pause</td></tr>
+    </table>
+    <table class="keys tc">
+      <tr><td>Left thumb</td><td>move</td><td>Right thumb</td><td>drag to aim</td></tr>
+      <tr><td>FIRE</td><td>hold, slide to aim</td><td>JUMP</td><td>tap again to jet-boost</td></tr>
+      <tr><td>DASH</td><td>quick dodge</td><td>Weapon</td><td>tap for the wheel</td></tr>
+    </table>
+    <table class="keys gp">
+      <tr><td>Left stick</td><td>move</td><td>Right stick</td><td>aim</td></tr>
+      <tr><td>RT</td><td>fire</td><td>A</td><td>jump, again to jet-boost</td></tr>
+      <tr><td>B / LT</td><td>dash</td><td>Hold LB</td><td>weapon wheel</td></tr>
+      <tr><td>RB / Y</td><td>next weapon</td><td>D-pad</td><td>pick a weapon</td></tr>
+    </table>
+    <p class="small kb">A gamepad works too, including one paired to your phone.</p>
+  </div>
+</div>
+
+<div class="overlay hidden" id="pauseMenu">
+  <div class="logo"><h1>PAUSED</h1></div>
+  <div class="menu">
+    <button class="mbtn primary" data-act="resume">Resume</button>
+    <button class="mbtn" data-act="restart">Restart</button>
+    <button class="mbtn" data-act="settings">Settings</button>
+    <button class="mbtn" data-act="quit">Quit to title</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="settingsMenu">
+  <div class="logo"><h1>SETTINGS</h1></div>
+  <div class="panel" id="setList"></div>
+  <div class="menu row"><button class="mbtn primary" data-act="back">Back</button></div>
+</div>
+
+<div class="overlay hidden" id="over">
+  <div class="logo"><h1>HULL BREACHED</h1></div>
+  <p id="summary"></p>
+  <div class="menu">
+    <button class="mbtn primary" data-act="again">Try again</button>
+    <button class="mbtn" data-act="quit">Quit to title</button>
+  </div>
 </div>
 <div class="rotate">Turn your phone sideways to play</div>
-<div class="overlay hidden" id="over">
-  <h1>HULL BREACHED</h1>
-  <p id="summary"></p>
-  <p class="go">Click to try again</p>
-</div>
 <script type="module" src="./src/main.js"></script>
 </body></html>

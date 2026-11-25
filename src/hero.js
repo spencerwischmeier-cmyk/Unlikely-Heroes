@@ -32,7 +32,10 @@ export function createHero(scene, model) {
   const flashCore = glowSprite(0xffffff, 0.35, 0); muzzle.add(flashCore);
   const mLight = new THREE.PointLight(0x60f0ff, 0, 5, 2); muzzle.add(mLight);
   const gunZ = gun.position.z;
-  return animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash, flashCore, mLight, gunZ });
+  // how far the barrel sits to the hero's left, used to turn the body so the barrel points at the crosshair
+  root.updateMatrixWorld(true);
+  const gunSide = root.worldToLocal(muzzle.getWorldPosition(new THREE.Vector3())).x;
+  return animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash, flashCore, mLight, gunZ, gunSide });
 }
 
 // the original basic-shape hero, used if the model can't load
@@ -149,7 +152,7 @@ function buildBasic() {
   return { root, body, upper, legs, jets, coils, gun, muzzle };
 }
 
-function animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash, flashCore, mLight, gunZ }) {
+function animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash, flashCore, mLight, gunZ, gunSide }) {
 
   // collect materials so the whole hero can flash when hit
   const flashables = [];
@@ -175,7 +178,7 @@ function animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash,
     }
     body.position.y = grounded ? Math.abs(Math.sin(phase)) * 0.05 * run : 0;
     body.rotation.x = grounded ? run * 0.08 : THREE.MathUtils.clamp(-vy * 0.02, -0.15, 0.15);
-    upper.rotation.x = THREE.MathUtils.clamp(-aimPitch * 0.6, -0.5, 0.45);
+    upper.rotation.x = THREE.MathUtils.clamp(-aimPitch, -0.75, 0.6);
     upper.rotation.z = grounded ? Math.sin(phase) * 0.04 * run : 0;
     // jetpack flames grow when hovering
     jets.forEach(j => { const s = jetting ? 0.7 + Math.random() * 0.3 : 0.3; j.scale.setScalar(s); j.material.opacity = jetting ? 1 : 0.6; });
@@ -193,7 +196,7 @@ function animateHero({ root, body, upper, legs, jets, coils, gun, muzzle, flash,
   }
 
   return {
-    root, upper, muzzle, gun, animate,
+    root, upper, muzzle, gun, animate, gunSide,
     fireFlash() { flashT = 1; },
     hurt() { hurtT = 1; },
   };
