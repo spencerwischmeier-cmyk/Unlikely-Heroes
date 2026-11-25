@@ -161,7 +161,11 @@ func _physics_process(dt: float) -> void:
 		var hit := space.intersect_ray(q)
 		if hit:
 			var col: Object = hit.collider
-			var t: Node = col if (col is Node and col.is_in_group("targets")) else (col.get_parent() if col is Node and col.get_parent() and col.get_parent().is_in_group("targets") else null)
+			var t: Node = null
+			if col is Node:
+				if col.is_in_group("targets"): t = col
+				elif col.has_meta("owner"): t = col.get_meta("owner")
+				elif col.get_parent() and col.get_parent().is_in_group("targets"): t = col.get_parent()
 			if t and not t.dead:
 				var kill: bool = t.damage(b.dmg, hit.position, b.vel.normalized())
 				hit_marker.emit(kill)
