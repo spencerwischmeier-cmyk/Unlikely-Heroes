@@ -64,3 +64,39 @@ export function mergeByMaterial(root) {
   }
   return root;
 }
+
+// Fewer draw calls for scenery that never moves: bake every matching mesh under `root` into world space and merge
+// the ones that share a material (and shadow settings, and grid cell if `cell` is set) into one mesh each.
+export function mergeStatic(root, keep = () => true, cell = 0) {
+  root.updateMatrixWorld(true);
+  const groups = new Map();
+  root.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !o.visible || o.renderOrder !== 0 || !o.frustumCulled || !keep(o)) return;
+    if (Array.isArray(o.material)) return;
+    // optional spatial cells keep frustum culling useful for spread-out scenery
+    const p = o.getWorldPosition(new THREE.Vector3());
+    const c = cell ? `${Math.floor(p.x / cell)},${Math.floor(p.z / cell)}` : '';
+    const key = `${o.material.uuid}|${o.castShadow}|${o.receiveShadow}|${c}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(o);
+  });
+  let removed = 0, added = 0;
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const geos = list.map(m => {
+      let g = m.geometry.clone().applyMatrix4(m.matrixWorld);
+      if (g.index !== null) g = g.toNonIndexed();
+      for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      return g;
+    });
+    const merged = mergeGeometries(geos, false);
+    geos.forEach(g => g.dispose());
+    if (!merged) continue;
+    const m = new THREE.Mesh(merged, list[0].material);
+    m.castShadow = list[0].castShadow; m.receiveShadow = list[0].receiveShadow;
+    list.forEach(x => { x.parent.remove(x); removed++; });
+    root.add(m); added++;
+  }
+  return { removed, added };
+}

@@ -1,6 +1,7 @@
 // Menu screens (title, pause, settings, game over). Works with mouse, touch, keyboard and controller:
 // up/down move between buttons, left/right change a setting, A/Enter selects, B/Esc goes back.
 import { buildSettings } from './settings.js';
+import { sfx, music } from './audio.js';
 
 const $ = id => document.getElementById(id);
 const SCREENS = ['title', 'pauseMenu', 'settingsMenu', 'over'];
@@ -28,12 +29,13 @@ export function createMenu(onAction) {
     act(b.dataset.act);
   });
   function act(a) {
+    sfx.uiSelect(); music.start();
     if (a === 'settings') return show('settingsMenu');
     if (a === 'back') return show(back);
     onAction(a);
   }
-  function nav(dir) { if (current) setFocus(focus + dir); }
-  function adjust(dir) { const e = items()[focus]; e?.adjust?.(dir); }
+  function nav(dir) { if (current) { setFocus(focus + dir); sfx.ui(); } }
+  function adjust(dir) { const e = items()[focus]; if (e?.adjust) { e.adjust(dir); sfx.ui(); } }
   function select() { const e = items()[focus]; if (!e) return; if (e.activate) e.activate(); else if (e.dataset.act) act(e.dataset.act); }
   function cancel() {
     if (current === 'settingsMenu') show(back);

@@ -54,7 +54,7 @@ touch controls, or `?touch=0` to turn them off.
 **Gamepads** work on computers and phones, including a controller paired to a phone over Bluetooth. As soon as you
 use the controller the touch buttons hide; touching the screen brings them back. Menus work with the d-pad, A and B.
 
-**Settings** (title or pause menu, saved on the device): look sensitivity, controller aim speed, invert Y, aim assist,
+**Settings** (title or pause menu, saved on the device): master, effects and music volume, look sensitivity, controller aim speed, invert Y, aim assist,
 auto-fire on touch, touch button size, vibration and graphics quality.
 
 ### Weapons
@@ -74,6 +74,8 @@ refill on their own.
 - The sidekick drone follows you and zaps the nearest bot every couple of seconds.
 - Hex nuts (currency) fly to you, green repair cells restore one hull segment, purple capsules refill ammo.
 
+`/pad.html` is a controller test page that shows what the browser receives from a gamepad.
+
 URL switches: `?lq=1` for a lighter mode on slow machines, `?bloom=0` to turn off glow.
 
 ## Code layout
@@ -81,6 +83,7 @@ URL switches: `?lq=1` for a lighter mode on slow machines, `?bloom=0` to turn of
 - `src/weapons.js`: the four weapons, their projectiles and upgrades. `src/wheel.js`: the weapon wheel.
 - `src/range.js`: practice targets and the call-bots pad. `src/hud.js`: HUD, damage numbers, markers.
 - `src/menu.js`, `src/settings.js`: menus and saved settings. `src/gamepad.js`: controller input.
+- `src/audio.js`: all sound effects and the music, synthesized with the Web Audio API (no audio files).
 - `src/world.js`: sky, lights, the sky city and the deck with its zones (combat deck, target range, jump course,
   cover yard).
 - `src/hero.js`, `src/drone.js`, `src/enemies.js`: characters (and `art/weapons.py` builds the three new blasters). They load the Blender models from `public/models/`
@@ -92,4 +95,4 @@ URL switches: `?lq=1` for a lighter mode on slow machines, `?bloom=0` to turn of
 - `public/`: home-screen app files (manifest, icons, offline service worker).
 
 ## Next steps
-Sound, then traversal (grind rails, grapple) and the first full planet.
+Traversal (grind rails, grapple) and the first full planet.

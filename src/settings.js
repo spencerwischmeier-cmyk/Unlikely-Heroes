@@ -1,6 +1,9 @@
 // Player settings, saved on this device. The settings screen is built from the SPEC list below.
 const KEY = 'uh-settings-v1';
 const SPEC = [
+  { key: 'volume', label: 'Master volume', type: 'range', min: 0, max: 1, step: 0.05, def: 0.8 },
+  { key: 'sfxVolume', label: 'Sound effects', type: 'range', min: 0, max: 1, step: 0.05, def: 0.9 },
+  { key: 'musicVolume', label: 'Music', type: 'range', min: 0, max: 1, step: 0.05, def: 0.6 },
   { key: 'sens', label: 'Look sensitivity', type: 'range', min: 0.3, max: 2.5, step: 0.1, def: 1 },
   { key: 'padSens', label: 'Controller aim speed', type: 'range', min: 0.3, max: 2.5, step: 0.1, def: 1 },
   { key: 'invertY', label: 'Invert look up/down', type: 'toggle', def: false },

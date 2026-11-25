@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { V, UP, glow, mesh, glowSprite, rand, clamp } from './util.js';
 import { onDeck } from './world.js';
 import { mergeByMaterial } from './models.js';
+import { sfx } from './audio.js';
 
 export const LEVELS = [0, 120, 300, 560, 900]; // xp needed for V1..V5
 
@@ -31,6 +32,7 @@ export const ICONS = {
 };
 
 export function createArsenal({ scene, fx, hero, models, colliders, floorAt, hits, deal, onEmpty, onLevel }) {
+  const near = p => 1 / (1 + p.distanceTo(hero.root.position) / 14); // quieter when far away
   // ---- weapon models in the hero's hands ----
   const lancerMeshes = hero.gun.children.filter(c => c.isMesh);
   const held = { lancer: { meshes: lancerMeshes, muzzle: hero.muzzle } };
@@ -115,11 +117,11 @@ export function createArsenal({ scene, fx, hero, models, colliders, floorAt, hit
     const dir = aimDir.clone().add(spread).normalize();
     const p = spawn('rocket', rocketGeo, rocketMat, muzzle, dir.multiplyScalar(14), { life: 3, dmg: b.dmg, wid: b.wid, target: b.target, goal: aimPoint.clone(), age: 0 });
     p.m.add(glowSprite(0xffb040, 0.6, 0.9));
-    hero.fireFlash();
+    hero.fireFlash(); sfx.rocket();
   }
 
   function explode(pos, p) {
-    fx.explosion(pos, 0.9);
+    fx.explosion(pos, 0.9); sfx.explosion(near(pos), 1);
     fx.ring(pos.clone().setY(Math.max(0.05, pos.y)), 0x9dff5a);
     for (const { t, c } of hits.inRadius(pos, p.radius)) {
       const k = 1 - 0.5 * clamp(c.distanceTo(pos) / p.radius, 0, 1);
@@ -152,7 +154,7 @@ export function createArsenal({ scene, fx, hero, models, colliders, floorAt, hit
         fire(w, held[w.id].muzzle.getWorldPosition(V(0, 0, 0)), aimPoint, aimDir);
         if (!infinite || w.regen) w.ammo -= 1;
         w.cool = interval(w); w.sinceShot = 0; fired = true;
-        if (w.id !== 'seeker') hero.fireFlash();
+        if (w.id !== 'seeker') { hero.fireFlash(); sfx[w.id](); }
         if (w.regen && w.ammo <= 0) { w.ammo = 0; w.hot = true; onEmpty?.(w, true); }
       } else if (w.cool <= 0) { w.cool = 0.4; onEmpty?.(w, false); }
     }
@@ -178,7 +180,7 @@ export function createArsenal({ scene, fx, hero, models, colliders, floorAt, hit
       const hit = hits.segment(a, n, p.kind === 'bomb' ? 0.2 : p.kind === 'pellet' ? 0.12 : 0.15);
       if (hit && !done) {
         if (p.kind === 'bomb') explode(hit.point, p);
-        else { deal(hit.t, p.dmg, hit.point, p.wid); fx.sparks(hit.point, p.kind === 'rocket' ? 0xffd040 : p.kind === 'pellet' ? 0xff8ac4 : 0xaefaff, p.kind === 'pellet' ? 4 : 8, 5); if (p.kind === 'rocket') fx.explosion(hit.point, 0.35); }
+        else { deal(hit.t, p.dmg, hit.point, p.wid); fx.sparks(hit.point, p.kind === 'rocket' ? 0xffd040 : p.kind === 'pellet' ? 0xff8ac4 : 0xaefaff, p.kind === 'pellet' ? 4 : 8, 5); if (p.kind === 'rocket') { fx.explosion(hit.point, 0.35); sfx.explosion(near(hit.point) * 0.5, 0.5); } }
         done = true;
       } else if (!done) {
         p.m.position.copy(n);
@@ -186,14 +188,14 @@ export function createArsenal({ scene, fx, hero, models, colliders, floorAt, hit
           const f = floorAt(n) + 0.16;
           if (n.y < f && onDeck(n.x, n.z)) {
             p.m.position.y = f; p.vel.y = Math.abs(p.vel.y) * 0.45; p.vel.x *= 0.6; p.vel.z *= 0.6; p.bounces++;
-            fx.puff(n.clone(), 0xc8ffb0);
+            fx.puff(n.clone(), 0xc8ffb0); sfx.bounce(near(n));
             if (p.bounces >= 3) { explode(p.m.position.clone(), p); done = true; }
           } else if (solid(n)) { p.vel.x *= -0.5; p.vel.z *= -0.5; p.m.position.copy(a); }
           p.m.scale.setScalar(1 + Math.sin(p.life * 30) * 0.08);
           if (!done && p.life - dt <= 0) { explode(p.m.position.clone(), p); done = true; }
         } else if (solid(n)) {
           fx.sparks(n.clone(), p.kind === 'rocket' ? 0xffd040 : 0xaefaff, 6, 3);
-          if (p.kind === 'rocket') fx.explosion(n.clone(), 0.35);
+          if (p.kind === 'rocket') { fx.explosion(n.clone(), 0.35); sfx.explosion(near(n) * 0.5, 0.5); }
           done = true;
         }
       }

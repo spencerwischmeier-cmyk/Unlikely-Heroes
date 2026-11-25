@@ -21,6 +21,7 @@ import { createHud } from './hud.js';
 import { createMenu } from './menu.js';
 import { createGamepad } from './gamepad.js';
 import { settings } from './settings.js';
+import { sfx, music, audioState } from './audio.js';
 
 const params = new URLSearchParams(location.search);
 // phones and tablets get touch controls and the lighter graphics mode by default
@@ -93,6 +94,8 @@ let waveState = { toSpawn: [], spawnT: 0, clearT: -1 };
 const pickups = [];
 let timeScale = 1, lastWid = 'lancer';
 
+const near = p => 1 / (1 + p.distanceTo(player.pos) / 14); // sounds get quieter with distance
+
 // ---------- targets (bots + practice targets) shared by every weapon ----------
 const centerOf = t => (t.type === 'roller' ? t.pos.clone().add(V(0, 0.55, 0)) : t.pos.clone());
 const liveTargets = () => { const out = []; for (const e of enemies.list) if (!e.dead) out.push(e); for (const t of range.targets) if (!t.dead) out.push(t); return out; };
@@ -129,6 +132,7 @@ function deal(t, amount, point, wid) {
   if (t.type === 'dummy') kill = range.damage(t, amount);
   else { enemies.damage(t, amount, point, ctx); kill = t.dead; }
   hud.hit(kill);
+  if (t.type === 'dummy') { if (kill) sfx.targetDown(); else sfx.targetHit(); } else if (!kill) sfx.hit(near(point));
   hud.damageNumber(point, amount, kill, WEAPONS.find(w => w.id === wid)?.color);
 }
 
@@ -136,19 +140,19 @@ function deal(t, amount, point, wid) {
 const hud = createHud({ maxHull: MAX_HULL, weapons: WEAPONS });
 const arsenal = createArsenal({
   scene, fx, hero, models, colliders: world.colliders, floorAt, hits, deal,
-  onEmpty(w, overheated) { if (overheated) hud.toast('Overheated'); else hud.toast(`${w.name}: out of ammo`); },
-  onLevel(w) { hud.banner(`${w.name} V${w.level}`, 'Weapon upgraded: more damage, faster fire', w.color); fx.ring(player.pos.clone().add(V(0, 1, 0)), 0xffc23d); buzz(30); },
+  onEmpty(w, overheated) { if (overheated) { hud.toast('Overheated'); sfx.overheat(); } else { hud.toast(`${w.name}: out of ammo`); sfx.empty(); } },
+  onLevel(w) { hud.banner(`${w.name} V${w.level}`, 'Weapon upgraded: more damage, faster fire', w.color); fx.ring(player.pos.clone().add(V(0, 1, 0)), 0xffc23d); buzz(30); sfx.levelUp(); },
 });
 function selectWeapon(i) {
-  if (arsenal.select(i)) { hud.toast(WEAPONS[i].name); buzz(12); }
+  if (arsenal.select(i)) { hud.toast(WEAPONS[i].name); buzz(12); sfx.switchWeapon(); }
 }
 const wheel = createWheel(WEAPONS, i => selectWeapon(i));
-const openWheel = () => { if (state === 'playing') { wheel.show(arsenal.state, arsenal.index); input.fire = false; } };
+const openWheel = () => { if (state === 'playing' && !wheel.open) { wheel.show(arsenal.state, arsenal.index); input.fire = false; sfx.wheelOpen(); } };
 const menu = createMenu(a => {
   if (a === 'waves' || a === 'range') { mode = a; reset(); begin(); }
   else if (a === 'resume') begin();
   else if (a === 'restart' || a === 'again') { reset(); begin(); }
-  else if (a === 'quit') { reset(); state = 'title'; touch?.show(false); menu.show('title'); }
+  else if (a === 'quit') { reset(); state = 'title'; touch?.show(false); menu.show('title'); music.intensity = 0.3; }
 });
 
 // ---------- input ----------
@@ -219,6 +223,7 @@ function reset() {
   hud.hull(player.hull); hud.nuts(stats.nuts);
 }
 function begin() {
+  music.start(); music.intensity = 1;
   if (touch) {
     // go full screen and sideways where the browser allows it
     const de = document.documentElement;
@@ -232,13 +237,14 @@ function begin() {
 }
 function pause() {
   if (state !== 'playing') return;
+  music.intensity = 0.3;
   state = 'paused'; input.fire = false; wheel.close(false);
   touch?.show(false);
   if (document.pointerLockElement) document.exitPointerLock();
   menu.show('pauseMenu');
 }
 function gameOver() {
-  state = 'dead'; input.fire = false; touch?.show(false); wheel.close(false);
+  state = 'dead'; input.fire = false; touch?.show(false); wheel.close(false); sfx.gameOver(); music.intensity = 0.3;
   if (document.pointerLockElement) document.exitPointerLock();
   $('summary').innerHTML = `You reached wave <b>${stats.wave}</b>, wrecked <b>${stats.kills}</b> bots and banked <b>${stats.nuts.toLocaleString()}</b> hex nuts.`;
   setTimeout(() => { if (state === 'dead') menu.show('over'); }, 1200);
@@ -251,7 +257,7 @@ function startWave(n) {
   const list = [];
   for (let i = 0; i < Math.max(rollers, hornets); i++) { if (i < rollers) list.push('roller'); if (i < hornets) list.push('hornet'); }
   waveState.toSpawn = list; waveState.spawnT = 0.6;
-  hud.banner(`WAVE ${n}`, n === 1 ? 'Clear the deck' : `${list.length} bots incoming`);
+  hud.banner(`WAVE ${n}`, n === 1 ? 'Clear the deck' : `${list.length} bots incoming`); sfx.waveStart();
 }
 const aggression = () => (mode === 'range' ? 1 : 1 + (stats.wave - 1) * 0.08);
 // somewhere on open deck 8-22 m from the hero
@@ -276,11 +282,11 @@ function updateWaves(dt) {
     waveState.spawnT -= dt;
     if (waveState.spawnT <= 0) {
       const [x, z] = spawnPoint();
-      enemies.spawn(waveState.toSpawn.shift(), x, z);
+      enemies.spawn(waveState.toSpawn.shift(), x, z); sfx.spawn(near(V(x, 0, z)));
       waveState.spawnT = rand(0.5, 1.1);
     }
   } else if (enemies.list.length === 0 && state === 'playing') {
-    hud.banner('WAVE CLEAR', `+${50 * stats.wave} bonus nuts`);
+    hud.banner('WAVE CLEAR', `+${50 * stats.wave} bonus nuts`); sfx.waveClear();
     stats.nuts += 50 * stats.wave; hud.nuts(stats.nuts);
     if (player.hull < MAX_HULL) { player.hull = Math.min(MAX_HULL, player.hull + 2); hud.hull(player.hull); }
     waveState.clearT = 3.2;
@@ -295,7 +301,7 @@ function callBots() {
 function updateCalls(dt) {
   for (let i = callQueue.length - 1; i >= 0; i--) {
     const c = callQueue[i]; c.t -= dt;
-    if (c.t <= 0) { const [x, z] = spawnPoint(); enemies.spawn(c.type, x, z); callQueue.splice(i, 1); }
+    if (c.t <= 0) { const [x, z] = spawnPoint(); enemies.spawn(c.type, x, z); sfx.spawn(near(V(x, 0, z))); callQueue.splice(i, 1); }
   }
 }
 
@@ -351,7 +357,7 @@ function updatePlayer(dt, p) {
   if (input.dashPressed && player.dashCd <= 0) {
     const dir = ml > 0.1 ? wish.clone().normalize() : V(Math.sin(player.yaw), 0, Math.cos(player.yaw));
     player.vel.x = dir.x * 17; player.vel.z = dir.z * 17;
-    player.dashT = 0.17; player.dashCd = 0.75; player.invuln = Math.max(player.invuln, 0.2);
+    player.dashT = 0.17; player.dashCd = 0.75; player.invuln = Math.max(player.invuln, 0.2); sfx.dash();
     fx.puff(player.pos.clone().add(V(0, 0.3, 0)));
   }
   input.dashPressed = false;
@@ -365,8 +371,8 @@ function updatePlayer(dt, p) {
   // jump / jet boost
   player.coyote -= dt;
   if (input.jumpPressed) {
-    if (player.grounded || player.coyote > 0) { player.vel.y = JUMP; player.grounded = false; player.coyote = 0; player.jumps = 1; fx.puff(player.pos.clone().add(V(0, 0.1, 0))); }
-    else if (player.jumps < 2) { player.vel.y = BOOST; player.jumps = 2; player.jetT = 0.35; fx.sparks(player.pos.clone().add(V(0, 0.6, 0)), 0x60e8ff, 12, 3); }
+    if (player.grounded || player.coyote > 0) { player.vel.y = JUMP; player.grounded = false; player.coyote = 0; player.jumps = 1; fx.puff(player.pos.clone().add(V(0, 0.1, 0))); sfx.jump(); }
+    else if (player.jumps < 2) { player.vel.y = BOOST; player.jumps = 2; player.jetT = 0.35; fx.sparks(player.pos.clone().add(V(0, 0.6, 0)), 0x60e8ff, 12, 3); sfx.boost(); }
   }
   input.jumpPressed = false;
   player.jetT -= dt;
@@ -383,7 +389,7 @@ function updatePlayer(dt, p) {
   pp.y += player.vel.y * dt;
   const f = floorAt(pp);
   if (pp.y <= f) {
-    if (!player.grounded && player.vel.y < -6) fx.puff(pp.clone().add(V(0, 0.05, 0)));
+    if (!player.grounded && player.vel.y < -6) { fx.puff(pp.clone().add(V(0, 0.05, 0))); sfx.land(); }
     pp.y = f; player.vel.y = 0; player.grounded = true; player.jumps = 0; player.coyote = 0.1;
   } else if (player.grounded && pp.y > f) {
     player.grounded = false; player.jumps = 1; // walked off a ledge
@@ -473,9 +479,9 @@ function updatePickups(dt) {
     if (onDeck(p.m.position.x, p.m.position.z, 0) && p.m.position.y < fl) { p.m.position.y = fl; p.vel.y = Math.abs(p.vel.y) * 0.4; p.vel.x *= 0.7; p.vel.z *= 0.7; }
     p.m.rotation.x += p.spin.x * dt; p.m.rotation.y += p.spin.y * dt;
     if (d < 0.7 && state === 'playing') {
-      if (p.kind === 'nut') { stats.nuts += 10; hud.nuts(stats.nuts); }
-      else if (p.kind === 'cell') { player.hull = Math.min(MAX_HULL, player.hull + 1); hud.hull(player.hull, true); }
-      else { arsenal.refill(0.35); hud.toast('Ammo +35%'); }
+      if (p.kind === 'nut') { stats.nuts += 10; hud.nuts(stats.nuts); sfx.nut(); }
+      else if (p.kind === 'cell') { player.hull = Math.min(MAX_HULL, player.hull + 1); hud.hull(player.hull, true); sfx.cell(); }
+      else { arsenal.refill(0.35); hud.toast('Ammo +35%'); sfx.ammo(); }
       scene.remove(p.m); pickups.splice(i, 1); continue;
     }
     if (p.t > 25 || p.m.position.y < -30) { scene.remove(p.m); pickups.splice(i, 1); }
@@ -490,14 +496,16 @@ const ctx = {
   hurtHero(n, from) {
     if (player.invuln > 0 || player.hull <= 0) return;
     player.hull -= n; player.invuln = 0.9; shake = 1;
-    hero.hurt(); hud.hurt(); hud.hull(player.hull); buzz(60);
+    hero.hurt(); hud.hurt(); hud.hull(player.hull); buzz(60); sfx.hurt();
     if (from) { const k = player.pos.clone().sub(from).setY(0).normalize().multiplyScalar(6); player.vel.x += k.x; player.vel.z += k.z; }
     if (player.hull <= 0) {
       if (mode === 'range') { player.hull = MAX_HULL; hud.hull(player.hull); hud.toast('Hull restored (test range)'); }
       else gameOver();
     }
   },
+  sound(name, pos) { sfx[name]?.(pos ? near(pos) : 1); },
   onKill(e) {
+    sfx.explosion(near(e.pos), e.type === 'hornet' ? 1.2 : 0.9);
     if (e.selfDestruct) return; // a roller that blew itself up earns nothing
     stats.kills++;
     dropNuts(e.pos.clone().add(V(0, 0.6, 0)), e.nuts);
@@ -550,7 +558,7 @@ function frame(dtRaw, render = true) {
     enemies.update(dt, ctx);
     range.update(dt, { heroPos: player.pos, active: mode === 'range' && playing, onCall: callBots });
     updatePickups(dt);
-    drone.update(dt, player.pos, player.yaw, enemies.list, e => { deal(e, 0.75, centerOf(e), arsenal.current.id); fx.sparks(centerOf(e), 0x8ffcff, 6, 3); });
+    drone.update(dt, player.pos, player.yaw, enemies.list, e => { deal(e, 0.75, centerOf(e), arsenal.current.id); fx.sparks(centerOf(e), 0x8ffcff, 6, 3); sfx.zap(); });
     fx.update(dt);
   }
 
@@ -590,14 +598,16 @@ function loop(ts) {
 reset();
 menu.show('title');
 loop();
+// title music starts with the first tap, click or key press (browsers block sound before that)
+for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { music.start(); if (state !== 'playing') music.intensity = 0.3; }, { once: true });
 
 // hooks for automated play tests
 window.__game = {
   get state() { return state; }, get mode() { return mode; }, aimPoint, player, stats, enemies, keys, input, hero, arsenal, range, wheel, hits, menu,
-  info() { renderer.info.autoReset = false; renderer.info.reset(); composer.render(); const r = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; renderer.info.autoReset = true; return r; },
+  merged: world.merged, info() { renderer.info.autoReset = false; renderer.info.reset(); composer.render(); const r = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; renderer.info.autoReset = true; return r; },
   begin(m) { if (m) { mode = m; reset(); } begin(); }, reset, frame, render: () => composer.render(), set autoLoop(v) { autoLoop = v; },
   look(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; },
-  selectWeapon, callBots, openWheel,
+  selectWeapon, callBots, openWheel, audioState,
   aimAtNearest() {
     const e = enemies.list.find(x => !x.dead); if (!e) return false;
     const d = centerOf(e).sub(camPivot);

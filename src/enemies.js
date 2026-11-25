@@ -158,14 +158,14 @@ export function createEnemies(scene, fx, models = {}) {
         e.inner.rotation.z = clamp(-e.vel.x * 0.05, -0.5, 0.5) + Math.sin(e.t * 2) * 0.08;
         // attack: charge the eye, then fire
         e.fireT -= dt;
-        if (e.fireT < 0.7 && e.fireT > 0) e.charge = 1 - e.fireT / 0.7; else e.charge = 0;
+        if (e.fireT < 0.7 && e.fireT > 0) { if (e.charge === 0) ctx.sound?.('enemyCharge', e.pos); e.charge = 1 - e.fireT / 0.7; } else e.charge = 0;
         e.eyeMat.emissiveIntensity = 6 + e.charge * 14;
         e.eg.scale.setScalar(1.4 + e.charge * 1.6);
         if (e.fireT <= 0 && ctx.alive) {
           e.fireT = rand(2.2, 3.4) / ctx.aggression;
           const lead = heroCenter.clone().addScaledVector(ctx.heroVel, 0.35 * Math.random());
           const muzzle = e.pos.clone().add(lead.clone().sub(e.pos).normalize().multiplyScalar(0.9));
-          fireShot(muzzle, lead);
+          fireShot(muzzle, lead); ctx.sound?.('enemyShot', e.pos);
         }
         e.thrusters.forEach(t => t.scale.setScalar(0.6 + Math.random() * 0.4));
       } else {
@@ -180,6 +180,7 @@ export function createEnemies(scene, fx, models = {}) {
           e.vel.multiplyScalar(Math.exp(-6 * dt));
           e.fuse -= dt;
           e.eyeMat.emissiveIntensity = 5 + (Math.sin(e.t * 50) > 0 ? 18 : 0);
+          ctx.sound?.('fuse', e.pos);
           e.g.scale.setScalar(1 + (0.55 - e.fuse) * 0.4);
           if (e.fuse <= 0) {
             const d = V(hp.x - e.pos.x, 0, hp.z - e.pos.z).length();

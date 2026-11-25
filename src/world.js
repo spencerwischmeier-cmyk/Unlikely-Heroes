@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { rnd, R, V, UP, std, glow, mesh, canvasTex, glowSprite } from './util.js';
+import { mergeStatic } from './models.js';
 
 export const ARENA = { minX: -36, maxX: 36, minZ: -40, maxZ: 30 };
 // is (x, z) over the deck?
@@ -373,5 +374,7 @@ export function createWorld(renderer, scene, { lq = false } = {}) {
   }
   update(0, V(0, 0, 0));
 
-  return { colliders, update, sun };
+  // bake all the static scenery into a few big meshes (hundreds fewer draw calls, which matters on phones)
+  const merged = mergeStatic(scene, o => o !== sky, 180);
+  return { colliders, update, sun, merged };
 }
