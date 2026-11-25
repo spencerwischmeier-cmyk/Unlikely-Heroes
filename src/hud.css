@@ -1,0 +1,44 @@
+html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Inter Display","Inter",system-ui,sans-serif;user-select:none}
+canvas{display:block}
+#hud{position:fixed;inset:0;pointer-events:none;color:#fff}
+.hp{position:absolute;left:34px;top:30px;display:flex;gap:6px}
+.hp i{width:30px;height:34px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:linear-gradient(#7ff7ff,#18a9c9);filter:drop-shadow(0 0 6px #4ef);transition:background .2s,transform .2s}
+.hp i.off{background:rgba(20,40,60,.55);filter:none}
+.hp i.low{background:linear-gradient(#ffb0a0,#e8402a);filter:drop-shadow(0 0 6px #f53)}
+.hp i.pop{transform:scale(1.35)}
+.hp b{position:absolute;top:44px;left:2px;font-weight:900;font-size:15px;letter-spacing:2px;text-shadow:0 2px 6px #0008;font-style:italic}
+.cur{position:absolute;right:38px;top:28px;display:flex;align-items:center;gap:12px;font-weight:900;font-style:italic;font-size:38px;text-shadow:0 3px 10px #0009,0 0 18px #ffb34766;transition:transform .1s}
+.cur.pop{transform:scale(1.12)}
+.cur svg{width:40px;height:40px;filter:drop-shadow(0 0 8px #ffc04d)}
+.wave{position:absolute;left:50%;top:26px;transform:translateX(-50%);font-weight:900;font-style:italic;font-size:22px;letter-spacing:3px;text-shadow:0 2px 8px #000a}
+.left{position:absolute;left:50%;top:54px;transform:translateX(-50%);font-weight:700;font-size:14px;letter-spacing:1px;opacity:.85;text-shadow:0 2px 6px #000a}
+.wpn{position:absolute;right:38px;bottom:34px;text-align:right;white-space:nowrap}
+.wpn .ring{display:inline-flex;align-items:center;justify-content:center;width:96px;height:96px;border-radius:50%;border:4px solid #5ff2ff;background:radial-gradient(#0d3a4ccc,#05141dcc);box-shadow:0 0 22px #3ef,inset 0 0 18px #2bd;float:right;margin-left:16px;transition:border-color .2s,box-shadow .2s}
+.wpn .ring.hot{border-color:#ff6a3a;box-shadow:0 0 22px #f63,inset 0 0 18px #f53}
+.wpn .name{font-weight:900;font-style:italic;font-size:24px;letter-spacing:1px;margin-top:10px;text-shadow:0 2px 8px #000a}
+.wpn .lvl{display:inline-block;background:#ffb020;color:#2a1600;font-size:14px;font-weight:900;padding:2px 7px;border-radius:4px;margin-left:8px;vertical-align:middle;font-style:normal}
+.wpn .ammo{font-weight:900;font-size:40px;font-style:italic;text-shadow:0 2px 8px #000a}
+.wpn .ammo .max{font-size:22px;opacity:.75}
+.wpn .ammo.hot{color:#ff7a50}
+.xp{width:220px;height:7px;background:#0007;border-radius:4px;margin:6px 0 0 auto;overflow:hidden}
+.xp div{width:0;height:100%;background:linear-gradient(90deg,#ffcf5a,#ff8a1f);box-shadow:0 0 8px #ffa53a;transition:width .25s}
+.cross{position:absolute;left:50%;top:50%;width:0;height:0}
+.cross i{position:absolute;width:4px;height:12px;background:#fff;border-radius:2px;box-shadow:0 0 6px #4ef,0 0 2px #000}
+.cross i:nth-child(1){left:-2px;top:-20px}.cross i:nth-child(2){left:-2px;top:8px}
+.cross i:nth-child(3){left:-20px;top:-2px;width:12px;height:4px}.cross i:nth-child(4){left:8px;top:-2px;width:12px;height:4px}
+.cross.on i{background:#ff6a5a}
+.hitmark{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;opacity:0;border:3px solid #fff;border-radius:50%;transition:opacity .15s}
+.hitmark.on{opacity:1;transition:none}
+.banner{position:absolute;left:0;right:0;top:32%;text-align:center;font-weight:900;font-style:italic;font-size:56px;letter-spacing:3px;text-shadow:0 4px 18px #000a,0 0 30px #3ef8;opacity:0;transform:scale(.9);transition:opacity .3s,transform .3s}
+.banner.on{opacity:1;transform:scale(1)}
+.banner small{display:block;font-size:20px;letter-spacing:2px;margin-top:6px;opacity:.9}
+.hurt{position:absolute;inset:0;box-shadow:inset 0 0 160px 40px #ff1a1a;opacity:0}
+.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;background:radial-gradient(#04182499,#020a10dd);cursor:pointer;text-align:center}
+.overlay.hidden{display:none}
+.overlay h1{margin:0;font-weight:900;font-style:italic;font-size:64px;letter-spacing:4px;text-shadow:0 4px 24px #3ef8}
+.overlay h2{margin:4px 0 26px;font-weight:700;font-size:18px;letter-spacing:6px;text-transform:uppercase;opacity:.8}
+.overlay .go{font-weight:900;font-size:26px;font-style:italic;color:#ffc23d;animation:pulse 1.2s infinite}
+.overlay .small{opacity:.7;font-size:14px}
+.keys{margin:10px auto;border-collapse:collapse;font-size:16px}
+.keys td{padding:3px 10px}.keys td:first-child{text-align:right;font-weight:900;color:#5ff2ff}.keys td:last-child{text-align:left}
+@keyframes pulse{50%{opacity:.5}}
