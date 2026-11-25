@@ -97,6 +97,7 @@ func _open(i: int, pause := true) -> void:
 	tw.tween_property(panel, "modulate:a", 1.0, 0.15); tw.tween_property(panel, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK)
 	Snd.play("ui_select", -4)
 	Kit.flash(kiosks[i].node, "grin", Color(0.55, 1, 0.45), 9.0, 3.0, 0.5)
+	Snd.play("gizmart_chime", -6, 0.0, 0.0)
 	if hello_cd <= 0.0: Snd.bark("gizmart", "hello"); hello_cd = 20.0
 	if rows.size() > 0: rows[0].button.grab_focus()
 

@@ -550,7 +550,7 @@ func _cab_strike() -> void:
 	_rail_lock(true); rail_cd = 8.0
 	if hp > 0.0:
 		state = "stunned"; stun_t = 3.0; warn.visible = false
-		Snd.at("crane_slam", position, 0)
+		Snd.at("crane_slam", position, 0); Snd.at("crane_stun", position, 2)
 
 # ---------- phase change ----------
 func _start_rip() -> void:
@@ -577,7 +577,7 @@ func _rip(dt: float, to_hero: Vector3) -> void:
 	elif rip_stage == 0:
 		rip_stage = 1
 		FX.explosion(stub.global_position, 1.2); FX.shake(1.4); FX.stop(0.08)
-		Snd.at("crane_slam", stub.global_position, 4); Snd.at("explode_small", stub.global_position, 2)
+		Snd.at("crane_rip", stub.global_position, 4); Snd.at("explode_small", stub.global_position, 2)
 	elif k < 2.3:
 		# the jib tears free, flips up, then swings down into the cab's grip
 		var u := clampf((k - 1.3) / 1.0, 0, 1)
@@ -612,7 +612,7 @@ func _start_dying() -> void:
 	state = "dying"; st_t = 3.4; warn.visible = false
 	_rail_on(false); rail_path.visible = false
 	for c in crates: c.charge = 0.0
-	Snd.at("crane_warn", center(), 4, 0.0)
+	Snd.at("crane_warn", center(), 4, 0.0); Snd.at("boss_defeat", center(), 6, 0.0)
 	FX.stop(0.15); FX.shake(1.5)
 	Game.boss_health.emit(NAME, 0.0)
 

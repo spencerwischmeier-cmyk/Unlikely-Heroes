@@ -63,7 +63,7 @@ class Crate extends StaticBody3D:
 		FX.explosion(c, 0.55 if not big else 0.8, chunk_mats)
 		FX.puff(c, Color(0.85, 0.75, 0.6))
 		FX.shake(0.3)
-		Snd.at("crate_break", c, 0, 0.1, 0.0)
+		Snd.at("crate_break" if randf() < 0.5 else "crate_break_2", c, 0, 0.1, 0.0); Snd.at("sprocket_burst", c, -8, 0.1, 0.0)
 		var combat := Game.combat
 		if combat:
 			combat.drop_nuts(c, randi_range(6, 9) if big else randi_range(3, 5))

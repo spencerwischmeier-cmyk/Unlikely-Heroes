@@ -52,7 +52,7 @@ func _spawn_members(main: Node, pos: Vector3) -> void:
 		m.global_position = p + Vector3(0, 6 + i * 1.2, 0)
 		FX.ring(p + Vector3(0, 0.05, 0), Color(1, 0.7, 0.2), 0.7)
 		members.append(m)
-	Snd.at("bot_spawn", pos, -2)
+	Snd.at("bot_spawn", pos, -2); Snd.at("crew_whistle", pos, -2, 0.1)
 
 ## Story skip / boss cleanup: destroy the whole crew.
 func die(self_destruct := false) -> void:
@@ -99,6 +99,7 @@ func _physics_process(dt: float) -> void:
 				Snd.at("melee_hit", m.global_position + Vector3(0, 0.8, 0), -10, 0.2, 0.05)
 				FX.sparks(m.global_position + line_n * 1.0 + Vector3(0, 0.6, 0), Color(1, 0.8, 0.4), 4, 3.0)
 			if st_t <= 0.0:
+				if barricades.size() > 0: Snd.at("barricade_up", line_c, -2, 0.1)
 				for b in barricades: b.rise = 1.0
 				state = "hold"; st_t = randf_range(7.0, 9.0); fire_t = 0.6
 		"hold":
@@ -144,6 +145,7 @@ func _fire_turns(dt: float, gap: float, max_d: float) -> void:
 func _start_build(lead: Node3D, n: Vector3) -> void:
 	builds += 1
 	state = "build"; st_t = BUILD_T; hammer_t = 0.0
+	Snd.at("crew_hammer", lead.global_position, -4, 0.1)
 	line_n = n
 	var side := Vector3(n.z, 0, -n.x)
 	line_c = lead.global_position + n * 1.7

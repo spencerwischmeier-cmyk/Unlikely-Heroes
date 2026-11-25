@@ -207,7 +207,8 @@ func _add_xp(id: String, n: int) -> void:
 		# a level up tops the weapon up to its new, bigger magazine
 		if uses_ammo(id): wdata[id].ammo = max_ammo(id)
 		weapon_level_up.emit(id, after)
-		Snd.play("combo_up", -2, 0.0)
+		Snd.play("weapon_v5" if after >= 5 else "weapon_levelup", -2, 0.0)
+		Snd.bark("dodger" if randf() < 0.6 else "vesk", "levelup", 1.0)
 		if player: FX.ring(player.global_position + Vector3(0, 0.1, 0), weapon_color(id), 1.4)
 		Game.save()
 	_store()
@@ -264,7 +265,7 @@ func try_fire(dt: float, want: bool, muzzle: Vector3, aim_point: Vector3, aim_di
 		"arc_lancer": return _fire_lancer(muzzle, dir)
 		"scatter_bloom", "thump_lobber", "seeker_hive":
 			if wdata[current].ammo <= 0:
-				cool = 0.35; Snd.play("shop_deny", -10, 0.0, 0.3)
+				cool = 0.35; Snd.play("ammo_empty", -6, 0.0, 0.3); Snd.bark("vesk", "empty", 0.35)
 				return false
 			var ok := false
 			match current:
@@ -327,7 +328,7 @@ func _fire_scatter(muzzle: Vector3, dir: Vector3) -> bool:
 	var tw := fl.create_tween(); tw.tween_property(fl, "scale", Vector3.ONE * 0.1, 0.09); tw.tween_callback(fl.queue_free)
 	FX.sparks(muzzle, weapon_color("scatter_bloom"), 14 if v5 else 8, 7.0)
 	if v5: FX.ring(muzzle, GOLD, 0.35)
-	Snd.play("blaster", -3, 0.05, 0.0); Snd.play("melee_hit", -12, 0.1, 0.0)
+	Snd.play("scatter_fire", -4, 0.06, 0.0)
 	FX.shake(0.25)
 	return true
 
@@ -341,7 +342,7 @@ func _fire_lobber(muzzle: Vector3, aim_point: Vector3, dir: Vector3) -> bool:
 	_spawn_bomb(muzzle, vel, lv, false)
 	FX.sparks(muzzle, weapon_color("thump_lobber"), 6, 3.0)
 	FX.puff(muzzle, Color(0.8, 0.95, 0.8))
-	Snd.play("hook_fire", -3, 0.08, 0.0)
+	Snd.play("lobber_fire", -3, 0.08, 0.0)
 	return true
 
 func _spawn_bomb(pos: Vector3, vel: Vector3, lv: int, small: bool) -> void:
@@ -381,7 +382,7 @@ func _fire_seeker(muzzle: Vector3, dir: Vector3) -> bool:
 		bolts.append({ node = mi, vel = d * 16.0, life = 3.2, dmg = 1.3 + 0.15 * (lv - 1), wpn = "seeker_hive", kind = "seeker",
 			target = _seek_target(muzzle + dir * 6.0, dir, 40.0, []), t = 0.0, retarget = 1 if v5 else 0, wob = randf() * TAU })
 	FX.sparks(muzzle, weapon_color("seeker_hive"), 6, 3.0)
-	Snd.play("hornet_buzz", -8, 0.15, 0.0); Snd.play("blaster", -12, 0.2, 0.0)
+	Snd.play("seeker_fire", -5, 0.1, 0.0)
 	return true
 
 func _seek_target(origin: Vector3, dir: Vector3, max_d: float, skip: Array) -> Node3D:
@@ -430,6 +431,7 @@ func _explode(pos: Vector3, radius: float, dmg: float, wpn: String, scale := 1.0
 			var f := lerpf(1.0, 0.5, clampf(d / radius, 0, 1))
 			_hit(t, snappedf(dmg * f, 0.1), c, (c - pos).normalized(), wpn)
 	FX.explosion(pos, scale)
+	if wpn == "thump_lobber": Snd.at("lobber_explode", pos, -2 if scale >= 1.0 else -7, 0.1, 0.03)
 	FX.shake(0.7 * scale)
 	Snd.at("explode_small" if scale < 1.0 else "explode_big", pos, -1, 0.1, 0.0)
 
@@ -633,7 +635,7 @@ func _step_projectiles(dt: float, space: PhysicsDirectSpaceState3D) -> void:
 						var nrm: Vector3 = hit.normal
 						b.vel = b.vel.bounce(nrm) * 0.45
 						b.node.global_position = hit.position + nrm * 0.22
-						Snd.at("land", hit.position, -8, 0.2, 0.05)
+						Snd.at("lobber_bounce", hit.position, -4, 0.15, 0.05)
 						continue
 					_bomb_burst(b, hit.position + (hit.normal as Vector3) * 0.2, spawn_after)
 					b.node.queue_free(); bolts.remove_at(i); continue

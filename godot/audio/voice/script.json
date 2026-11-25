@@ -117,13 +117,18 @@
  "multi": ["Two for one! Thrifty.", "Group discount!"],
  "combo": ["Combo! Keep it going!", "Look at you go!", "Chain them, chain them!"],
  "comboEnd": ["Combo over. It was beautiful while it lasted.", "And the streak ends. Bonus sprockets, though."],
- "rate": ["Wow. A shot. Three out of ten.", "Five out of ten. Points for effort.", "Solid. Six out of ten.", "Seven out of ten. Not bad, old man.", "Okay, that was an eight. Don't let it go to your head.", "Nine out of ten! I'm telling everyone!", "[shouting] TEN OUT OF TEN! Okay, nine. No, ten!"]
+ "rate": ["Wow. A shot. Three out of ten.", "Five out of ten. Points for effort.", "Solid. Six out of ten.", "Seven out of ten. Not bad, old man.", "Okay, that was an eight. Don't let it go to your head.", "Nine out of ten! I'm telling everyone!", "[shouting] TEN OUT OF TEN! Okay, nine. No, ten!"],
+ "levelup": ["[excited] Ooh, your blaster just went up a level! It looks so shiny and dangerous!", "[cheering] Level up! I'm putting that in my scrapbook!", "[impressed] Whoa. It's humming. Is it supposed to hum? I like the hum."],
+ "washer": ["[gasps] A Lucky Washer! That's the luckiest kind of washer!", "[delighted] Ooh, shiny! Gizmart trades those for the good stuff!", "[whispering] Lucky Washer. Pocket it before somebody sees."],
+ "page": ["[curious] A pink slip? It's got Foreman Grudd's stamp on it. Huh.", "[reading slowly] 'Your position has been... discontinued.' Ouch. Who wrote this?"]
 },
 "vesk": {
  "hurt": ["[grunts] Ugh.", "[pained] Hey!", "[grunts] Rude."],
  "kill": ["Scrap.", "Back to the pile.", "Should've stayed in the box.", "Next."],
  "overheat": ["[annoyed] Hot, hot, hot.", "Gotta let it cool."],
- "buy": ["Fine. I'll take it.", "This better work."]
+ "buy": ["Fine. I'll take it.", "This better work."],
+ "empty": ["[annoyed] Out. Of course it is.", "[grumbling] Empty. Somebody find me a crate.", "[flatly] Click. That's the sound of bad planning."],
+ "levelup": ["[grudging] Huh. That actually feels better.", "[satisfied] Now we are talking. Mostly to myself.", "[dry] Tuned it up. Like riding a bike. A bike that shoots."]
 },
 "gizmart": {
  "hello": ["Welcome, welcome, valued customer! Gizmart has everything a hero needs!", "[cheerful] Ding ding! A shopper! Step right up!", "Back again? I knew you couldn't resist my selection!"],

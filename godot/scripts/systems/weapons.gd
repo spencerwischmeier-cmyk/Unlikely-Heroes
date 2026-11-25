@@ -142,12 +142,13 @@ func _open() -> void:
 	wheel.modulate.a = 0.0; wheel.scale = Vector2(0.85, 0.85)
 	var tw := wheel.create_tween().set_parallel().set_ignore_time_scale(true)
 	tw.tween_property(wheel, "modulate:a", 1.0, 0.1); tw.tween_property(wheel, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK)
-	Snd.play("ui_select", -8, 0.0, 0.0)
+	Snd.play("wheel_open", -6, 0.0, 0.0)
 
 func _close(apply: bool) -> void:
 	open = false
 	wheel.visible = false
 	Engine.time_scale = 1.0
+	Snd.play("wheel_close", -8, 0.0, 0.0)
 	if Game.combat:
 		Game.combat.wheel_open = false
 		if apply and sel >= 0:

@@ -202,7 +202,7 @@ func open_pause() -> void:
 	pause_root.modulate.a = 0.0
 	pause_root.create_tween().tween_property(pause_root, "modulate:a", 1.0, 0.12)
 	pause_buttons.get_child(0).grab_focus()
-	Snd.play("ui_select", -6)
+	Snd.play("pause_in", -4)
 
 func close_pause() -> void:
 	if state != "pause": return

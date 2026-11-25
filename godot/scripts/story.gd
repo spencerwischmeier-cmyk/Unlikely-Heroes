@@ -190,7 +190,7 @@ func _boss_down(z: Dictionary, p: Vector3) -> void:
 	Game.boss_defeated.emit("CRANE BOT")
 	Game.combat.drop_nuts(p, 30); Game.combat.drop_cell(p)
 	for b in alive: if is_instance_valid(b) and not b.dead: b.die(true)
-	Snd.music("skyharbor", 2.0)
+	Snd.music("skyharbor", 2.0); Snd.play("victory_sting", 0, 0.0, 0.0)
 	Game.hud.show_banner("CRANE BOT SCRAPPED", "", Color(1, 0.85, 0.3))
 	active = false; finished = true
 	Game.complete(z.id); Game.zone_cleared.emit(z.id)

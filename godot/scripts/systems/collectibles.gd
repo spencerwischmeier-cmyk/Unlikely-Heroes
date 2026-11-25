@@ -97,7 +97,8 @@ func _pickup(it: Dictionary) -> void:
 	it.node.queue_free()
 	FX.sparks(pos, Color(1, 0.85, 0.4) if it.kind == "washer" else Color(1, 0.5, 0.75), 24, 5.0)
 	FX.ring(pos, Color(1, 0.8, 0.3) if it.kind == "washer" else Color(1, 0.45, 0.7), 0.6)
-	Snd.play("combo_up", -3, 0.0, 0.0); Snd.play("nut_pickup", -2, 0.0, 0.0)
+	Snd.play("washer_pickup" if it.kind == "washer" else "page_pickup", -2, 0.0, 0.0)
+	Snd.bark("dodger", "washer" if it.kind == "washer" else "page", 1.0)
 	if it.id != "test": Game.collect(it.kind, it.id)
 	_toast_for(it.kind)
 
