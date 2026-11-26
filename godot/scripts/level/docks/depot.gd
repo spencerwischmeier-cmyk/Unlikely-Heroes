@@ -544,18 +544,21 @@ static func _berth(L: Node3D, A: Node3D) -> void:
 	L.label("SKY BERTH", Vector3(117, 0, 30), 2.4, Color(0.75, 0.98, 1), PI / 2)
 	# the freighter rides above the cradle, bow north
 	var ship := Node3D.new(); ship.position = Vector3(129, 0, 30); L.add_child(ship)
-	var hull := DocksDressing.place(ship, "freighter", Vector3(0, 2.0, 0), PI / 2, 20.0, false)
+	var hull := DocksDressing.place(ship, "freighter", Vector3(0, 3.2, 0), PI / 2, 21.0, false)
 	A.bobbers.append({ node = ship, base = ship.position, amp = 0.25, w = 0.45, ph = 1.0, roll = 0.01 })
 	# cradle arms reaching up to the hull, a gangway stair up to the hatch platform
 	for z in [22.0, 38.0]:
 		for x in [123.0, 135.0]:
-			L.box(Vector3(x, 1.0, z), Vector3(0.6, 2.0, 0.6), L.mat_dark, false)
-		L.box(Vector3(129, 1.9, z), Vector3(13, 0.4, 0.7), M.hazard(), false)
+			L.box(Vector3(x, 1.6, z), Vector3(0.7, 3.2, 0.7), L.mat_dark, false)
+		L.box(Vector3(129, 3.1, z), Vector3(13, 0.4, 0.8), M.hazard(), false)
 	# hatch platform (y 4) on the hull's west flank, reached by a stair from the berth deck
 	var hp: Rect2 = Rect2(119.5, 27, 3.5, 6)
 	L.block(hp.get_center().x, hp.get_center().y, hp.size.x, hp.size.y, 0.4, 3.6, M.deck(Color(0.8, 0.78, 0.72)))
-	for i in 4:
-		L.block(116.4 + i * 0.85, 30, 0.85, 3.0, 0.4, (i + 1) * 0.8 - 0.4, M.deck(Color(0.78, 0.74, 0.7)), i == 3)
+	# a gangway ramp up to it (walkable slope) with posts under the platform
+	var r0 := Vector3(113.2, 0.0, 30); var r1 := Vector3(119.6, 4.0, 30)
+	var ramp: MeshInstance3D = L.box((r0 + r1) / 2 - Vector3(0, 0.15, 0), Vector3(r0.distance_to(r1), 0.3, 2.6), M.deck(Color(0.78, 0.74, 0.7)))
+	ramp.rotation.z = atan2(r1.y - r0.y, r1.x - r0.x)
+	for pz in [27.4, 32.6]: L.box(Vector3(120, 1.8, pz), Vector3(0.4, 3.6, 0.4), L.mat_dark, false)
 	L.railing(119.5, 27, 123, 27, 4.0); L.railing(119.5, 33, 123, 33, 4.0)
 	sprocket_line(A, Vector3(120.5, 4.9, 28), Vector3(120.5, 4.9, 32), 3, 10)
 	DocksDressing.place(L, "crates", Vector3(127, 0, 21), 0.3, 1.6, true)
