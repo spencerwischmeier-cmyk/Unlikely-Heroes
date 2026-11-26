@@ -14,6 +14,8 @@ const LIFE := preload("res://scripts/level/plaza/plaza_life.gd")
 const H := 5.0                 # walkable height of the upper ring
 const GALLERY := 12.2          # clock gallery
 const TOWER := Vector3(17, 0, 22.5)
+const PARK := Rect2(-22.5, 50, 9.5, 8.5)   # Pigeon Park, a floating pocket south-west (glide down from the Lug Nut roof)
+const PARK_Y := 2.4
 
 static var L: Node3D
 static var _mats := {}
@@ -29,6 +31,7 @@ const SPOTS := {
 	plaza_roof = [Vector3(-20, H + 0.1, 30), PI * 0.7],
 	plaza_clock = [Vector3(13.6, GALLERY + 0.1, 19.4), PI * 0.6],
 	plaza_east = [Vector3(4, 0.1, 30), PI / 2 - 0.5],
+	plaza_park = [Vector3(-14.5, PARK_Y + 0.1, 57.0), -PI * 0.7],
 }
 
 static func build(level: Node3D) -> void:
@@ -48,6 +51,7 @@ static func build(level: Node3D) -> void:
 	_props()
 	_cables()
 	_banners()
+	_park()
 	_sky_life()
 	_merge_static()
 	# hidden sprocket crates up on the ring
@@ -59,6 +63,8 @@ static func build(level: Node3D) -> void:
 		Vector3(20.2, GALLERY, 25.6),  # clock gallery, two of them
 		Vector3(20.2, GALLERY, 22.6),
 		Vector3(14.6, 0, 26.9),        # ground: under the tower balcony
+		Vector3(-21.6, PARK_Y, 57.4),  # Pigeon Park, two of them
+		Vector3(-20.2, PARK_Y, 57.6),
 	])
 	for k in SPOTS: L.debug_spots[k] = SPOTS[k]
 	# level_skyharbor rebuilds debug_spots after the areas, so honour --at=<plaza spot> here
@@ -90,6 +96,11 @@ static func traversal_cases(moves: Dictionary) -> Dictionary:
 		out["plaza_ledge1_" + k] = [Vector3(15.2, H + 0.1, 26.2), -PI / 2, _tap(r), 7.4, Rect2(8.3, 25.9, 2.6, 2.6)]
 		if r > 0.35: out["plaza_ledge2_" + k] = [Vector3(9.6, 7.5, 27.8), PI, _tap(r), 9.8, Rect2(8.3, 20.5, 2.6, 2.6)]
 		out["plaza_gallery_" + k] = [Vector3(9.0, 9.9, 21.8), PI / 2, _tap(r), GALLERY, Rect2(13, 18.5, 8, 8)]
+	# Pigeon Park: glide off the Lug Nut roof, then hop the stepping pad back to the junkyard bridge
+	# Pigeon Park: glide/double jump off the Lug Nut roof, then the stepping pad back to the junkyard bridge
+	out["plaza_park"] = [Vector3(-17.5, H + 0.1, 44.6), 0.0, _tap(0.8), PARK_Y, PARK]
+	out["plaza_park_back"] = [Vector3(-9.5, 0.1, 55.5), PI / 2, _tap(0.5), 0.0, Rect2(-5, 53, 5, 5)]
+	out["plaza_park_pad"] = [Vector3(-14.0, PARK_Y + 0.1, 55.5), PI / 2, _tap(0.35), 0.0, Rect2(-10.5, 54, 3, 3)]
 	return out
 
 # ---------------------------------------------------------------- helpers
@@ -386,7 +397,8 @@ static func _shops() -> void:
 		Color(1.0, 0.45, 0.8), ["f4efe6", "d9473f"], Vector2(-3.8, -1.2), -2.2)
 	# roof railings on the outer edges (the plaza side stays open for the jumps)
 	L.railing(-22.1, 20.3, -22.1, 46.1, H)
-	L.railing(-22.1, 46.1, -10, 46.1, H)
+	L.railing(-22.1, 46.1, -19.5, 46.1, H)   # gap: glide off to Pigeon Park
+	L.railing(-15.0, 46.1, -10, 46.1, H)
 	L.railing(-22.1, 20.3, -18, 20.3, H)
 	# cafe roof pocket: a little glasshouse shed with a crate on top (one more double jump)
 	bx(Vector3(-20.6, H + 1.2, 21.6), Vector3(2.6, 2.4, 2.0), "plaster_teal", true)
@@ -727,6 +739,48 @@ static func _cables() -> void:
 	# a few of the lanterns actually light the floor
 	for p in [Vector3(-2.5, 3.6, 22.5), Vector3(-14.5, 4.6, 40.2), Vector3(15.2, 4.6, 32.0)]:
 		light(p, Color(1.0, 0.65, 0.3), 1.4, 7.0)
+
+# ---------------------------------------------------------------- Pigeon Park
+static func _park() -> void:
+	var r := PARK; var y := PARK_Y; var c := r.get_center()
+	L.island("plaza_park", r, y, Color(0.95, 0.97, 0.9), 1.6)
+	L.fence(r, y, [["n", r.position.x, r.end.x], ["e", 53.5, 57.5]], "nsew")
+	# a lawn with stepping stones
+	bx(Vector3(c.x - 0.8, y + 0.03, c.y + 0.8), Vector3(6.4, 0.06, 5.6), "leaf")
+	for i in 5: cy(Vector3(c.x + 3.2 - i * 0.2, y + 0.07, r.position.y + 1.2 + i * 1.4), 0.35, 0.35, 0.05, "stone", 10)
+	bonsai(Vector3(r.position.x + 1.2, y, r.position.y + 1.3), 0.5, 2.4)
+	bonsai(Vector3(r.position.x + 1.3, y, r.end.y - 3.4), 2.0, 1.9)
+	# a bird bath with pigeons, a bench facing the sky and a coin telescope
+	var bb := Vector3(c.x - 0.8, y, c.y + 0.2)
+	cy(bb + Vector3(0, 0.45, 0), 0.18, 0.3, 0.9, "cream", 12)
+	cy(bb + Vector3(0, 0.95, 0), 0.75, 0.4, 0.2, "cream", 16)
+	cy(bb + Vector3(0, 1.04, 0), 0.62, 0.62, 0.02, "water", 16)
+	solid(bb + Vector3(0, 0.5, 0), Vector3(1.2, 1.0, 1.2))
+	for i in 4:
+		var a := i * TAU / 4 + 0.4
+		_pigeon(bb + Vector3(sin(a) * 0.7, 1.08, cos(a) * 0.7), a + PI / 2)
+	for p in [Vector3(c.x + 1.5, y, r.end.y - 1.5), Vector3(c.x - 2.5, y, r.position.y + 2.5)]: _pigeon(p + Vector3(0, 0.0, 0), randf() * TAU)
+	L.prop("bench", Vector3(c.x + 0.5, y, r.end.y - 0.9), PI, 1.0, true)
+	var tel := frame(Vector3(r.end.x - 1.0, y, r.end.y - 1.0), PI * 0.75)
+	cy(Vector3(0, 0.6, 0), 0.08, 0.16, 1.2, "dark", 8, tel)
+	cy(Vector3(0, 1.3, 0.2), 0.12, 0.16, 1.0, "brass", 12, tel).rotation.x = 1.2
+	L.prop("lamp_post", Vector3(r.position.x + 0.6, y, c.y + 0.5), 0.0, 1.0, true)
+	var sg := frame(Vector3(c.x + 2.0, y, r.position.y + 0.6), PI)
+	for x in [-0.8, 0.8]: bx(Vector3(x, 0.7, 0), Vector3(0.1, 1.4, 0.1), "wood", false, sg)
+	bx(Vector3(0, 1.3, 0), Vector3(2.0, 0.75, 0.08), "3c9a5c", false, sg)
+	text("PIGEON PARK", Vector3(0, 1.45, 0.05), 0.0, Color(1, 0.97, 0.85), 0.005, sg)
+	text("NO BOTS ALLOWED. THIS MEANS YOU, GRRK.", Vector3(0, 1.15, 0.05), 0.0, Color(1, 0.97, 0.85), 0.0026, sg)
+	# under the park: hanging roots and a lantern; and the stepping pad back to the junkyard bridge
+	L.sky_pad(-9.0, 55.5, 3, 3, 0.0)
+	light(Vector3(c.x, y + 3.2, c.y), Color(1, 0.8, 0.5), 1.4, 7.0)
+	L.hint_sign("PIGEON PARK THIS WAY. GLIDE!", Vector3(-12.6, H, 45.2), PI)
+
+static func _pigeon(p: Vector3, yaw: float) -> void:
+	var f := frame(p, yaw)
+	sphere(Vector3(0, 0.13, 0), 0.12, "9aa3ad", f).scale = Vector3(0.8, 0.8, 1.2)
+	sphere(Vector3(0, 0.26, 0.11), 0.07, "6f7a86", f)
+	bx(Vector3(0, 0.25, 0.19), Vector3(0.03, 0.03, 0.06), "e8a83a", false, f)
+	bx(Vector3(0, 0.15, -0.16), Vector3(0.1, 0.03, 0.12), "6f7a86", false, f)
 
 # ---------------------------------------------------------------- hanging banners
 static func banner(pos: Vector3, yaw: float, c: String, h := 2.6) -> void:
