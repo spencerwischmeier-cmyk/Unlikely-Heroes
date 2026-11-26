@@ -184,7 +184,8 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cub(-50.0, 2.7, 40.0, 0.12)    # front three-quarter medium, wide enough that the slurp stays in frame
+	C.setv(dodger, "global_position", dspot + Vector3(0.5, 0.45, -0.5))   # off-camera: drift him clear of the lens line
+	_cub(-50.0, 2.2, 40.0, 0.05)    # front three-quarter medium, wide enough that the slurp stays in frame
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
@@ -196,6 +197,7 @@ func run() -> void:
 	await C.wait(maxf(0.0, sp4 - 3.2))
 	dodger.act("sad")
 	await C.wait(0.9)
+	C.setv(dodger, "global_position", dspot)
 	C.auto_look = true
 	# 9. 7:59:57 ... 8:00:00. The relay dish on the Signal Mast pulses; a voice on the wind
 	C.mark("clock")
