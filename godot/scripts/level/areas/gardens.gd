@@ -113,6 +113,7 @@ static func _gardens(L: Node3D, K, life) -> void:
 	K.hedge(Vector2(-31.0, -13.55), Vector2(-27.0, -13.55), Y, 1.0, 0.8)
 	for p in [Vector2(-38.6, -1.5), Vector2(-33.6, 3.0)]:
 		K.bush(Vector3(p.x, Y + 0.5, p.y), 0.7, Color(0.3, 0.62, 0.32))
+	K.hedge(Vector2(-20.45, -12.6), Vector2(-20.45, -7.6), Y, 1.0, 0.8)
 	# greenhouse shed in the south gap, door to the north
 	K.model("greenhouse", Vector3(-31.0, Y, 2.3), PI, 3.0, true, 0.9)
 	K.flower_patch(-33.0, 3.4, -29.0, 3.9, Y, 4.0)
@@ -157,7 +158,7 @@ static func _promenade(L: Node3D, K, life) -> void:
 	K.flower_bed(-25.55, -24.5, 0.8, 20.0, Y, 0.55, true, 7.0)
 	K.flower_bed(-20.45, -25.5, 0.8, 22.0, Y, 0.55, true, 7.0)
 	# vine arches over the path, lanterns between
-	for z in [-18.0, -25.5, -33.0]:
+	for z in [-15.2, -24.5, -33.0]:
 		K.model("vine_arch", Vector3(-23.0, Y + 0.4, z), 0.0, 0.0, false, 0.85, 5.6)
 	K.garden_lamp(Vector3(-25.55, Y + 0.55, -21.7), 0.0, Color(1.0, 0.8, 0.5), false)
 	K.garden_lamp(Vector3(-20.45, Y + 0.55, -29.3), PI, Color(1.0, 0.8, 0.5), true)
