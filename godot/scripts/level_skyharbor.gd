@@ -450,27 +450,21 @@ func _build_junkyard() -> void:
 
 func _build_plaza() -> void:
 	var r := rect(0, 30, 44, 32)
+	var deck_i := get_child_count()
 	island("plaza", r, 0.0, Color(1.0, 0.97, 0.92))
+	# worn stone-and-moss paving like the concept, instead of the clean deck plates
+	(get_child(deck_i) as MeshInstance3D).material_override = M.worn("deck", Color(0.98, 0.92, 0.82), 0.14, 0.15, 0.7, 0.6)
 	fence(r, 0.0, [["s", -8, 8], ["w", 29, 37], ["e", 26, 34], ["e", 12, 20], ["n", -11, -1]])
-	# fountain in the middle
-	cyl(Vector3(0, 0.4, 28), 3.0, 3.3, 0.8, mat_teal, 24, true)
-	cyl(Vector3(0, 0.82, 28), 2.7, 2.7, 0.08, M.glow(Color(0.38, 0.88, 1), 1.5))
-	cyl(Vector3(0, 1.6, 28), 0.4, 0.6, 1.6, mat_brass, 12)
-	for p in [Vector2(-8, 20), Vector2(8, 20), Vector2(-8, 38), Vector2(8, 38)]: prop("bench", Vector3(p.x, 0, p.y), 0.0 if p.y > 30 else PI)
-	for p in [Vector2(-20, 16), Vector2(20, 16), Vector2(-20, 44), Vector2(20, 22), Vector2(-4, 44), Vector2(4, 44)]:
-		lamp(p.x, p.y, Color(1, 0.8, 0.5))
-	for p in [Vector2(-12, 24), Vector2(12, 24)]: prop("planter", Vector3(p.x, 0, p.y))
-	prop("market_stall", Vector3(-17, 0, 22), PI / 2)
-	prop("awning", Vector3(-17, 0, 26), PI / 2, 1.0, false)
-	prop("flag_pole", Vector3(-6, 0, 15), 0.0, 1.0, false); prop("flag_pole", Vector3(6, 0, 15), 0.0, 1.0, false)
+	# the fountain, shopfronts, stalls, clock tower and the upper ring of balconies: scripts/level/areas/plaza.gd
 	label("DOCK PLAZA", Vector3(0, 0, 34), 9)
 	checkpoints.append({ pos = Vector3(0, 0.1, 40), r = 3.0 })
 	# the bank: a sealed vault (needs the Pulse Key from Dustvein Gulch); the Pink Slip Page is inside
 	var bx := 16.0; var bz := 41.0
+	var bank_wall := M.surface("paint", Color(0.93, 0.88, 0.76), 0.1, 0.7, 0.6, true)
 	for w in [[bx, bz - 4, 10, 0.5], [bx, bz + 4, 10, 0.5], [bx + 5, bz, 0.5, 8], [bx - 5, bz - 2.75, 0.5, 2.5], [bx - 5, bz + 2.75, 0.5, 2.5]]:
-		box(Vector3(w[0], 2.25, w[1]), Vector3(w[2], 4.5, w[3]), M.std(Color(0.88, 0.84, 0.74), 0.2, 0.5))
+		box(Vector3(w[0], 2.25, w[1]), Vector3(w[2], 4.5, w[3]), bank_wall)
 	box(Vector3(bx, 4.75, bz), Vector3(10.6, 0.5, 8.6), mat_brass)
-	box(Vector3(bx - 5, 3.75, bz), Vector3(0.5, 1.5, 3.0), M.std(Color(0.88, 0.84, 0.74), 0.2, 0.5))
+	box(Vector3(bx - 5, 3.75, bz), Vector3(0.5, 1.5, 3.0), bank_wall)
 	prop("bank_vault_door", Vector3(bx - 5.1, 0, bz), -PI / 2)
 	hint_sign("SKYHARBOR SAVINGS & LOAN. VAULT SEALED: PULSE KEY REQUIRED", Vector3(bx - 6.5, 0, bz - 3.4), -PI / 2)
 	# bridges: west to the Terrace, east to the docks, north to the causeway
@@ -478,7 +472,7 @@ func _build_plaza() -> void:
 	walkway(22, 27, 28, 33)
 	walkway(-9, 9, -3, 14)
 	gate("causeway_gate", Vector3(-6, 0, 11.5), 7.0, 4.0)
-	hint_sign("CRANE YARD: CLOSED FOR SIGNAL MAINTENANCE", Vector3(-1, 0, 15.5), 0.0)
+	hint_sign("CRANE YARD: CLOSED FOR SIGNAL MAINTENANCE", Vector3(-1, 0, 15.6), 0.0)
 
 func _build_terrace() -> void:
 	# Market Terrace (west of the plaza), then tiers that need the double jump, a glide gap, pillars,
