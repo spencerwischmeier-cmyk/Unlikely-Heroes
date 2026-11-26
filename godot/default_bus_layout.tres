@@ -1,6 +1,7 @@
 [gd_resource type="AudioBusLayout" format=3]
 
 [sub_resource type="AudioEffectHardLimiter" id="AudioEffectHardLimiter_j3pel"]
+pre_gain_db = 2.5
 ceiling_db = -0.8
 release = 0.12
 

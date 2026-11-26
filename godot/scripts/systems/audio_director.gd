@@ -70,8 +70,9 @@ func _ready() -> void:
 	Game.collectible_found.connect(func(_k, _id): Snd.sting("sting_secret", -3.0))
 	Game.bot_killed.connect(_on_bot_killed)
 	Game.zone_entered.connect(_on_zone_entered)
-	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0); alert_cd = 30.0)
+	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0)
 	if args.has("--audio-test"): _self_test.call_deferred()
+	for a in args: if a.begins_with("--audio-mix="): _mix_capture.call_deferred(a.substr(12))
 
 func _level_ok() -> bool:
 	return Game.level != null and is_instance_valid(Game.level) and "islands" in Game.level \
@@ -183,7 +184,7 @@ func _update_combat(dt: float) -> void:
 		if combat_t > 0.35:
 			combat = true; combat_t = 0.0
 			if alert_cd <= 0.0 and Snd.adaptive:
-				Snd.sting("sting_alert", -4.0); alert_cd = 25.0
+				Snd.sting("sting_alert", -4.0, 4.0, 1.0); alert_cd = 25.0
 				Snd.play("zone_alarm", -14.0, 0.0, 1.0)
 	else:
 		combat_t = combat_t + dt if near == 0 else 0.0
@@ -415,3 +416,40 @@ func _beds_str() -> String:
 	var s := ""
 	for a in weights: if weights[a] > 0.01: s += "%s:%.2f " % [a, weights[a]]
 	return s
+
+## Debug: record the Master mix of a scripted scene (explore, fight, a voice line) to a wav, for level checks.
+func _mix_capture(path: String) -> void:
+	await get_tree().create_timer(1.0).timeout
+	var rec := AudioEffectRecord.new()
+	AudioServer.add_bus_effect(0, rec)
+	var spots: Dictionary = Game.level.debug_spots
+	Game.player.global_position = spots.plaza[0]
+	Snd.music("skyharbor", 0.5)
+	rec.set_recording_active(true)
+	var t0 := Time.get_ticks_msec()
+	var logger := func():
+		var tp: AudioStreamPlayer = Snd.tracks[Snd.track].p if Snd.tracks.has(Snd.track) else null
+		print("[audio-mix] t=%.1f track=%s vol=%.1f duck=%.2f sting=%.2f voice=%s area=%s" % [(Time.get_ticks_msec() - t0) / 1000.0, Snd.track,
+			tp.volume_db if tp else -99.0, Snd.duck, Snd.sting_duck, Snd.voice_player != null and Snd.voice_player.playing, area])
+	var tm := Timer.new(); tm.wait_time = 1.0; tm.autostart = true; add_child(tm); tm.timeout.connect(logger)
+	await get_tree().create_timer(8.0).timeout
+	var pp: Vector3 = Game.player.global_position
+	for i in 3: Game.main.spawn_bot("roller", pp + Vector3(5 + i * 2, 0, 4), Game.level.islands.plaza)
+	await get_tree().create_timer(2.0).timeout
+	for i in 24:
+		Snd.play("blaster", -9, 0.07, 0.0)
+		if i % 6 == 5: Snd.at("explode_small", pp + Vector3(6, 0.5, 4), 0.0)
+		if i % 4 == 0: Snd.at("bolt_hit", pp + Vector3(6, 0.5, 4), -6)
+		if i % 5 == 0: Snd.play("step_metal", -12, 0.12)
+		await get_tree().create_timer(0.15).timeout
+	Snd.at("explode_big", pp + Vector3(5, 0.5, 5), -1)
+	Snd.play("hurt", -2)
+	Game.say("dock_intro_1", true)
+	await get_tree().create_timer(6.0).timeout
+	for b in get_tree().get_nodes_in_group("bots"): if is_instance_valid(b): b.queue_free()
+	await get_tree().create_timer(9.0).timeout
+	rec.set_recording_active(false)
+	var w := rec.get_recording()
+	if w: w.save_to_wav(path); print("[audio-mix] saved ", path, " ", w.get_length())
+	else: print("[audio-mix] no recording")
+	get_tree().quit()

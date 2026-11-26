@@ -184,16 +184,16 @@ func _bus(name_: String, send: String) -> int:
 	return i
 
 func _fx(bus: int, cls: String, props: Dictionary) -> AudioEffect:
+	var e: AudioEffect = null
 	for k in AudioServer.get_bus_effect_count(bus):
-		var e := AudioServer.get_bus_effect(bus, k)
-		if e.get_class() == cls: return e
-	var e: AudioEffect = ClassDB.instantiate(cls)
+		if AudioServer.get_bus_effect(bus, k).get_class() == cls: e = AudioServer.get_bus_effect(bus, k)
+	if e == null:
+		e = ClassDB.instantiate(cls); AudioServer.add_bus_effect(bus, e)
 	for k in props: e.set(k, props[k])
-	AudioServer.add_bus_effect(bus, e)
 	return e
 
 func _setup_buses() -> void:
-	_fx(0, "AudioEffectHardLimiter", {"ceiling_db": -0.8, "pre_gain_db": 0.0, "release": 0.12})
+	_fx(0, "AudioEffectHardLimiter", {"ceiling_db": -0.8, "pre_gain_db": 2.5, "release": 0.12})
 	var mu := _bus("Music", "Master")
 	_fx(mu, "AudioEffectAmplify", {"volume_db": 0.0})
 	_fx(mu, "AudioEffectLowPassFilter", {"cutoff_hz": 20500.0})
@@ -222,7 +222,7 @@ var duck := 0.0
 func _duck_process(dt: float) -> void:
 	var talking := voice_player != null and voice_player.playing
 	duck = move_toward(duck, 1.0 if talking else 0.0, dt * (4.0 if talking else 1.2))
-	var m := bus_fx("Music", "AudioEffectAmplify"); if m: m.volume_db = -8.0 * duck
+	var m := bus_fx("Music", "AudioEffectAmplify"); if m: m.volume_db = -6.5 * duck
 	var a := bus_fx("Amb", "AudioEffectAmplify"); if a: a.volume_db = -6.0 * duck
 	var w := bus_fx("World", "AudioEffectAmplify"); if w: w.volume_db = -2.5 * duck
 
@@ -237,6 +237,7 @@ var loop_points := {}
 var sting_player: AudioStreamPlayer
 var sting_duck := 0.0
 var sting_t := 0.0
+var sting_depth := 9.0
 
 func _load_loop_points() -> void:
 	if FileAccess.file_exists(MUSIC_DIR + "loops.json"):
@@ -283,19 +284,20 @@ func _music_process(dt: float) -> void:
 		var want := 1.0 if k == track else 0.0
 		tr.fade = move_toward(tr.fade, want, dt * tr.rate)
 		var p: AudioStreamPlayer = tr.p
-		p.volume_db = music_db + tr.db + linear_to_db(maxf(tr.fade, 0.001)) - 9.0 * sting_duck
+		p.volume_db = music_db + tr.db + linear_to_db(maxf(tr.fade, 0.001)) - sting_depth * sting_duck
 		if tr.fade <= 0.0 and p.playing:
 			tr.pos = p.get_playback_position(); p.stop()
 
 ## a short musical stinger over the music
-func sting(n: String, db := 0.0) -> void:
+func sting(n: String, db := 0.0, duck_db := 9.0, duck_time := -1.0) -> void:
 	var path := MUSIC_DIR + n + ".ogg"
 	if not ResourceLoader.exists(path): return
 	if sting_player == null:
 		sting_player = AudioStreamPlayer.new(); sting_player.bus = "Music"; add_child(sting_player)
 		music_players.append(sting_player)
 	sting_player.stream = load(path); sting_player.volume_db = music_db + 3.0 + db; sting_player.play()
-	sting_t = maxf(0.5, sting_player.stream.get_length() - 1.2)
+	sting_t = duck_time if duck_time >= 0.0 else maxf(0.5, sting_player.stream.get_length() - 1.2)
+	sting_depth = duck_db
 
 # ---------- voice lines (audio/voice, text in audio/voice/script.json) ----------
 signal line_started(id: String, speaker: String, text: String)
