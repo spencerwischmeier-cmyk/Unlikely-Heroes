@@ -32,6 +32,13 @@ static func build(L: Node3D) -> void:
 	_sky_lanterns()
 	TK.flush()
 	_spots(L)
+	if OS.get_cmdline_user_args().has("--terrace-stats"):
+		var r := TK.root
+		var inst := 0
+		for mm: MultiMeshInstance3D in r.find_children("*", "MultiMeshInstance3D", true, false): inst += mm.multimesh.instance_count
+		print("[terrace] nodes=%d meshes=%d multimeshes=%d instances=%d lights=%d bodies=%d" % [r.get_child_count(),
+			r.find_children("*", "MeshInstance3D", true, false).size(), r.find_children("*", "MultiMeshInstance3D", true, false).size(), inst,
+			r.find_children("*", "OmniLight3D", true, false).size(), r.find_children("*", "StaticBody3D", true, false).size()])
 
 # ------------------------------------------------------------------ islands
 ## a market deck: warm paving with a brass and glowing edge trim; registered with the level like island()
@@ -498,7 +505,7 @@ static func _spots(L: Node3D) -> void:
 	]
 	var spots := {
 		bazaar = [Vector3(-65, 0.1, 47), PI], tea = [Vector3(-66, 3.7, 28), -2.6], loft = [Vector3(-84.5, 7.9, 12), -PI / 2],
-		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-49.5, 4.1, -20.5), 0.15], perch = [Vector3(-93, 12.7, 23.5), PI], roof = [Vector3(-78.6, 7.9, 15.6), PI / 2], nook = [Vector3(-56, -3.1, 56.0), 0.0],
+		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-49.5, 4.1, -20.5), 0.15], perch = [Vector3(-93, 12.7, 23.5), PI], roof = [Vector3(-78.6, 7.9, 15.6), PI / 2], nook = [Vector3(-56, -3.1, 56.0), 0.0], overlook = [Vector3(-67.5, 3.7, 27.5), 0.35],
 	}
 	for k in spots: L.debug_spots["terrace_" + k] = spots[k]
 	# debug_spots is filled after the area files run, so honour --at=terrace_* here
