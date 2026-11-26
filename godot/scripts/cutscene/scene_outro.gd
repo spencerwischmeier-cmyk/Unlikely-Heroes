@@ -116,8 +116,9 @@ func run() -> void:
 	C.focus(0.0)
 	C.move(c + Vector3(-1.5, 2.1, -4.4), c + Vector3(0.4, 1.3, 1), 26.0)
 	await C.wait(0.6)
+	vesk.play("cs_listen", 0.5)
 	await C.say("sky_outro_nana_1", 0.3)
-	vesk.gesture("cs_scratch", 0.3, "idle")
+	vesk.gesture("cs_scratch", 0.3)
 	await C.say("sky_outro_nana_2", 0.3)
 	await C.say("sky_outro_nana_3", 0.3)
 	C.call_text.text = "SHARD 1 DECODED\n> DUSTVEIN GULCH"
@@ -125,6 +126,7 @@ func run() -> void:
 	await C.say("sky_outro_nana_4", 0.3)
 	await C.say("sky_outro_nana_5", 0.2)
 	await C.say("sky_outro_nana_6", 0.6)
+	vesk.play("idle", 0.5)
 	C.tw(C, "call_a", 0.0, 0.5)
 	C.tw(dodger, "eye_color", C.DroneActor.EYE, 0.4)
 	# 8. "Back to my chair?" "Road trip!"

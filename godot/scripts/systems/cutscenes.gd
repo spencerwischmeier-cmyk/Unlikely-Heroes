@@ -87,6 +87,7 @@ var bar_top: ColorRect
 var bar_bot: ColorRect
 var black: ColorRect
 var flash: ColorRect
+var vignette: ColorRect
 var sub: Control        # subtitle box (menus.gd hides it when subtitles are off)
 var sub_rt: RichTextLabel
 var sub_t := 0.0
@@ -290,6 +291,7 @@ func _apply(dt: float) -> void:
 
 func _overlays() -> void:
 	black.color.a = fade
+	(vignette.material as ShaderMaterial).set_shader_parameter("amount", 0.55 * clampf(bars, 0, 1))
 	flash.color.a = white
 	var vs := root_ui.size
 	var h := vs.y * 0.105 * bars
@@ -413,6 +415,7 @@ func _finish(id: String) -> void:
 
 func _overlays_only() -> void:
 	black.color.a = fade
+	(vignette.material as ShaderMaterial).set_shader_parameter("amount", 0.55 * clampf(bars, 0, 1))
 	flash.color.a = 0.0
 	var vs := root_ui.size
 	var h := vs.y * 0.105 * bars
@@ -531,6 +534,12 @@ func _build_ui() -> void:
 	flash = ColorRect.new(); flash.color = Color(1, 0.95, 0.85, 0); flash.set_anchors_preset(Control.PRESET_FULL_RECT); flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_top = ColorRect.new(); bar_top.color = Color.BLACK; bar_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_bot = ColorRect.new(); bar_bot.color = Color.BLACK; bar_bot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# soft cinematic vignette while the letterbox is up
+	vignette = ColorRect.new(); vignette.set_anchors_preset(Control.PRESET_FULL_RECT); vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vs := Shader.new()
+	vs.code = "shader_type canvas_item;\nuniform float amount = 0.0;\nvoid fragment() {\n\tvec2 d = (UV - 0.5) * vec2(1.25, 1.0);\n\tfloat v = smoothstep(0.35, 0.95, length(d));\n\tCOLOR = vec4(0.02, 0.01, 0.03, v * amount);\n}\n"
+	var vm := ShaderMaterial.new(); vm.shader = vs; vignette.material = vm
+	root_ui.add_child(vignette)
 	root_ui.add_child(flash)
 	root_ui.add_child(bar_top); root_ui.add_child(bar_bot)
 	# subtitles: centred in the lower letterbox bar, speaker name in their colour
