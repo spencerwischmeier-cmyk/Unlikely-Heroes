@@ -556,7 +556,7 @@ func hive(base: Vector3, r := 1.1, h := 2.2, col := Color(0.95, 0.75, 0.35)) -> 
 	var holder := Node3D.new(); holder.position = base; root.add_child(holder)
 	var tiers := maxi(2, int(h / 0.75))
 	var th := h / tiers
-	var mat := M.paint(col)
+	var mat := ShaderMaterial.new(); mat.shader = _comb_shader(); mat.set_shader_parameter("base", col)
 	for i in tiers:
 		var rr := r * (1.0 if i % 2 == 0 else 0.94)
 		var c := cylm(Vector3(0, th * i + th / 2, 0), rr, rr, th - 0.05, mat, 6, holder)
@@ -787,6 +787,35 @@ void fragment() {
 }
 """
 	return s
+
+static var _comb: Shader
+static func _comb_shader() -> Shader:
+	if _comb: return _comb
+	_comb = Shader.new()
+	_comb.code = """
+shader_type spatial;
+uniform vec3 base : source_color = vec3(0.95, 0.75, 0.35);
+varying vec3 lpos;
+void vertex() { lpos = VERTEX; }
+void fragment() {
+	// hexagonal comb cells wrapped round the hive (angle, height)
+	vec2 p = vec2(atan(lpos.x, lpos.z) * 2.2, lpos.y * 3.2);
+	vec2 r = vec2(1.0, 1.732);
+	vec2 h = r * 0.5;
+	vec2 a = mod(p, r) - h;
+	vec2 b = mod(p - h, r) - h;
+	vec2 g = dot(a, a) < dot(b, b) ? a : b;
+	vec2 q = abs(g);
+	float hex = max(q.x * 0.866 + q.y * 0.5, q.y);
+	float rim = smoothstep(0.36, 0.43, hex);
+	vec3 c = mix(base * 1.05, base * 0.55, rim);
+	ALBEDO = c;
+	ROUGHNESS = mix(0.45, 0.8, rim);
+	SPECULAR = 0.4;
+	EMISSION = base * vec3(1.0, 0.6, 0.15) * (1.0 - rim) * 0.08;
+}
+"""
+	return _comb
 
 static func _lawn_shader() -> Shader:
 	var s := Shader.new()
