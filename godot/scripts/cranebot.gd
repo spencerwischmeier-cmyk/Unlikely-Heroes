@@ -200,6 +200,12 @@ func _skin() -> void:
 	base_model = _skin_model("res://models/chars/crane_base.glb", self, Vector3.ZERO, Vector3(1.15, 0.7, 0.9))
 	cab_model = _skin_model("res://models/chars/crane_cab.glb", turn, Vector3(0, -0.02, -0.25), Vector3.ONE * 1.25)
 	mag_model = _skin_model("res://models/chars/crane_magnet.glb", magnet, Vector3(0, 0.72, 0), Vector3.ONE * 1.0)
+	if ResourceLoader.exists("res://models/chars/crane_boom.glb"):
+		for n in boom.get_children():
+			if n is MeshInstance3D: (n as MeshInstance3D).visible = false
+		for n in tip.get_children():
+			if n is MeshInstance3D: (n as MeshInstance3D).visible = false
+		_skin_model("res://models/chars/crane_boom.glb", boom, Vector3.ZERO, Vector3.ONE)
 	# the angry visor (eye_mat) and the rivet port (cab_glow) as overlays on the new cab
 	for sx in [-1.0, 1.0]:
 		var e := _box(turn, Vector3(0.62, 0.2, 0.08), eye_mat, Vector3(0.31 * sx, 1.93, 1.4), Vector3(0, 0, 0.2 * sx))
