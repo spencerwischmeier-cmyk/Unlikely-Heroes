@@ -267,6 +267,8 @@ func _bots_near(pos: Vector3) -> int:
 
 func _update_combat(dt: float) -> void:
 	var near := 0 if Game.input_locked else _bots_near(Game.player.global_position)
+	# a big fight pushes the combat track up a little
+	if combat and Snd.tracks.has(Snd.track): Snd.tracks[Snd.track].db = move_toward(Snd.tracks[Snd.track].db, 2.5 if near >= 4 else 1.0, dt * 2.0)
 	if not combat:
 		combat_t = combat_t + dt if near > 0 else 0.0
 		if combat_t > 0.35:
