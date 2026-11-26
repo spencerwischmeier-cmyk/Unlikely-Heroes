@@ -28,6 +28,29 @@ const MOODS := {
 		"ssr": true,                    # oil puddles and wet patches reflect (on while the mood is mostly in)
 		"fill_energy": 0.22,
 	},
+	# the Crane Bot arena and the foundry behind it: darker, smokier, redder; the floodlight beams and the
+	# molten glow cut through the haze (scripts/level/yard/arena_look.gd dresses the stage to match)
+	"arena": {
+		"rect": Rect2(-30, -190, 60, 74),
+		"fade": 12.0,
+		"env": {
+			"tonemap_exposure": 0.74,
+			"adjustment_contrast": 1.22,
+			"adjustment_saturation": 1.1,
+			"volumetric_fog_density": 0.0048,
+			"volumetric_fog_albedo": Color(1.0, 0.8, 0.66),
+			"volumetric_fog_anisotropy": 0.72,
+			"fog_light_color": Color(0.9, 0.56, 0.38),
+			"fog_sun_scatter": 0.45,
+			"ssao_intensity": 2.8,
+			"ssil_intensity": 1.4,
+			"glow_intensity": 1.15,
+			"glow_bloom": 0.2,
+		},
+		"sun_color": Color(1.0, 0.68, 0.46),
+		"ssr": true,
+		"fill_energy": 0.18,
+	},
 }
 
 var env: Environment
