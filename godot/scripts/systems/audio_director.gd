@@ -60,6 +60,7 @@ var turbines_done := false
 var chat_t := 2.0
 var lowpass := 20500.0
 var fountain_done := false
+var boss_phase2 := false
 var flyby: AudioStreamPlayer3D
 var flyby_t := 25.0
 var flyby_a := Vector3.ZERO
@@ -76,7 +77,8 @@ func _ready() -> void:
 	Game.collectible_found.connect(func(_k, _id): Snd.sting("sting_secret", -3.0))
 	Game.bot_killed.connect(_on_bot_killed)
 	Game.zone_entered.connect(_on_zone_entered)
-	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0)
+	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0; boss_phase2 = false)
+	Game.boss_health.connect(_on_boss_health)
 	get_tree().node_added.connect(_on_node_added)
 	for t in [0.5, 3.0]: get_tree().create_timer(t).timeout.connect(_route_all)
 	if args.has("--audio-test"): _self_test.call_deferred()
@@ -87,6 +89,14 @@ func _ready() -> void:
 func _on_node_added(n: Node) -> void:
 	if n is AudioStreamPlayer3D or n is AudioStreamPlayer:
 		_route.call_deferred(n)
+	elif n is CharacterBody3D and n.get_script() and (n.get_script() as Script).resource_path.ends_with("enemy_hornet.gd"):
+		_hornet_hum.call_deferred(n)
+
+## a quiet buzzing hover loop on every hornet
+func _hornet_hum(n: Node) -> void:
+	_attach(n, "drone_hum", -14.0, 2.5, 22.0, Vector3(0, 0.5, 0))
+	var p: Node = n.get_node_or_null("SndLoop")
+	if p: p.pitch_scale = randf_range(1.5, 1.75)
 
 func _route_all() -> void:
 	for n in get_tree().root.find_children("*", "AudioStreamPlayer3D", true, false): _route(n)
@@ -226,6 +236,13 @@ func _on_zone_cleared(id: String) -> void:
 	if kind == "boss" or kind == "reach": return
 	Snd.sting("sting_clear", 0.0)
 	combat_t = maxf(combat_t, 3.5)   # let the combat music go soon after
+
+## the boss fight's music turns furious at half health
+func _on_boss_health(_n: String, frac: float) -> void:
+	if boss_phase2 or frac > 0.5 or Snd.music_name != "boss" or not Snd.has_music("boss_b"): return
+	boss_phase2 = true
+	Snd.sting("sting_alert", 2.0, 6.0, 1.2)
+	Snd.music("boss_b", 1.2)
 
 func _on_zone_entered(id: String) -> void:
 	if Game.story and "zones" in Game.story:
@@ -475,6 +492,13 @@ func _self_test() -> void:
 	var e_ok := not combat and Snd.track == "area_plaza"
 	print("[audio-test] %s combat off: combat=%s track=%s" % ["PASS" if e_ok else "FAIL", combat, Snd.track])
 	ok = ok and e_ok
+	Game.boss_started.emit("TEST"); Snd.music("boss", 0.5)
+	await get_tree().create_timer(0.5).timeout
+	Game.boss_health.emit("TEST", 0.45)
+	var b_ok := Snd.track == "boss_b"
+	print("[audio-test] %s boss phase two: track=%s" % ["PASS" if b_ok else "FAIL", Snd.track])
+	ok = ok and b_ok
+	Snd.music("skyharbor", 0.5)
 	var emitters := 0
 	for p in get_tree().root.find_children("SndLoop", "AudioStreamPlayer3D", true, false): emitters += 1
 	print("[audio-test] emitters=%d" % emitters)

@@ -123,6 +123,7 @@ func play(n: String, db := 0.0, pitch_var := 0.06, gap := 0.03) -> void:
 	if n == "land" and _dir(): director.landed(db)
 	if not _ok(n, gap): return
 	var pitch := 1.0 + randf_range(-pitch_var, pitch_var)
+	if pitch_var > 0.0: db += randf_range(-1.0, 0.4)
 	_play2(pick(n), db, pitch, n)
 	_layers(n, db, pitch, null)
 
@@ -134,6 +135,7 @@ func _play2(c: String, db: float, pitch: float, key: String) -> void:
 func at(n: String, pos: Vector3, db := 0.0, pitch_var := 0.08, gap := 0.03) -> void:
 	if not _ok(n, gap): return
 	var pitch := 1.0 + randf_range(-pitch_var, pitch_var)
+	if pitch_var > 0.0: db += randf_range(-1.0, 0.4)
 	_play3(pick(n), pos, db, pitch, n)
 	_layers(n, db, pitch, pos)
 
@@ -201,6 +203,7 @@ func _setup_buses() -> void:
 	_fx(mu, "AudioEffectAmplify", {"volume_db": 0.0})
 	_fx(mu, "AudioEffectLowPassFilter", {"cutoff_hz": 20500.0})
 	var sfx := _bus("SFX", "Master")
+	_fx(sfx, "AudioEffectAmplify", {"volume_db": 0.0})
 	_fx(sfx, "AudioEffectCompressor", {"threshold": -14.0, "ratio": 2.5, "attack_us": 4000.0, "release_ms": 140.0, "gain": 0.0})
 	var vo := _bus("Voice", "Master")
 	_fx(vo, "AudioEffectHighPassFilter", {"cutoff_hz": 95.0})
@@ -229,8 +232,9 @@ func _duck_process(dt: float) -> void:
 	duck = move_toward(duck, 1.0 if talking else 0.0, dt * (4.0 if talking else 1.2))
 	var m := bus_fx("Music", "AudioEffectAmplify"); if m: m.volume_db = -6.5 * duck
 	menu_amt = move_toward(menu_amt, 1.0 if menu_duck else 0.0, dt * 3.0)
-	var a := bus_fx("Amb", "AudioEffectAmplify"); if a: a.volume_db = -6.0 * duck - 12.0 * menu_amt
-	var w := bus_fx("World", "AudioEffectAmplify"); if w: w.volume_db = -2.5 * duck
+	# SFX (and Amb / World, which feed it) dip a little; ambience a little more
+	var sf := bus_fx("SFX", "AudioEffectAmplify"); if sf: sf.volume_db = -2.5 * duck
+	var a := bus_fx("Amb", "AudioEffectAmplify"); if a: a.volume_db = -3.5 * duck - 12.0 * menu_amt
 
 # ---------- music (crossfades between tracks in audio/music) ----------
 var music_players: Array[AudioStreamPlayer] = []   # every music player (menus routes these to the Music bus)

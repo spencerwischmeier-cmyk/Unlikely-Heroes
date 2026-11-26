@@ -16,6 +16,8 @@ ratio = 2.5
 attack_us = 4000.0
 release_ms = 140.0
 
+[sub_resource type="AudioEffectAmplify" id="AudioEffectAmplify_j3pel"]
+
 [sub_resource type="AudioEffectHighPassFilter" id="AudioEffectHighPassFilter_5t1r3"]
 cutoff_hz = 95.0
 
@@ -60,6 +62,8 @@ bus/2/volume_db = 0.0
 bus/2/send = &"Master"
 bus/2/effect/0/effect = SubResource("AudioEffectCompressor_n8wo2")
 bus/2/effect/0/enabled = true
+bus/2/effect/1/effect = SubResource("AudioEffectAmplify_j3pel")
+bus/2/effect/1/enabled = true
 bus/3/name = &"Voice"
 bus/3/solo = false
 bus/3/mute = false
