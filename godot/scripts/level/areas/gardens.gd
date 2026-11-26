@@ -286,6 +286,18 @@ static func _sky_tree(L: Node3D, K, life) -> void:
 		pod.material_override = M.glow(Color(0.6, 1.0, 0.5), 3.0); pod.position = p + Vector3(0.6, -1.3, 0.4); K.root.add_child(pod)
 		life.add_bobber(pod, 0.12, 1.5)
 		life.add_sprocket(p + Vector3(0, 1.0, 0))
+		for k in 4:
+			var a := randf() * TAU
+			K.flower(p + Vector3(cos(a) * 1.35, 0.12, sin(a) * 1.35), Kit.FLOWER_COLS[(i * 3 + k) % Kit.FLOWER_COLS.size()], 0.26)
+	# shelf fungi glowing softly up the trunk
+	var fungus := M.std(Color(1.0, 0.85, 0.6), 0.0, 0.6)
+	fungus.emission_enabled = true; fungus.emission = Color(1.0, 0.6, 0.3); fungus.emission_energy_multiplier = 0.6
+	for i in 10:
+		var a := i * 2.4
+		var h := 3.0 + i * 1.6
+		var r := lerpf(2.0, 1.4, h / 19.0)
+		var f: Node3D = K.cylm(T + Vector3(cos(a) * r, h, sin(a) * r), 0.5, 0.35, 0.14, fungus, 10)
+		f.scale = Vector3(1.0, 1.0, 0.7); f.rotation.y = -a
 	# the Canopy Crown: a round deck on top of the trunk with the canopy billowing above
 	var crown: Node3D = K.cylm(T + Vector3(0, CROWN_Y - 0.3, 0), CROWN_R, CROWN_R * 0.85, 0.6, K.bark_mat, 20)
 	K.cyl_collider(crown, CROWN_R, 0.6)
