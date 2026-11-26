@@ -47,7 +47,7 @@ static func build(L) -> void:
 	_vista(L, B, rng, life)
 	B.flush(L, JK)
 	_chatter(L, life)
-	L.debug_spots["junk_home"] = [Vector3(0, 0.1, 104), PI]
+	L.debug_spots["junk_home"] = [Vector3(1.0, 0.1, 111.0), PI]
 	L.debug_spots["junk_heap"] = [Vector3(-25, 0.1, 82), -PI * 0.6]
 	L.debug_spots["junk_hull"] = [Vector3(26.5, 0.1, 79.5), 0.84]
 	L.debug_spots["junk_lookout"] = [Vector3(0, 0.1, 133), PI]
@@ -82,13 +82,8 @@ static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
 	JK.pile(B, rng, Vector3(-9.0, 0, 78.5), 2.6, 1.0, 34)
 	JK.pile(B, rng, Vector3(-16.2, 0, 70.6), 1.6, 2.8, 30)
 	life.creaks.append(Vector3(-12.5, 2.0, 74.5))
-	# oil stains on the deck
-	var stain := M.std(Color(0.08, 0.07, 0.06, 0.55), 0.3, 0.2); stain.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	for p in [Vector2(8.5, 93.0), Vector2(-9.5, 89.0), Vector2(3.0, 79.0), Vector2(12.0, 98.5), Vector2(-12.0, 99.5), Vector2(6.0, 72.0), Vector2(-2.0, 104.0)]:
-		var sm := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.5; cm.bottom_radius = 0.5; cm.height = 0.01; cm.radial_segments = 14
-		sm.mesh = cm; sm.material_override = stain; sm.position = Vector3(p.x, 0.012, p.y)
-		sm.scale = Vector3(rng.randf_range(1.0, 2.4), 1, rng.randf_range(0.8, 1.8)); sm.rotation.y = rng.randf() * TAU
-		sm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; L.add_child(sm)
+	# oil stains and patched floor plates
+	_grime(L, B, rng, [Vector2(8.5, 93.0), Vector2(-9.5, 89.0), Vector2(3.0, 79.0), Vector2(12.0, 98.5), Vector2(-12.0, 99.5), Vector2(6.0, 72.0), Vector2(-2.0, 104.0)])
 	# wrench practice: a few crates by the start, and a sign that says what F does
 	L.crate_spots.append(Vector3(10.6, 0, 89.6)); L.crate_spots.append(Vector3(11.4, 0, 88.4))
 	L.hint_sign("F: WRENCH IT. CRATES COUGH UP SPROCKETS", Vector3(12.6, 0, 90.2), PI * 0.85)
@@ -126,6 +121,17 @@ static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
 	DocksDressing.place(L, "cable_spool", Vector3(-6.6, 0, 72.6), 0.4, 1.2, true)
 	DocksDressing.place(L, "barrels", Vector3(16.2, 0, 85.0), 1.0, 1.3, true)
 	DocksDressing.steam(L, Vector3(-16.6, 2.2, 92.2), 0.7)
+
+## Dark oil stains (flat transparent discs) and riveted patch plates on the floor at the given spots.
+static func _grime(L, B, rng: RandomNumberGenerator, spots: Array, y := 0.0) -> void:
+	var stain := M.std(Color(0.08, 0.07, 0.06, 0.55), 0.3, 0.2); stain.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var cm := CylinderMesh.new(); cm.top_radius = 0.5; cm.bottom_radius = 0.5; cm.height = 0.01; cm.radial_segments = 14
+	for p: Vector2 in spots:
+		var sm := MeshInstance3D.new(); sm.mesh = cm; sm.material_override = stain; sm.position = Vector3(p.x, y + 0.012, p.y)
+		sm.scale = Vector3(rng.randf_range(1.0, 2.4), 1, rng.randf_range(0.8, 1.8)); sm.rotation.y = rng.randf() * TAU
+		sm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; L.add_child(sm)
+		var q := p + Vector2(rng.randf_range(-2.5, 2.5), rng.randf_range(-2.5, 2.5))
+		B.add("plate", "scrap", JK.xform(Vector3(q.x, y + 0.02, q.y), Vector3(0, rng.randf_range(-0.3, 0.3), 0), Vector3(rng.randf_range(1.2, 2.4), 0.5, rng.randf_range(1.0, 2.0))), JK.RUST * rng.randf_range(0.7, 1.0))
 
 # ---------------------------------------------------------------- home yard (z 96..112)
 static func _home(L, B, rng: RandomNumberGenerator, life) -> void:
@@ -296,6 +302,7 @@ static func _heap(L, B, rng: RandomNumberGenerator, life) -> void:
 	L.prop("junk_pile", Vector3(-38.0, 0, 97.5), 2.2, 1.0, true)
 	JK.litter(B, rng, HEAP.grow(-0.6), 0.0, 60, [Rect2(-29, 76.5, 5, 5), Rect2(-37, 82, 14, 10)])
 	L.label("SCRAP HEAP", Vector3(-30, 0, 78.5), 4, Color(1, 0.8, 0.55))
+	_grime(L, B, rng, [Vector2(-27.0, 89.0), Vector2(-33.0, 80.0), Vector2(-40.0, 75.0), Vector2(-29.0, 75.5), Vector2(-35.0, 96.0)])
 	# long-jump teaser: a junk raft off the heap's south edge (dash, then jump), a stash on it
 	var raft := Rect2(-37, 106, 6, 7)
 	JK.slab(L, "junk_raft", raft, 0.0, Color(0.8, 0.7, 0.58), "nsew", 0.8)
@@ -331,6 +338,16 @@ static func _hull_dock(L, B, rng: RandomNumberGenerator, life) -> void:
 	life.welder(hc + Vector3(-1.75, 1.4, 1.2))
 	life.welder(hc + Vector3(1.75, 1.7, -1.8))
 	JK.omni(L, hc + Vector3(-2.6, 1.4, 1.2), Color(0.5, 0.8, 1.0), 0.8, 5.0)
+	# a patched tarp canopy over the skiff on four scaffold poles
+	for c in [Vector2(30.2, 82.6), Vector2(36.4, 82.6), Vector2(30.2, 93.4), Vector2(36.4, 93.4)]:
+		L.cyl(Vector3(c.x, 3.3, c.y), 0.12, 0.14, 6.6, JK.mat("dark"), 8)
+	for k in 3:
+		var pc: Color = [Color(0.25, 0.5, 0.5), Color(0.8, 0.42, 0.2), Color(0.86, 0.8, 0.66)][k]
+		var cv: MeshInstance3D = L.box(Vector3(33.3, 6.7 - k * 0.02, 84.6 + k * 3.6), Vector3(7.0, 0.05, 3.9), JK.cloth(pc), false)
+		cv.rotation.x = 0.06 * (k - 1); cv.rotation.z = 0.08
+	JK.rope(L, Vector3(30.2, 6.6, 82.6), Vector3(36.4, 6.6, 82.6), 0.4, 0.02)
+	JK.bulbs(B, L, Vector3(30.2, 6.2, 93.4), Vector3(30.2, 6.2, 82.6), 0.6, 10)
+	_grime(L, B, rng, [Vector2(29.0, 89.0), Vector2(33.0, 80.0), Vector2(41.0, 86.0), Vector2(27.0, 95.0), Vector2(42.0, 72.0), Vector2(35.5, 96.0)])
 	# scaffold along the east side (top 2.4), with a crate step at its south end
 	var sc := Vector3(37.9, 2.4, 88.0)
 	L.box(sc + Vector3(0, -0.1, 0), Vector3(2.4, 0.2, 8.0), JK.mat("plank"))
@@ -378,7 +395,7 @@ static func _hull_dock(L, B, rng: RandomNumberGenerator, life) -> void:
 		JK.cyl_collider(L, h[0], h[1] * 0.6, h[2] * 0.55)
 		life.creaks.append(h[0] + Vector3(0, 1, 0))
 	JK.litter(B, rng, HULL.grow(-0.6), 0.0, 55, [Rect2(24, 76, 6, 4), Rect2(31, 83, 10, 11), Rect2(38, 75, 6, 6)])
-	JK.sign(L, "PROJECT SOMEDAY", Vector3(30.2, 0, 83.2), PI, 2.6, 0.6, 1.0, Color(1, 0.9, 0.6), Color(0.22, 0.3, 0.38))
+	JK.sign(L, "PROJECT SOMEDAY", Vector3(32.6, 0, 81.4), PI, 2.6, 0.6, 1.0, Color(1, 0.9, 0.6), Color(0.22, 0.3, 0.38))
 	L.label("HULL DOCK", Vector3(28, 0, 79), 4, Color(1, 0.8, 0.55))
 
 static func _crane(L, B, life, base: Vector3) -> void:

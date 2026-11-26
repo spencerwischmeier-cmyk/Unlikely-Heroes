@@ -116,7 +116,7 @@ static func pile(B: Batch, rng: RandomNumberGenerator, c: Vector3, radius: float
 		elif pick < 0.62: B.add("drum", "scrap", xform(p, rot, Vector3.ONE * rng.randf_range(0.8, 1.2)), col)
 		elif pick < 0.72: B.add("tire", "rubber", xform(p, rot, Vector3.ONE * rng.randf_range(0.8, 1.3)))
 		elif pick < 0.8: B.add("gear", "scrap", xform(p, rot, Vector3(1, 1, 1) * rng.randf_range(0.5, 1.3)), col.lerp(YELLOW, 0.4))
-		elif pick < 0.9: B.add("pipe", "scrap", xform(p, rot, Vector3(rng.randf_range(0.15, 0.35), rng.randf_range(0.8, 2.4), rng.randf_range(0.15, 0.35))), col)
+		elif pick < 0.9: B.add("pipe", "scrap", xform(p, rot, Vector3(rng.randf_range(0.12, 0.26), rng.randf_range(0.7, 1.7), rng.randf_range(0.12, 0.26))), col)
 		else: B.add("block", "scrap", xform(p, rot, Vector3(rng.randf_range(0.4, 1.0), rng.randf_range(0.3, 0.8), rng.randf_range(0.4, 1.0))), col)
 
 ## Scrap pieces scattered flat on the ground around a rect (small stuff underfoot, no colliders).
