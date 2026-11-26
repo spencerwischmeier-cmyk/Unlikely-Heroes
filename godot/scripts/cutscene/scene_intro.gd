@@ -61,7 +61,7 @@ func run() -> void:
 	var vh: Node3D = C.head_of(vesk)            # his eyes, for focus pulls and the light rig
 	var dh: Node3D = dodger
 	C.score("open", 0.0)
-	C.grade("golden", 0.0)
+	C.grade("vista", 0.0)
 	C.mblur = 0.55
 
 	# 1. the sky city, from far out: a slow crane down through the haze
@@ -76,6 +76,7 @@ func run() -> void:
 	await C.say("intro_01", 0.6)
 	# 2. low along the docks, tracking the dock bot as it hauls crates (still a nice bot, for now)
 	C.mark("docks")
+	C.grade("golden", 0.0)
 	var dbp: Vector3 = dock_bot.global_position
 	C.cut(dbp + Vector3(-3.5, 1.1, 4.2), dbp + Vector3(0, 0.9, 0)); C.lens(35.0)
 	# roll, ease to a stop to let a gull pass, then carry on (eased, so the roll reads as weight)
@@ -110,10 +111,10 @@ func run() -> void:
 	await C.say("intro_03", 0.9)
 	# 5. "Ahhh. Finally. Nothing left to fix." Eyes shut, the long happy sigh, then the sip
 	C.mark("sigh")
-	_cu(38.0, 1.25, 65.0, -0.02)
+	_cu(-30.0, 1.45, 65.0, -0.02)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 0.8)
 	C.light(vh, "golden", -1.0)
-	_push(38.0, 0.95, 12.0)   # slow push-in
+	_push(-30.0, 1.2, 12.0)   # slow push-in
 	vesk.mood("content", 0.6)
 	vesk.act("content_sigh")
 	C.fx(func(): C.foley("chair_creak", chair_pos, -10))
@@ -144,12 +145,12 @@ func run() -> void:
 	await C.say("intro_05", 0.4)
 	# 7. "Dodger. It's my day off." Close on Vesk, Dodger a soft blur at the frame edge
 	C.mark("day_off")
-	_cu(-28.0, 1.35, 85.0, 0.0)
+	C.auto_look = false
+	vesk.look_target = null; vesk.look_point = chair_pos + Vector3(2, 1.4, -8)
+	_cu(28.0, 1.5, 75.0, -0.03)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", 1.0)
-	_push(-28.0, 1.15, 10.0)
-	C.auto_look = false
-	vesk.look_point = chair_pos + Vector3(2, 1.4, -8)
+	_push(28.0, 1.3, 10.0)
 	vesk.mood("annoyed", 0.4)
 	vesk.act("sigh")
 	var l6: float = C.say_async("intro_06")
@@ -170,7 +171,7 @@ func run() -> void:
 	C.move(seat + Vector3(2.1, 1.4, -2.0), seat + Vector3(0.7, 1.2, 0), 6.0)
 	dodger.act("hop")
 	await C.say("cs_intro_gate_1", 0.25)
-	_cu(30.0, 1.2, 75.0, 0.0)
+	_cu(-28.0, 1.45, 70.0, 0.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	vesk.mood("tired", 0.3)
@@ -180,7 +181,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cu(30.0, 1.2, 75.0, 0.0)
+	_cu(-35.0, 2.3, 50.0, -0.05)    # a little wider: the mug comes up for the slurp
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
@@ -211,8 +212,15 @@ func run() -> void:
 	C.clock_label.text = "SKYHARBOR   8:00:00 AM"
 	C.fx(func(): Snd.play("cutscenes_factory_whistle", -2, 0.0); Snd.play("checkpoint", -6))
 	# long lens on the mast: heat haze, the dish pulsing
-	C.cut(S.at(Vector3(-3, 3.2, 73)), mast + Vector3(0, 0.5, 0)); C.lens(180.0)
-	C.move(S.at(Vector3(-2.6, 3.4, 72)), mast + Vector3(0, 1.2, 0), 7.0)
+	var mto: Vector3 = (mast - seat) * Vector3(1, 0, 1)
+	var mdir := mto.normalized()
+	var mcands := []
+	for k in [0.0, 0.15, 0.3, 0.45]:      # from the porch out along the line to the mast, rising
+		for up in [4.0, 7.0, 11.0]:
+			mcands.append(seat + mto * k + Vector3(0, up, 0) - mdir * 2.0)
+	var mcam := _clear(mast + Vector3(0, 0.5, 0), mcands)
+	C.cut(mcam, mast + Vector3(0, 0.5, 0)); C.lens(180.0)
+	C.move(mcam + Vector3(0, 0.3, 0) + mdir * 0.5, mast + Vector3(0, 1.2, 0), 7.0)
 	C.lens(240.0, 7.0)
 	C.hand = 0.5
 	C.tw(C, "clock_a", 0.0, 1.0, 1.2)
@@ -226,7 +234,7 @@ func run() -> void:
 	dodger.look_target = null
 	C.tw(dodger, "rotation:y", C.face_to(dodger, mast), 0.6)
 	# both of them turn to the mast, framed small against it
-	C.cut(seat + Vector3(-1.2, 1.2, 1.9), mast); C.lens(35.0)
+	C.cut(_clear(mast, [seat + Vector3(-1.5, 1.75, 2.7), seat + Vector3(1.2, 1.75, 2.7), seat + Vector3(-1.5, 2.6, 3.4)]), mast); C.lens(35.0)
 	C.focus(0.0)
 	vesk.mood("skeptical", 0.4)
 	await C.say("intro_07", 0.6)
@@ -261,7 +269,7 @@ func run() -> void:
 	vesk.mood("shocked", 0.15); vesk.act("flinch")
 	C.focus_on(vh, Vector3.ZERO, 0.6)                  # rack to Vesk's face over the hat
 	await C.say("sky_intro_coffee_1", 0.3)
-	_cu(22.0, 1.15, 75.0, 0.02)
+	_cu(-25.0, 1.4, 65.0, 0.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "tension", -1.0)
 	vesk.mood("annoyed", 0.25); vesk.act("lean_in")
@@ -295,8 +303,10 @@ func run() -> void:
 	C.score("haywire", 0.4)
 	C.grade("chaos", 1.0)
 	C.mblur = 0.9
-	C.cut(dock_bot.global_position + Vector3(2.2, 1.4, 3.0), dock_bot.global_position + Vector3(0, 0.8, 0)); C.lens(35.0)
-	C.move(dock_bot.global_position + Vector3(1.6, 1.2, 2.2), dock_bot.global_position + Vector3(0, 0.9, 0), 2.6)
+	var dbm: Vector3 = dock_bot.global_position + Vector3(0, 0.8, 0)
+	var dcam := _clear(dbm, _ring(dbm, 3.4, 0.6, deg_to_rad(55.0)))   # first angle with nothing in the way
+	C.cut(dcam, dbm); C.lens(35.0)
+	C.move(dbm + (dcam - dbm) * 0.72, dbm + Vector3(0, 0.1, 0), 2.6)
 	C.lens(45.0, 2.6)
 	await C.wait(0.5)
 	C.tw(hats[0], "scale", Vector3.ONE, 0.25, 0.0, Tween.TRANS_BACK, Tween.EASE_OUT)
@@ -346,7 +356,10 @@ func run() -> void:
 	C.hand = 0.0
 	C.mblur = 0.55
 	# 14. Dodger picks up the signal, looking north to the mast
-	C.cut(dodger.global_position + Vector3(0.5, 0.35, 1.4), mast); C.lens(30.0)
+	var dgp: Vector3 = dodger.global_position
+	var dgd := ((mast - dgp) * Vector3(1, 0, 1)).normalized()
+	var dgs := dgd.cross(Vector3.UP)
+	C.cut(dgp - dgd * 1.5 + dgs * 0.55 + Vector3(0, 0.15, 0), dgp.lerp(mast, 0.04)); C.lens(30.0)   # over his shoulder, mast beyond
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.7)
 	C.light(dodger, "tension", 1.0, 0.0)
 	C.tw(dodger, "rotation:y", PI, 0.6)
@@ -357,7 +370,7 @@ func run() -> void:
 	C.mark("not_my_problem")
 	C.grade("porch", 1.5)
 	C.score("porch_b", 1.5)
-	_cu(34.0, 1.2, 75.0, 0.0)
+	_cu(-32.0, 1.4, 70.0, 0.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", 1.0)
 	vesk.look_target = null; vesk.look_point = chair_pos + Vector3(2, 1.2, -8)
@@ -399,7 +412,9 @@ func run() -> void:
 		C.tw(chair, "scale", Vector3(1, 0.75, 1), 0.3)
 	await C.wait(0.6)
 	dodger.look_target = vesk
-	C.cut(dodger.global_position + Vector3(0.9, 0.2, 1.2), dodger.global_position); C.lens(50.0)
+	var dpp: Vector3 = dodger.global_position
+	C.cut(_clear(dpp, _ring(dpp, 1.6, 0.2, 0.6, 8)), dpp); C.lens(45.0)
+	C.look_node = dodger; C.look_off = Vector3.ZERO
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.9)
 	C.light(dodger, "soft", 1.0, 0.0)
 	await C.say("intro_12", 0.4)
@@ -410,12 +425,12 @@ func run() -> void:
 	var vp: Vector3 = vesk.global_position
 	var fwd := Vector3(sin(vesk.rotation.y), 0, cos(vesk.rotation.y))
 	var side := fwd.cross(Vector3.UP)
-	_cu(12.0, 2.4, 50.0, 0.0)
-	_push(12.0, 1.3, 4.0)
+	vesk.look_target = null; vesk.look_point = chair_pos
+	_cu(-50.0, 2.4, 50.0, 0.0)          # off to the side, so the roller isn't between us and him
+	_push(-50.0, 1.5, 4.0)
 	C.lens(35.0, 4.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "angry", 1.0)
-	vesk.look_target = null; vesk.look_point = chair_pos
 	vesk.mood("stunned", 0.4)
 	await C.wait(0.6)
 	var lc: float = C.say_async("cs_intro_chair")
@@ -502,16 +517,48 @@ func _ride(bot: Node3D, n: Node3D, off: Vector3, sc: float) -> void:
 	n.global_position = bot.global_transform * off
 	n.global_basis = bot.global_basis.orthonormalized().scaled(Vector3.ONE * sc)
 
+## Close-up on Vesk's face. `az` is degrees off his gaze (where his head will be turned to: the look
+## target or look point, clamped to how far his head can turn), so the camera always sees his face.
 func _cu(az: float, dist: float, mm: float, dy := 0.0) -> void:
 	var e: Vector3 = C.head_of(_vesk).global_position
-	var f := Vector3(sin(_vesk.rotation.y), 0, cos(_vesk.rotation.y)).rotated(Vector3.UP, deg_to_rad(az))
-	C.cut(e + f * dist + Vector3(0, dy, 0), e + Vector3(0, -0.04, 0)); C.lens(mm)
+	C.cut(e + _gaze_dir(az) * dist + Vector3(0, dy, 0), e + Vector3(0, -0.04, 0)); C.lens(mm)
 
 ## Slow push-in to `dist` along the same angle.
 func _push(az: float, dist: float, dur: float) -> void:
 	var e: Vector3 = C.head_of(_vesk).global_position
-	var f := Vector3(sin(_vesk.rotation.y), 0, cos(_vesk.rotation.y)).rotated(Vector3.UP, deg_to_rad(az))
-	C.move(e + f * dist, e + Vector3(0, -0.04, 0), dur)
+	C.move(e + _gaze_dir(az) * dist, e + Vector3(0, -0.04, 0), dur)
+
+## Candidate camera spots on a ring around `c` (radius r, height h above c), starting at angle a0.
+func _ring(c: Vector3, r: float, h: float, a0 := 0.0, n := 10) -> Array:
+	var out := []
+	for i in n:
+		var a := a0 + TAU * float(i) / float(n)
+		out.append(c + Vector3(sin(a) * r, h, cos(a) * r))
+	return out
+
+## First candidate with a clear line of sight to `target` (nothing solid in between), else the first.
+func _clear(target: Vector3, cands: Array) -> Vector3:
+	var space := (C as Node).get_viewport().world_3d.direct_space_state
+	for p in cands:
+		var pq := PhysicsPointQueryParameters3D.new(); pq.position = p
+		if not space.intersect_point(pq, 1).is_empty(): continue      # camera inside something
+		var q := PhysicsRayQueryParameters3D.create(p, target)
+		q.hit_from_inside = true
+		var hit := space.intersect_ray(q)
+		if hit.is_empty() or (hit.position as Vector3).distance_to(target) < 1.0:
+			return p
+	return cands[0]
+
+func _gaze_dir(az: float) -> Vector3:
+	var e: Vector3 = C.head_of(_vesk).global_position
+	var r: float = _vesk.rotation.y
+	var tp: Vector3 = _vesk.look_point
+	if is_instance_valid(_vesk.look_target): tp = _vesk.look_target.global_position
+	var rel := 0.0
+	if tp != Vector3.INF:
+		var d := tp - e
+		rel = clampf(wrapf(atan2(d.x, d.z) - r, -PI, PI), -0.8, 0.8)
+	return Vector3(sin(r + rel), 0, cos(r + rel)).rotated(Vector3.UP, deg_to_rad(az))
 
 ## The first Gizmart kiosk (position, front direction), from the Gizmart system or the level's shop spots.
 func _gizmart_spot() -> Array:

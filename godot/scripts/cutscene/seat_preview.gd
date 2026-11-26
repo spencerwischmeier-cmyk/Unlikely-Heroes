@@ -14,6 +14,7 @@ var cam: Camera3D
 var n := 0
 var views := [PI * 0.5, PI, PI * 0.75]
 var look := Vector3.INF
+var cus := []   # close-ups: [az, dist, mm] framed from the head like scene_intro._cu
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
@@ -21,6 +22,9 @@ func _initialize() -> void:
 		elif a.begins_with("--off="):
 			var p := a.substr(6).split(","); off = Vector3(float(p[0]), float(p[1]), float(p[2]))
 		elif a.begins_with("--at="): at = float(a.substr(5))
+		elif a.begins_with("--cu="):
+			for c in a.substr(5).split(";"):
+				var q := c.split(","); cus.append([float(q[0]), float(q[1]), float(q[2])])
 		elif a.begins_with("--look="):
 			var q := a.substr(7).split(","); look = Vector3(float(q[0]), float(q[1]), float(q[2]))
 		elif a.begins_with("--clip="): clip = a.substr(7)
@@ -61,9 +65,17 @@ func _process(_dt: float) -> bool:
 	var vi := n - 42
 	if vi >= 0 and vi % 4 == 0:
 		var k := vi / 4
-		if k >= views.size(): quit(); return true
-		var y: float = views[k]
-		cam.position = Vector3(sin(y) * 3.2, 0.9, cos(y) * 3.2); cam.look_at(Vector3(0, 0.75, 0))
+		if k >= views.size() + cus.size(): quit(); return true
+		if k < views.size():
+			var y: float = views[k]
+			cam.fov = 40
+			cam.position = Vector3(sin(y) * 3.2, 0.9, cos(y) * 3.2); cam.look_at(Vector3(0, 0.75, 0))
+		else:
+			var c: Array = cus[k - views.size()]
+			var e: Vector3 = vesk.head_node().global_position
+			var f := Vector3(sin(vesk.rotation.y), 0, cos(vesk.rotation.y)).rotated(Vector3.UP, deg_to_rad(c[0]))
+			cam.fov = rad_to_deg(2.0 * atan(12.0 / c[2]))
+			cam.position = e + f * c[1]; cam.look_at(e + Vector3(0, -0.04, 0))
 	if vi >= 0 and vi % 4 == 3:
 		root.get_viewport().get_texture().get_image().save_png("%s_%d.png" % [out, vi / 4])
 	return false

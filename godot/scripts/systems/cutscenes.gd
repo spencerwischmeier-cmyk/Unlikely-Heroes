@@ -891,11 +891,12 @@ func _rig_update() -> void:
 	fill.global_position = c + fd.normalized() * 1.8
 
 const GRADES := {
-	"golden": {"adjustment_saturation": 1.24, "adjustment_contrast": 1.12, "tonemap_exposure": 0.95, "volumetric_fog_density": 0.006, "glow_intensity": 0.95},
-	"porch": {"adjustment_saturation": 1.2, "adjustment_contrast": 1.1, "tonemap_exposure": 0.92, "volumetric_fog_density": 0.012, "glow_intensity": 1.0},
-	"tension": {"adjustment_saturation": 0.88, "adjustment_contrast": 1.22, "tonemap_exposure": 0.82, "volumetric_fog_density": 0.014, "glow_intensity": 1.1},
-	"chaos": {"adjustment_saturation": 1.32, "adjustment_contrast": 1.24, "tonemap_exposure": 0.92, "volumetric_fog_density": 0.01, "glow_intensity": 1.2},
-	"hero": {"adjustment_saturation": 1.28, "adjustment_contrast": 1.18, "tonemap_exposure": 0.98, "volumetric_fog_density": 0.009, "glow_intensity": 1.15},
+	"vista": {"adjustment_saturation": 1.22, "adjustment_contrast": 1.16, "tonemap_exposure": 0.9, "volumetric_fog_density": 0.0008, "glow_intensity": 0.8, "fog_aerial_perspective": 0.6},
+	"golden": {"adjustment_saturation": 1.24, "adjustment_contrast": 1.12, "tonemap_exposure": 0.95, "volumetric_fog_density": 0.0024, "glow_intensity": 0.9},
+	"porch": {"adjustment_saturation": 1.2, "adjustment_contrast": 1.1, "tonemap_exposure": 0.92, "volumetric_fog_density": 0.0045, "glow_intensity": 1.0},
+	"tension": {"adjustment_saturation": 0.88, "adjustment_contrast": 1.22, "tonemap_exposure": 0.82, "volumetric_fog_density": 0.005, "glow_intensity": 1.05},
+	"chaos": {"adjustment_saturation": 1.32, "adjustment_contrast": 1.24, "tonemap_exposure": 0.92, "volumetric_fog_density": 0.0035, "glow_intensity": 1.1},
+	"hero": {"adjustment_saturation": 1.28, "adjustment_contrast": 1.18, "tonemap_exposure": 0.98, "volumetric_fog_density": 0.003, "glow_intensity": 1.1},
 }
 
 ## Scene colour grade and atmosphere (the world Environment, put back when the cutscene ends).
