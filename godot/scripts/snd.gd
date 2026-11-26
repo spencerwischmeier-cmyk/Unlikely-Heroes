@@ -33,6 +33,7 @@ const LAYERS := {
 	"sprocket_burst": [["coin_burst", -3.0, 0.05]],
 	"hook_fire": [["rope_swing", -7.0, 0.06]],
 	"crate_break": [["debris", -12.0, 0.06]],
+	"melee_hit": [["explode_sub", -18.0, 0.0]],
 	"scatter_fire": [["scatter_punch", -5.0, 0.0]],
 	"lobber_fire": [["thump_launch", -4.0, 0.0]],
 	"seeker_fire": [["seeker_whir", -6.0, 0.02]],
@@ -271,7 +272,14 @@ func music(n: String, fade := 1.5) -> void:
 	music_name = n
 	adaptive = n == "skyharbor" and has_music("area_plaza")
 	if adaptive and _dir(): director.pick_track(fade)
-	else: set_track(n, fade)   # (adaptive without a director yet: the plain theme until it takes over)
+	elif adaptive: get_tree().create_timer(0.25, true, false, true).timeout.connect(_adaptive_start.bind(fade))
+	else: set_track(n, fade)
+
+## the level asked for adaptive music before the director was installed: wait a moment for it
+func _adaptive_start(fade: float) -> void:
+	if not adaptive: return
+	if _dir(): director.pick_track(fade)
+	else: set_track("skyharbor", fade)   # no director (another scene): the plain theme
 
 ## crossfade to a track (fade seconds); area and combat themes resume where they left off
 func set_track(t: String, fade := 1.5, db := 0.0) -> void:
