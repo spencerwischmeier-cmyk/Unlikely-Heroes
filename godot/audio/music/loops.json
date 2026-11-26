@@ -1,5 +1,6 @@
 {
 	"_": "loop_offset (seconds) for each music file: playback loops from the file end back to this point",
-	"area_junkyard": 23.9049, "area_plaza": 23.9862, "area_terrace": 23.9862, "area_gardens": 14.4544,
-	"area_docks": 20.7354, "area_mast": 20.6077, "area_yard": 20.422, "combat_a": 17.206, "combat_b": 11.4823
+	"area_junkyard": 56.378, "area_plaza": 55.8556, "area_terrace": 49.4585, "area_gardens": 54.3115,
+	"area_docks": 48.0885, "area_mast": 50.3757, "area_yard": 54.7527,
+	"combat_a": 17.206, "combat_b": 11.4823, "combat_c": 23.9862
 }

@@ -26,7 +26,7 @@ const AREAS := {
 		"shots": [["gull_call", -4.0], ["os_creak", -4.0], ["os_horn", -6.0], ["os_gust", -8.0]]},
 	"mast": {"combat": "combat_a", "surface": "metal", "amb_db": -6.0, "verb": 0.04,
 		"shots": [["os_gust", -2.0], ["gull_call", -8.0], ["os_horn", -10.0]]},
-	"yard": {"combat": "combat_a", "surface": "metal", "amb_db": -6.0, "verb": 0.18,
+	"yard": {"combat": "combat_c", "surface": "metal", "amb_db": -6.0, "verb": 0.18,
 		"shots": [["os_clank", -2.0], ["os_hiss", -3.0], ["os_clank", -6.0], ["os_horn", -12.0]]},
 }
 ## island name (exact, then prefix, in this order) -> area
@@ -450,7 +450,7 @@ func _self_test() -> void:
 		var g: Array = Snd.groups.get(n, [n] if Snd.streams.has(n) else [])
 		print("[audio-test] %s group %s = %d" % ["PASS" if g.size() > 0 else "FAIL", n, g.size()])
 		ok = ok and g.size() > 0
-	for t in ["area_junkyard", "area_plaza", "area_terrace", "area_gardens", "area_docks", "area_mast", "area_yard", "combat_a", "combat_b"]:
+	for t in ["area_junkyard", "area_plaza", "area_terrace", "area_gardens", "area_docks", "area_mast", "area_yard", "combat_a", "combat_b", "combat_c"]:
 		var h := Snd.has_music(t)
 		ok = ok and h
 		if not h: print("[audio-test] FAIL missing music ", t)
