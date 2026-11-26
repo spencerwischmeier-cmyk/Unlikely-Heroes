@@ -42,7 +42,7 @@ static func group_at(p: Vector3) -> String:
 	if x >= -1.0 and x <= 34.0 and z >= -56.0 and z <= -20.0: return "mast"
 	if x > 34.0 and x <= 54.0 and z >= -62.0 and z < -44.0 and p.y > 2.5: return "mast"
 	# hive grove above Container Row
-	if x > -52.0 and x < -24.0 and z > -72.0 and z < -54.0 and p.y > 6.0: return "west"
+	if x > -66.0 and x < -24.0 and z > -72.0 and z < -54.0 and p.y > 6.0: return "west"
 	if z < -55.0: return "yard"
 	if z > 60.5 and x > -48.0: return "junk"
 	if x >= 24.0 and z > -50.0: return "docks"
