@@ -81,6 +81,7 @@ func _ready() -> void:
 	combat.nuts_changed.emit(1240)
 	match state:
 		"boss":
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true}
 			combat.current = "scatter_bloom"; combat.lv = 3; combat.xp = 0.65; combat.am = 6; combat.mx = 32
 			combat.hull = 5; combat.hull_changed.emit(5, true)
 			Game.objective_set.emit("boss", "Scrap the Crane Bot")
@@ -92,7 +93,23 @@ func _ready() -> void:
 			player.jumps = 2; player.dash_cd = 0.3
 			Snd.line_started.emit("x", "grudd", "You call that a dent? My crane's taken worse from a pigeon!")
 			combat.hit_marker.emit(false)
+		"shop", "shop_buy", "shop_deny":
+			var giz: Node = load("res://scripts/systems/gizmart.gd").new(); add_child(giz)
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true}
+			combat.nuts_changed.emit(700); Game.data.nuts = 700
+			giz.kiosks.append({ node = Node3D.new(), spot = { stock = ["scatter_bloom", "thump_lobber", "seeker_hive"] }, front = Vector3.ZERO, actor = null })
+			giz._open(0, false)
+			await get_tree().create_timer(0.3).timeout
+			giz.rows[1].button.grab_focus()
+			if state == "shop_buy":
+				await get_tree().create_timer(0.2).timeout
+				giz._buy("thump_lobber")
+			elif state == "shop_deny":
+				giz.rows[2].button.grab_focus()
+				await get_tree().create_timer(0.2).timeout
+				giz._buy("seeker_hive")
 		"lowhull":
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true, "seeker_hive": true}
 			combat.current = "seeker_hive"; combat.lv = 5; combat.xp = 1.0; combat.am = 0; combat.mx = 55
 			combat.hull = 2; combat.hull_changed.emit(2, false)
 			Game.objective_set.emit("yard", "Get through the Holding Pens")
