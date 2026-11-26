@@ -133,11 +133,12 @@ def junk():
     col = col * (1 - 0.18 * sstep(0.2, 0.7, fbm(260))[..., None]) + hexc('6d5a3e') * 0.18 * sstep(0.2, 0.7, fbm(260))[..., None]
     h = e * 0.15 + fbm(8) * 0.08
     # gravel: many small voronoi pebbles
-    f1, f2, ids, _, _ = voronoi(40, seed=3)
-    keep = (per_id(ids, 40 * 40, 4) < 0.35) * sstep(-0.2, 0.3, fbm(150))
-    peb = sstep(0.4, 0.2, f1) * keep
-    pc = pal(per_id(ids, 40 * 40, 5), ['6e6862', '857c70', '5a5450', '93866f', '6d5a48'])
-    col = col * (1 - peb[..., None]) + pc * (0.75 + 0.35 * peb[..., None]) * peb[..., None]
+    f1, f2, ids, ox, oy = voronoi(72, jitter=0.9, seed=3)
+    keep = (per_id(ids, 72 * 72, 4) < 0.3) * sstep(0.05, 0.45, fbm(150))
+    shape = f1 * (1 + 0.35 * np.cos(np.arctan2(oy, ox) * 2 + per_id(ids, 72 * 72, 6) * 6))
+    peb = sstep(0.3, 0.16, shape) * keep
+    pc = pal(per_id(ids, 72 * 72, 5), ['7a6450', '8a735a', '66584a', '927c62', '705a44'])
+    col = col * (1 - peb[..., None]) + pc * (0.8 + 0.3 * peb[..., None]) * peb[..., None]
     h += peb * 0.35
     # tyre ruts
     rut = sstep(0.06, 0.0, np.abs(((V * 2 + 0.15 * noise(300)) % 1.0) - 0.5) - 0.12)
@@ -163,8 +164,8 @@ def junk():
         rx = ((lx - 12) % 40); ry = ((ly - 12) % 40)
         rv = inside & (((np.abs(ex - 12) < 6) & (ry < 1e9)) | ((np.abs(ey - 12) < 6))) & (np.hypot(np.where(np.abs(ex - 12) < 6, ex - 12, (rx - 20)), np.where(np.abs(ey - 12) < 6, ey - 12, (ry - 20))) < 5)
         riv = np.maximum(riv, rv.astype(np.float32))
-    rust = sstep(0.0, 0.5, fbm(60) + 0.25 * noise(12))
-    pcol = pcol * (1 - 0.65 * rust[..., None]) + hexc('8b4423') * 0.65 * rust[..., None] * (0.8 + 0.3 * noise(4)[..., None])
+    rust = sstep(0.1, 0.6, fbm(60, aniso=(0.35, 1.0)) + 0.25 * noise(12, aniso=(0.3, 1.0)))
+    pcol = pcol * (1 - 0.5 * rust[..., None]) + hexc('b06a2c') * 0.5 * rust[..., None] * (0.85 + 0.25 * noise(4)[..., None])
     pcol *= (0.75 + 0.25 * edge[..., None])
     col = col * (1 - plate[..., None]) + pcol * plate[..., None]
     col = col * (1 - 0.15 * riv[..., None]) + hexc('c8c2b8') * 0.15 * riv[..., None]
@@ -191,7 +192,7 @@ def cobble():
     base = base * (0.93 + 0.08 * speck[..., None]) * (0.82 + 0.18 * dome[..., None])
     # worn polished tops
     base = base * (1 + 0.06 * sstep(0.5, 0.9, dome)[..., None])
-    mortar = hexc('6f6656') * (0.9 + 0.2 * noise(6)[..., None])
+    mortar = hexc('9a8f7c') * (0.9 + 0.15 * noise(6)[..., None])
     moss = sstep(0.0, 0.5, fbm(150)) * (1 - stone)
     mortar = mortar * (1 - moss[..., None]) + hexc('5d7a37') * moss[..., None]
     col = base * stone[..., None] + mortar * (1 - stone[..., None])
@@ -217,14 +218,12 @@ def terracotta():
     t = per_id(tid, k * k, 41)
     base = pal(t, ['c4693f', 'b75a35', 'cf7a4c', 'b0603f', 'd08452', 'a9512f'])
     base = base * (0.9 + 0.15 * noise(30)[..., None]) * (0.92 + 0.08 * noise(3)[..., None])
-    # glazed accent tiles: a teal and cream quatrefoil
-    acc = per_id(tid, k * k, 42) < 0.14
-    cx, cy = fx - 0.5, fy - 0.5
-    r = np.hypot(cx, cy); a = np.arctan2(cy, cx)
-    petal = sstep(0.02, 0.0, r - (0.28 + 0.1 * np.cos(a * 4)))
-    ring = sstep(0.025, 0.0, np.abs(r - 0.41))
-    glaze = np.where(petal[..., None] > 0.5, hexc('e9dcc0'), hexc('2f8f8a'))
-    glaze = glaze * (1 - ring[..., None]) + hexc('e9dcc0') * ring[..., None]
+    base = base * 0.85 + base.mean(-1, keepdims=True) * 0.15
+    # glazed accent tiles: teal with cream wave bands (a few, scattered)
+    acc = per_id(tid, k * k, 42) < 0.07
+    wave = np.abs(((fy + 0.06 * np.sin(fx * math.tau * 2)) * 3) % 1.0 - 0.5)
+    band = sstep(0.12, 0.06, wave)
+    glaze = hexc('3a8a86') * (1 - band[..., None]) + hexc('e6d8bb') * band[..., None]
     base = np.where(acc[..., None], glaze * (0.92 + 0.08 * noise(20)[..., None]), base)
     # chipped corners
     chip = (per_id(tid, k * k, 43) < 0.3) & (np.hypot(np.minimum(fx, 1 - fx), np.minimum(fy, 1 - fy)) < 0.08 + 0.04 * noise(6))
@@ -243,13 +242,13 @@ def flagstone():
     f1, f2, ids, ox, oy = voronoi(7, jitter=0.9, seed=51)
     n = 49
     gap = f2 - f1
-    stone = sstep(0.03, 0.08, gap)
+    stone = sstep(0.04, 0.1, gap)
     t = per_id(ids, n, 52)
-    base = pal(t, ['cfc6b0', 'bdb39b', 'd9d0bb', 'b0a690', 'c7bba0'])
+    base = pal(t, ['c4b69a', 'a99c84', 'd6c8ab', '978b78', 'b8a687', 'a8a08e'])
     base = base * (0.9 + 0.12 * fbm(40)[..., None]) * (0.94 + 0.06 * noise(2)[..., None])
     lich = sstep(0.35, 0.6, fbm(60)) * stone
     base = base * (1 - 0.35 * lich[..., None]) + hexc('a7b26a') * 0.35 * lich[..., None]
-    grass = hexc('5f8f3a') * (0.8 + 0.35 * noise(2.5)[..., None])
+    grass = hexc('3f6a2a') * (0.75 + 0.4 * noise(2.5)[..., None])
     col = base * stone[..., None] + grass * (1 - stone[..., None])
     col *= grime(200, 0.12)[..., None]
     h = stone * (0.5 + 0.1 * fbm(20)) + (1 - stone) * 0.2 * noise(1.5)
@@ -285,8 +284,8 @@ def planks():
     # bleached, sea-greyed boards and a few with old paint
     grey = sstep(0.2, 0.6, fbm(250)) * 0.5
     base = base * (1 - grey[..., None]) + base.mean(-1, keepdims=True) * np.array([0.98, 1.0, 1.04]) * 1.05 * grey[..., None]
-    painted = per_id(uid, rows * 8, 63) < 0.08
-    pc = np.where(per_id(uid, rows * 8, 64)[..., None] < 0.5, hexc('3f8fb0'), hexc('d4a83a'))
+    painted = per_id(uid, rows * 8, 63) < 0.035
+    pc = np.where(per_id(uid, rows * 8, 64)[..., None] < 0.5, hexc('5c8a9c'), hexc('bfa068')) * 0.6 + base * 0.4
     chips = sstep(-0.35, -0.15, noise(25) + 0.15 * noise(3))
     base = np.where(painted[..., None], base * (1 - chips[..., None]) + pc * chips[..., None], base)
     # nail heads at plank ends
@@ -340,25 +339,61 @@ def concrete():
     k = 2
     fx, fy = (U * k) % 1, (V * k) % 1
     pid = (np.floor(V * k) * k + np.floor(U * k)).astype(int)
-    joint = sstep(0.004, 0.01, np.minimum(np.minimum(fx, 1 - fx), np.minimum(fy, 1 - fy)))
-    base = hexc('b2aca2') * (0.9 + 0.1 * per_id(pid, k * k, 81)[..., None])
-    base = base * (0.88 + 0.14 * fbm(140)[..., None])
+    jd = np.minimum(np.minimum(fx, 1 - fx), np.minimum(fy, 1 - fy))
+    joint = sstep(0.006, 0.014, jd)
+    chamfer = sstep(0.0, 0.05, jd)
+    base = hexc('a39c90') * (0.86 + 0.18 * per_id(pid, k * k, 81)[..., None])
+    base = base * (0.8 + 0.28 * fbm(140)[..., None])
+    base = base * (0.82 + 0.18 * chamfer[..., None])
+    # patch repairs: darker poured rectangles
+    g = np.random.default_rng(83)
+    patch = np.zeros((N, N), np.float32)
+    for _ in range(4):
+        w, d = g.integers(80, 220), g.integers(60, 160); x0, y0 = g.integers(0, N), g.integers(0, N)
+        lx = (xx - x0) % N; ly = (yy - y0) % N
+        patch = np.maximum(patch, ((lx < w) & (ly < d)).astype(np.float32))
+    base = base * (1 - patch[..., None]) + hexc('8a8478')[None, None] * (0.9 + 0.15 * noise(20)[..., None]) * patch[..., None]
+    pedge = np.abs(blur(patch, 2) - 0.5) < 0.2
+    base *= (1 - 0.08 * pedge[..., None])
     agg = sstep(0.55, 0.8, noise(1.6)) * 0.5 - sstep(0.55, 0.85, -noise(1.4)) * 0.3
     base = base * (1 + 0.15 * agg[..., None])
     # trowel swirls
     base *= (1 + 0.03 * noise(70, aniso=(1.0, 0.2)))[..., None]
     # cracks: thin lines of a warped Voronoi
-    f1, f2, _, _, _ = voronoi(5, seed=82)
+    f1, f2, _, _, _ = voronoi(7, seed=82)
     wn = noise(30) * 0.04
-    crack = sstep(0.015, 0.0, (f2 - f1) + wn) * sstep(0.2, 0.55, fbm(200))
+    crack = sstep(0.02, 0.0, (f2 - f1) + wn) * sstep(0.05, 0.45, fbm(200))
     col = base * (1 - 0.55 * crack[..., None])
     stain = sstep(0.3, 0.8, fbm(90)) * 0.35
     col = col * (1 - stain[..., None]) + col * hexc('8a7e6c') * stain[..., None]
-    col = col * joint[..., None] + hexc('4a4640') * (1 - joint[..., None])
+    col = col * joint[..., None] + hexc('2f2c28') * (1 - joint[..., None])
     col *= grime(260, 0.15)[..., None]
-    h = 0.5 * joint + agg * 0.04 - crack * 0.2
+    h = 0.5 * joint + 0.1 * chamfer + agg * 0.04 - crack * 0.2 - patch * 0.04
     rough = 0.85 - stain * 0.2
     save('concrete', col, rough, h, 6.0)
+
+
+# ------------------------------------------------------------------ bazaar: big dusty sandstone flags, random bond
+def sandstone():
+    rows = 5
+    py = V * rows; row = np.floor(py).astype(int); fy = py - row
+    g = np.random.default_rng(95)
+    offs = g.random(rows); cnt = g.integers(2, 4, rows)
+    px = (U + offs[row % rows]) * cnt[row % rows]; pid = np.floor(px).astype(int); fx = px - pid
+    uid = row * 8 + pid % 8
+    jd = np.minimum(np.minimum(fy, 1 - fy) / 1.0, np.minimum(fx, 1 - fx) / cnt[row % rows] * rows)
+    j = sstep(0.012, 0.03, jd)
+    bev = sstep(0.015, 0.08, jd)
+    base = pal(per_id(uid, 64, 96), ['d8be8e', 'c9aa78', 'e0c99c', 'bf9f70', 'd2b383'])
+    base = base * (0.86 + 0.18 * fbm(80)[..., None]) * (0.94 + 0.08 * noise(2)[..., None])
+    strata = noise(40, aniso=(0.08, 1.0)) * 0.06
+    base = base * (1 + strata[..., None]) * (0.88 + 0.12 * bev[..., None])
+    sand = sstep(0.1, 0.6, fbm(160)) * 0.45
+    base = base * (1 - sand[..., None]) + hexc('e3cf9f') * sand[..., None]
+    col = base * j[..., None] + hexc('8f7550') * (1 - j[..., None])
+    col *= grime(220, 0.12)[..., None]
+    h = j * (0.5 + 0.2 * bev) + fbm(20) * 0.04
+    save('sandstone', col, 0.8 * j + 0.92 * (1 - j), h, 6.0)
 
 
 # ------------------------------------------------------------------ side faces (curbs, plinths): rough stone blocks
@@ -397,4 +432,4 @@ def macro():
 
 
 if __name__ == '__main__':
-    deck(); junk(); cobble(); terracotta(); flagstone(); planks(); tread(); concrete(); side(); macro()
+    deck(); junk(); cobble(); terracotta(); flagstone(); planks(); tread(); concrete(); side(); sandstone(); macro()

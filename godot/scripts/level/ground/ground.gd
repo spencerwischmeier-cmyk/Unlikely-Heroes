@@ -7,6 +7,7 @@ extends Node3D
 ## (shaders/ground.gdshader with a layer of the ground texture array made by art/ground_textures.py):
 ##   Junkyard   packed earth, gravel and patched scrap plates      Plaza       warm cobbles (roof decks: tiles)
 ##   Terrace    terracotta tiles with glazed accents                Gardens     mossy flagstones
+##   Bazaar     big dusty sandstone flags
 ##   Docks      weathered boardwalk planks                          Signal Mast steel tread plate
 ##   Crane Yard cast concrete slabs (and the docks depot)
 ## Each slab also gets per-instance edge grime and a random offset so neighbouring slabs never line up.
@@ -20,8 +21,8 @@ extends Node3D
 
 const M := preload("res://scripts/mats.gd")
 const DIR := "res://textures/ground/"
-const LAYERS := ["deck", "junk", "cobble", "terracotta", "flagstone", "planks", "tread", "concrete", "side"]
-enum { DECK, JUNK, COBBLE, TERRA, FLAG, PLANKS, TREAD, CONCRETE, CURB }
+const LAYERS := ["deck", "junk", "cobble", "terracotta", "flagstone", "planks", "tread", "concrete", "side", "sandstone"]
+enum { DECK, JUNK, COBBLE, TERRA, FLAG, PLANKS, TREAD, CONCRETE, CURB, SAND }
 const NONE_RECT := Vector4(-100000.0, -100000.0, 100000.0, 100000.0)
 
 var L: Node3D
@@ -149,18 +150,20 @@ func _make_mats() -> void:
 		metal = 0.4, edge_grime = 0.3, puddles = 0.1, oil = 0.15, variation = 0.6, grime_col = Color(0.45, 0.42, 0.4) })
 	mats[JUNK] = _mat({ layer = 1.0, side_layer = 1.0, tile_m = 9.0, side_m = 6.0, organic = 1.0, puddles = 0.55, oil = 0.6, moss = 0.2,
 		edge_grime = 0.6, grime_col = Color(0.42, 0.32, 0.24), nrm_depth = 1.2 })
-	mats[COBBLE] = _mat({ layer = 2.0, side_layer = 8.0, tile_m = 4.6, side_m = 3.2, organic = 0.7, puddles = 0.3, moss = 0.45,
+	mats[COBBLE] = _mat({ layer = 2.0, side_layer = 8.0, tile_m = 3.5, side_m = 3.2, organic = 0.7, puddles = 0.3, moss = 0.45,
 		edge_grime = 0.45, nrm_depth = 1.3, side_tint = Color(1.0, 0.96, 0.9) })
 	mats[TERRA] = _mat({ layer = 3.0, side_layer = 8.0, tile_m = 5.4, side_m = 3.2, puddles = 0.0, moss = 0.15, edge_grime = 0.4,
 		grime_col = Color(0.5, 0.36, 0.28), side_tint = Color(1.0, 0.9, 0.78), nrm_depth = 1.1 })
 	mats[FLAG] = _mat({ layer = 4.0, side_layer = 8.0, tile_m = 7.0, side_m = 3.2, organic = 0.8, puddles = 0.12, moss = 0.4,
 		edge_grime = 0.35, side_tint = Color(1.0, 0.95, 0.86) })
-	mats[PLANKS] = _mat({ layer = 5.0, side_layer = 5.0, tile_m = 6.0, side_m = 4.0, puddles = 0.35, oil = 0.25, moss = 0.15,
+	mats[PLANKS] = _mat({ layer = 5.0, side_layer = 0.0, tile_m = 6.0, side_m = 7.1, side_tint = Color(0.62, 0.66, 0.7), puddles = 0.35, oil = 0.25, moss = 0.15,
 		edge_grime = 0.5, grime_col = Color(0.4, 0.36, 0.32), nrm_depth = 1.2 })
 	mats[TREAD] = _mat({ layer = 6.0, side_layer = 6.0, tile_m = 3.0, side_m = 3.0, puddles = 0.2, oil = 0.3, edge_grime = 0.4,
 		metal = 0.6, rough_mul = 1.1, grime_col = Color(0.4, 0.38, 0.36) })
-	mats[CONCRETE] = _mat({ layer = 7.0, side_layer = 7.0, tile_m = 6.0, side_m = 6.0, puddles = 0.45, oil = 0.7, moss = 0.08,
+	mats[CONCRETE] = _mat({ layer = 7.0, side_layer = 7.0, tile_m = 5.0, side_m = 6.0, puddles = 0.55, oil = 0.8, moss = 0.08,
 		edge_grime = 0.55, grime_col = Color(0.42, 0.38, 0.34) })
+	mats[SAND] = _mat({ layer = 9.0, side_layer = 8.0, tile_m = 7.0, side_m = 3.2, puddles = 0.0, moss = 0.05, edge_grime = 0.45,
+		grime_col = Color(0.55, 0.45, 0.32), side_tint = Color(1.0, 0.92, 0.8) })
 	mats[CURB] = _mat({ layer = 8.0, side_layer = 8.0, tile_m = 3.2, side_m = 3.2, edge_grime = 0.0, variation = 0.5,
 		tint = Color(1.0, 0.96, 0.9), side_tint = Color(1.0, 0.96, 0.9) })
 
@@ -168,7 +171,8 @@ func _make_mats() -> void:
 static func name_style(n: String) -> int:
 	if n.begins_with("junk"): return JUNK
 	if n.begins_with("plaza") or n.begins_with("causeway"): return COBBLE
-	if n in ["terrace", "tier2", "tier3", "tier4", "bazaar", "tea_terrace", "lantern_loft", "chime_perch", "wash_nook"]: return TERRA
+	if n in ["bazaar", "wash_nook"]: return SAND
+	if n in ["terrace", "tier2", "tier3", "tier4", "tea_terrace", "lantern_loft", "chime_perch"]: return TERRA
 	if n in ["gardens", "promenade", "conservatory", "hive_grove"]: return FLAG
 	if n.begins_with("pier") or n == "berth": return PLANKS
 	if n == "depot" or n.begins_with("yard") or n == "arena": return CONCRETE
@@ -249,7 +253,8 @@ func _consider(g: GeometryInstance3D) -> void:
 		aabb = g.global_transform * (g as MeshInstance3D).mesh.get_aabb()
 	else:
 		var mm := (g as MultiMeshInstance3D).multimesh
-		if mm == null or mm.instance_count == 0: return
+		if mm == null or mm.instance_count == 0 or mm.mesh == null: return
+		if deck and _split_multimesh(g as MultiMeshInstance3D): return
 		aabb = g.global_transform * mm.get_aabb()
 	var c := aabb.get_center()
 	var top := aabb.end.y
@@ -258,7 +263,7 @@ func _consider(g: GeometryInstance3D) -> void:
 		# hazard edging: keep it on the industrial areas, swap it where it looks out of place
 		if not (g is MeshInstance3D and (g as MeshInstance3D).mesh is BoxMesh): return
 		match style:
-			COBBLE, FLAG, TERRA: g.material_override = mats[CURB]
+			COBBLE, FLAG, TERRA, SAND: g.material_override = mats[CURB]
 			PLANKS:
 				if _curb_wood == null: _curb_wood = M.wood(Color(0.75, 0.55, 0.4))
 				g.material_override = _curb_wood
@@ -283,14 +288,57 @@ func _consider(g: GeometryInstance3D) -> void:
 	floors.append({ node = g, style = style, rect = rect, top = top })
 	counts[LAYERS[style]] = counts.get(LAYERS[style], 0) + 1
 
+## A batched MultiMesh of deck blocks can span several areas (the terrace kit batches the whole market):
+## split its instances by area into one MultiMesh per style. Returns false when they all share one style.
+func _split_multimesh(g: MultiMeshInstance3D) -> bool:
+	var mm := g.multimesh
+	var by := {}
+	var maabb := mm.mesh.get_aabb()
+	# the instance transforms as built (the RenderingServer copy can't be read back without a GPU)
+	var xfs: Array = g.get_meta("xforms") if g.has_meta("xforms") else []
+	if xfs.size() != mm.instance_count:
+		xfs = []
+		for i in mm.instance_count: xfs.append(mm.get_instance_transform(i))
+	for i in mm.instance_count:
+		var a: AABB = g.global_transform * (xfs[i] as Transform3D) * maabb
+		var c := a.get_center()
+		var st := style_at(Vector3(c.x, a.end.y, c.z))
+		if not by.has(st): by[st] = []
+		by[st].append(i)
+		# big flat blocks count as floors for the clutter and decals
+		if a.size.x >= 3.0 and a.size.z >= 3.0 and (xfs[i] as Transform3D).basis.get_euler().length() < 0.01:
+			floors.append({ node = g, style = st, rect = Rect2(a.position.x, a.position.z, a.size.x, a.size.z), top = a.end.y })
+	if by.size() < 2: return false
+	for st in by:
+		var n := MultiMesh.new()
+		n.transform_format = MultiMesh.TRANSFORM_3D
+		n.use_colors = mm.use_colors
+		n.mesh = mm.mesh
+		n.instance_count = by[st].size()
+		for k in by[st].size():
+			var i: int = by[st][k]
+			n.set_instance_transform(k, xfs[i])
+			if mm.use_colors: n.set_instance_color(k, mm.get_instance_color(i))
+		var mi := MultiMeshInstance3D.new()
+		mi.multimesh = n; mi.transform = g.transform; mi.cast_shadow = g.cast_shadow
+		mi.material_override = mats[st]
+		mi.set_instance_shader_parameter("rect", NONE_RECT)
+		mi.set_instance_shader_parameter("seed", float(st) * 1.7)
+		g.get_parent().add_child(mi)
+		counts[LAYERS[st]] = counts.get(LAYERS[st], 0) + 1
+	g.visible = false
+	g.queue_free()
+	return true
+
 # ------------------------------------------------------------------ clutter and decals
 ## clutter kinds per style: [kind, weight]; density = pieces per square metre (before rejections)
 const CLUTTER := {
-	JUNK: [0.4, [["pebble", 4], ["nut", 2], ["scrap", 3], ["tuft", 2]]],
+	JUNK: [0.4, [["pebble", 2], ["nut", 2], ["scrap", 3], ["tuft", 3]]],
 	COBBLE: [0.2, [["leaf", 4], ["paper", 1], ["pebble", 1], ["tuft", 2]]],
 	TERRA: [0.16, [["petal", 3], ["leaf", 2], ["paper", 1]]],
 	FLAG: [0.16, [["leaf", 3], ["petal", 2], ["tuft", 2]]],
 	PLANKS: [0.08, [["nut", 1], ["paper", 1], ["leaf", 1], ["rope", 1]]],
+	SAND: [0.16, [["petal", 2], ["leaf", 2], ["paper", 2]]],
 	TREAD: [0.06, [["nut", 3], ["scrap", 1]]],
 	CONCRETE: [0.16, [["pebble", 2], ["nut", 2], ["scrap", 2], ["paper", 1], ["tuft", 1]]],
 }
@@ -303,7 +351,8 @@ const DECALS := {
 	FLAG: [50.0, [["leaves", 2.4, 2.4, 1, false]]],
 	PLANKS: [45.0, [["oil1", 2.2, 2.2, 2, false], ["oil2", 1.8, 1.8, 1, false], ["pier_text", 4.4, 1.1, 1, true]]],
 	TREAD: [40.0, [["mast_text", 3.6, 0.9, 1, true], ["stripes", 3.6, 0.9, 2, false], ["oil2", 1.4, 1.4, 1, false]]],
-	CONCRETE: [35.0, [["oil1", 2.8, 2.8, 3, false], ["oil2", 2.2, 2.2, 2, false], ["arrow", 1.4, 2.8, 2, false], ["stripes", 4.0, 1.0, 2, false],
+	SAND: [28.0, [["rug_a", 2.8, 1.8, 3, false], ["rug_b", 2.8, 1.8, 3, false], ["leaves", 2.0, 2.0, 1, false]]],
+	CONCRETE: [20.0, [["oil1", 2.8, 2.8, 3, false], ["oil2", 2.2, 2.2, 2, false], ["arrow", 1.4, 2.8, 2, false], ["stripes", 4.0, 1.0, 2, false],
 		["yard_text", 4.0, 1.0, 1, true], ["manhole_steel", 1.3, 1.3, 2, false], ["crack", 2.8, 2.8, 2, false], ["tyre", 1.2, 4.8, 2, false]]],
 }
 
@@ -368,7 +417,7 @@ func _dress() -> void:
 		# decals
 		if not DECALS.has(f.style) or area < 20.0: continue
 		var dc: Array = DECALS[f.style]
-		var nd := mini(int(area / dc[0]) + 1, 9)
+		var nd := mini(int(area / dc[0]) + 1, 14 if f.style == CONCRETE else 9)
 		var tries := 0
 		while nd > 0 and tries < 40:
 			tries += 1
@@ -404,7 +453,7 @@ func _dress() -> void:
 	if stats: print("[ground] clutter=%d decals=%d" % [n_cl, n_dec])
 
 const LEAF_COLS := [Color(0.78, 0.47, 0.2), Color(0.85, 0.63, 0.24), Color(0.62, 0.35, 0.16), Color(0.45, 0.6, 0.24), Color(0.8, 0.32, 0.2)]
-const PEBBLE_COLS := [Color(0.48, 0.45, 0.42), Color(0.58, 0.53, 0.46), Color(0.4, 0.37, 0.35), Color(0.62, 0.56, 0.48)]
+const PEBBLE_COLS := [Color(0.45, 0.38, 0.31), Color(0.52, 0.45, 0.36), Color(0.38, 0.33, 0.29), Color(0.56, 0.5, 0.42)]
 const SCRAP_COLS := [Color(0.55, 0.3, 0.18), Color(0.35, 0.52, 0.58), Color(0.5, 0.52, 0.55), Color(0.72, 0.56, 0.22), Color(0.4, 0.5, 0.34)]
 const PAPER_COLS := [Color(0.95, 0.93, 0.86), Color(0.98, 0.86, 0.7), Color(0.8, 0.9, 0.98), Color(0.98, 0.8, 0.85)]
 const PETAL_COLS := [Color(1.0, 0.62, 0.72), Color(1.0, 0.82, 0.86), Color(0.98, 0.55, 0.4), Color(1.0, 0.9, 0.6)]
@@ -416,10 +465,10 @@ func _clutter_xf(kind: String, p: Vector3) -> Array:
 	var s := 1.0; var col := Color.WHITE; var lift := 0.0
 	match kind:
 		"pebble":
-			s = rng.randf_range(0.05, 0.16); col = PEBBLE_COLS[rng.randi() % PEBBLE_COLS.size()]
+			s = rng.randf_range(0.03, 0.09); col = PEBBLE_COLS[rng.randi() % PEBBLE_COLS.size()]
 			b = b.scaled(Vector3(rng.randf_range(0.8, 1.3), rng.randf_range(0.45, 0.7), rng.randf_range(0.8, 1.2)) * s); lift = s * 0.12
 		"nut":
-			s = rng.randf_range(0.06, 0.1); col = Color(0.62, 0.6, 0.56) if rng.randf() < 0.6 else Color(0.7, 0.55, 0.28)
+			s = rng.randf_range(0.04, 0.07); col = Color(0.5, 0.48, 0.45) if rng.randf() < 0.6 else Color(0.62, 0.48, 0.26)
 			b = b.scaled(Vector3(s, s * 0.6, s)); lift = s * 0.3
 		"scrap":
 			col = SCRAP_COLS[rng.randi() % SCRAP_COLS.size()]
@@ -437,7 +486,7 @@ func _clutter_xf(kind: String, p: Vector3) -> Array:
 			s = rng.randf_range(0.7, 1.5); col = Color(0.36, 0.55, 0.2).lerp(Color(0.55, 0.62, 0.25), rng.randf())
 			b = Basis(Vector3.UP, yaw).scaled(Vector3(s, s * rng.randf_range(0.8, 1.4), s)); lift = 0.0
 		"rope":
-			s = rng.randf_range(0.8, 1.1); col = Color(0.78, 0.66, 0.46)
+			s = rng.randf_range(0.4, 0.55); col = Color(0.55, 0.44, 0.3)
 			b = Basis(Vector3.UP, yaw).scaled(Vector3(s, s * 0.6, s)); lift = 0.04 * s
 	return [Transform3D(b, p + Vector3(0, lift, 0)), col]
 

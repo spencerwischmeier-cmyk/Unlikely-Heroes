@@ -33,6 +33,7 @@ static func flush() -> void:
 			mm.set_instance_transform(i, b.xf[i])
 			if mm.use_colors: mm.set_instance_color(i, b.colors[i])
 		var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mm; mmi.material_override = b.mat
+		mmi.set_meta("xforms", b.xf)   # read back by the ground pass (scripts/level/ground/ground.gd)
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if b.shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mmi)
 	_batches.clear()
