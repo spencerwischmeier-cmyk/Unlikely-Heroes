@@ -106,6 +106,8 @@ static func build(L: Node3D, A: Node3D) -> void:
 	_shafts(root)
 	_lanes(root, A)
 	_birds(root, A)
+	_lighthouse(root, A, Vector3(300, -20, 60))
+	_lighthouse(root, A, Vector3(-260, -10, -220))
 
 ## Tiered city towers far around the islands, all in a handful of multimeshes.
 static func _towers(root: Node3D) -> void:
@@ -292,3 +294,29 @@ static func _birds(root: Node3D, A: Node3D) -> void:
 		mm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		A.flocks.append({ node = n, c = f[0], r = f[1], h = f[2], w = f[3], ph = rng.randf() * TAU })
 		A.horns.append({ node = n, every = 26.0, t = rng.randf_range(4.0, 20.0), sound = "docks_birds", db = -8.0, near = 45.0 })
+
+## A far sky-lighthouse: a tall banded tower whose lamp sweeps a soft beam round the sky.
+static func _lighthouse(root: Node3D, A: Node3D, base: Vector3) -> void:
+	var white := M.std(Color(0.92, 0.9, 0.86), 0.3, 0.5)
+	var red := M.std(Color(0.8, 0.28, 0.2), 0.3, 0.5)
+	var h := 0.0
+	for k in 6:
+		var c := CylinderMesh.new(); c.top_radius = 7.0 - k * 0.6; c.bottom_radius = 7.6 - k * 0.6; c.height = 16.0; c.radial_segments = 16
+		var mi := MeshInstance3D.new(); mi.mesh = c; mi.material_override = white if k % 2 == 0 else red
+		mi.position = base + Vector3(0, h + 8.0, 0); root.add_child(mi)
+		h += 16.0
+	var lamp := SphereMesh.new(); lamp.radius = 4.0; lamp.height = 8.0
+	var lm := MeshInstance3D.new(); lm.mesh = lamp; lm.material_override = M.glow(Color(1, 0.9, 0.6), 10.0)
+	lm.position = base + Vector3(0, h + 3.0, 0); root.add_child(lm)
+	var cap := CylinderMesh.new(); cap.top_radius = 0.5; cap.bottom_radius = 5.0; cap.height = 5.0
+	var cm := MeshInstance3D.new(); cm.mesh = cap; cm.material_override = red; cm.position = base + Vector3(0, h + 8.5, 0); root.add_child(cm)
+	var spin := Node3D.new(); spin.position = base + Vector3(0, h + 3.0, 0); root.add_child(spin)
+	var beam := CylinderMesh.new(); beam.top_radius = 1.5; beam.bottom_radius = 22.0; beam.height = 220.0; beam.radial_segments = 16; beam.rings = 1
+	beam.cap_top = false; beam.cap_bottom = false
+	var m := _shader(SHAFT); m.set_shader_parameter("strength", 0.2); m.set_shader_parameter("tint", Color(1.0, 0.9, 0.6))
+	for s in [-1, 1]:
+		var bm := MeshInstance3D.new(); bm.mesh = beam; bm.material_override = m
+		bm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		bm.rotation.z = s * PI / 2; bm.position = Vector3(s * 110.0, 0, 0)
+		spin.add_child(bm)
+	A.spinners.append({ node = spin, axis = Vector3.UP, speed = 0.35 })
