@@ -79,10 +79,10 @@ void fragment() {
 		col = mix(col, moss_col * (0.75 + 0.5 * mac2.b), mo);
 		// oil stains
 		float oi = smoothstep(0.68, 0.74, mac2.r * 0.75 + mac.b * 0.25) * oil;
-		col *= 1.0 - oi * 0.55;
+		col = mix(col, vec3(0.07, 0.07, 0.08) + col * 0.25, oi * 0.6);
 		// puddles: dark and glossy, flat
 		float pw = smoothstep(0.69, 0.73, mac.b + (0.5 - h) * 0.3 + (1.0 - mac.r) * 0.08) * puddles;
-		col *= 1.0 - pw * 0.4;
+		col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))) * 0.55, pw * 0.75);
 		rough = mix(rough, 0.04, pw);
 		rough = mix(rough, 0.3, oi);
 		rough = clamp(rough + mo * 0.2, 0.04, 1.0);

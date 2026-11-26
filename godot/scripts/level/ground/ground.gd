@@ -154,7 +154,7 @@ func _make_mats() -> void:
 		edge_grime = 0.45, nrm_depth = 1.3, side_tint = Color(1.0, 0.96, 0.9) })
 	mats[TERRA] = _mat({ layer = 3.0, side_layer = 8.0, tile_m = 5.4, side_m = 3.2, puddles = 0.0, moss = 0.15, edge_grime = 0.4,
 		grime_col = Color(0.5, 0.36, 0.28), side_tint = Color(1.0, 0.9, 0.78), nrm_depth = 1.1 })
-	mats[FLAG] = _mat({ layer = 4.0, side_layer = 8.0, tile_m = 7.0, side_m = 3.2, organic = 0.8, puddles = 0.12, moss = 0.4,
+	mats[FLAG] = _mat({ layer = 4.0, side_layer = 8.0, tile_m = 6.0, side_m = 3.2, organic = 0.8, puddles = 0.12, moss = 0.65,
 		edge_grime = 0.35, side_tint = Color(1.0, 0.95, 0.86) })
 	mats[PLANKS] = _mat({ layer = 5.0, side_layer = 0.0, tile_m = 6.0, side_m = 7.1, side_tint = Color(0.62, 0.66, 0.7), puddles = 0.35, oil = 0.25, moss = 0.15,
 		edge_grime = 0.5, grime_col = Color(0.4, 0.36, 0.32), nrm_depth = 1.2 })
@@ -214,6 +214,7 @@ func _is_deck(m: Material) -> bool:
 	if m is StandardMaterial3D:
 		var sm := m as StandardMaterial3D
 		return sm.albedo_texture == dt and sm.uv1_triplanar and sm.uv1_world_triplanar
+	if m.has_meta("ground"): return true
 	if m is ShaderMaterial:
 		var sh := m as ShaderMaterial
 		return sh.shader != null and sh.shader.resource_path.ends_with("worn_surface.gdshader") and sh.get_shader_parameter("albedo_tex") == dt
@@ -336,9 +337,9 @@ const CLUTTER := {
 	JUNK: [0.4, [["pebble", 2], ["nut", 2], ["scrap", 3], ["tuft", 3]]],
 	COBBLE: [0.2, [["leaf", 4], ["paper", 1], ["pebble", 1], ["tuft", 2]]],
 	TERRA: [0.16, [["petal", 3], ["leaf", 2], ["paper", 1]]],
-	FLAG: [0.16, [["leaf", 3], ["petal", 2], ["tuft", 2]]],
+	FLAG: [0.32, [["leaf", 3], ["petal", 3], ["tuft", 3]]],
 	PLANKS: [0.08, [["nut", 1], ["paper", 1], ["leaf", 1], ["rope", 1]]],
-	SAND: [0.16, [["petal", 2], ["leaf", 2], ["paper", 2]]],
+	SAND: [0.12, [["petal", 2], ["leaf", 2]]],
 	TREAD: [0.06, [["nut", 3], ["scrap", 1]]],
 	CONCRETE: [0.16, [["pebble", 2], ["nut", 2], ["scrap", 2], ["paper", 1], ["tuft", 1]]],
 }
@@ -348,7 +349,7 @@ const DECALS := {
 	COBBLE: [45.0, [["manhole_brass", 1.3, 1.3, 2, false], ["drain", 0.9, 0.9, 2, false], ["hopscotch", 1.4, 4.2, 1, true],
 		["chalk_bot", 2.0, 2.0, 1, true], ["leaves", 2.2, 2.2, 3, false], ["crack", 2.0, 2.0, 1, false]]],
 	TERRA: [40.0, [["rug_a", 2.6, 1.7, 2, false], ["rug_b", 2.6, 1.7, 2, false], ["leaves", 2.0, 2.0, 2, false]]],
-	FLAG: [50.0, [["leaves", 2.4, 2.4, 1, false]]],
+	FLAG: [30.0, [["leaves", 2.4, 2.4, 1, false]]],
 	PLANKS: [45.0, [["oil1", 2.2, 2.2, 2, false], ["oil2", 1.8, 1.8, 1, false], ["pier_text", 4.4, 1.1, 1, true]]],
 	TREAD: [40.0, [["mast_text", 3.6, 0.9, 1, true], ["stripes", 3.6, 0.9, 2, false], ["oil2", 1.4, 1.4, 1, false]]],
 	SAND: [28.0, [["rug_a", 2.8, 1.8, 3, false], ["rug_b", 2.8, 1.8, 3, false], ["leaves", 2.0, 2.0, 1, false]]],
@@ -450,6 +451,21 @@ func _dress() -> void:
 			parent.add_child(dec)
 			if d[4]: used_unique[key] = used_unique.get(key, 0) + 1
 			nd -= 1; n_dec += 1
+	# set pieces that fill the big open floors of the Crane Yard
+	for sp in [["arena", "arena_ring", Vector2(0, 0), 13.0, 13.0, 0.0], ["arena", "skid", Vector2(-7, 9), 6.0, 6.0, 0.6],
+			["arena", "oil1", Vector2(6, -6), 4.5, 4.5, 0.0], ["yard_gate", "bay_text", Vector2(4, 1), 6.0, 2.25, PI],
+			["yard_gate", "skid", Vector2(-8, 0), 5.0, 5.0, 2.0], ["yard_row", "skid", Vector2(0, 4), 6.0, 6.0, 1.0],
+			["yard_row", "oil1", Vector2(-3, -6), 4.0, 4.0, 0.0], ["yard_pen", "skid", Vector2(0, 0), 6.0, 6.0, 2.6]]:
+		if not L.islands.has(sp[0]): continue
+		var c: Vector2 = (L.islands[sp[0]] as Rect2).get_center() + sp[2]
+		var y: float = L.heights.get(sp[0], 0.0)
+		if not _ray_floor(c.x, c.y, y): continue
+		var dec := Decal.new()
+		dec.texture_albedo = load(DIR + "decals/" + sp[1] + ".png")
+		dec.size = Vector3(sp[3], 0.5, sp[4]); dec.position = Vector3(c.x, y, c.y); dec.rotation.y = sp[5]
+		dec.normal_fade = 0.4; dec.upper_fade = 0.15; dec.lower_fade = 0.15
+		dec.distance_fade_enabled = true; dec.distance_fade_begin = 70.0; dec.distance_fade_length = 15.0
+		add_child(dec); n_dec += 1
 	if stats: print("[ground] clutter=%d decals=%d" % [n_cl, n_dec])
 
 const LEAF_COLS := [Color(0.78, 0.47, 0.2), Color(0.85, 0.63, 0.24), Color(0.62, 0.35, 0.16), Color(0.45, 0.6, 0.24), Color(0.8, 0.32, 0.2)]

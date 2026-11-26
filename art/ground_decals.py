@@ -226,7 +226,35 @@ def leaves_patch():
     save('leaves', img)
 
 
+def arena_ring():
+    n = 1024
+    img = Image.new('RGBA', (n, n), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
+    c = n / 2; y = (245, 196, 40, 230)
+    d.ellipse([20, 20, n - 20, n - 20], outline=y, width=34)
+    d.ellipse([150, 150, n - 150, n - 150], outline=(240, 236, 225, 200), width=12)
+    for i in range(24):
+        a = i * math.tau / 24
+        r0, r1 = (n / 2 - 70), (n / 2 - 40)
+        d.line([(c + math.cos(a) * r0, c + math.sin(a) * r0), (c + math.cos(a) * r1, c + math.sin(a) * r1)], fill=y, width=14)
+    f = font(120)
+    for txt, yy in (('LIFT', c - 140), ('ZONE', c + 10)):
+        bb = d.textbbox((0, 0), txt, font=f)
+        d.text((c - (bb[2] - bb[0]) / 2 - bb[0], yy), txt, font=f, fill=y)
+    save('arena_ring', wear(img, 0.32, 6))
+
+
+def skid():
+    n = 768
+    img = Image.new('RGBA', (n, n), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
+    for k, (r, w) in enumerate([(300, 26), (250, 26), (180, 20), (140, 20)]):
+        a0 = random.uniform(150, 200); a1 = a0 + random.uniform(80, 140)
+        d.arc([n / 2 - r, n / 2 - r, n / 2 + r, n / 2 + r], a0, a1, fill=(22, 20, 18, 170), width=w)
+    img = img.filter(ImageFilter.GaussianBlur(2.0))
+    save('skid', wear(img, 0.3, 10))
+
+
 if __name__ == '__main__':
+    arena_ring(); skid(); stencil('bay_text', 'BAY 7', (240, 236, 225, 230), 1024, 384, 300)
     oil('oil1', 1); oil('oil2', 2); tyre(); crack('crack')
     manhole('manhole_brass', (150, 118, 60), (120, 100, 70), 'gear')
     manhole('manhole_steel', (90, 94, 100), (70, 74, 80), 'grid')

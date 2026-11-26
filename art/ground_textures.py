@@ -218,7 +218,7 @@ def terracotta():
     t = per_id(tid, k * k, 41)
     base = pal(t, ['c4693f', 'b75a35', 'cf7a4c', 'b0603f', 'd08452', 'a9512f'])
     base = base * (0.9 + 0.15 * noise(30)[..., None]) * (0.92 + 0.08 * noise(3)[..., None])
-    base = base * 0.85 + base.mean(-1, keepdims=True) * 0.15
+    base = base * 0.72 + base.mean(-1, keepdims=True) * 0.28
     # glazed accent tiles: teal with cream wave bands (a few, scattered)
     acc = per_id(tid, k * k, 42) < 0.07
     wave = np.abs(((fy + 0.06 * np.sin(fx * math.tau * 2)) * 3) % 1.0 - 0.5)
@@ -242,9 +242,9 @@ def flagstone():
     f1, f2, ids, ox, oy = voronoi(7, jitter=0.9, seed=51)
     n = 49
     gap = f2 - f1
-    stone = sstep(0.04, 0.1, gap)
+    stone = sstep(0.07, 0.15, gap)
     t = per_id(ids, n, 52)
-    base = pal(t, ['c4b69a', 'a99c84', 'd6c8ab', '978b78', 'b8a687', 'a8a08e'])
+    base = pal(t, ['b8a283', '9c8a6e', 'c9b28c', '8c7c66', 'ad9673', 'a0927a'])
     base = base * (0.9 + 0.12 * fbm(40)[..., None]) * (0.94 + 0.06 * noise(2)[..., None])
     lich = sstep(0.35, 0.6, fbm(60)) * stone
     base = base * (1 - 0.35 * lich[..., None]) + hexc('a7b26a') * 0.35 * lich[..., None]
@@ -390,6 +390,12 @@ def sandstone():
     base = base * (1 + strata[..., None]) * (0.88 + 0.12 * bev[..., None])
     sand = sstep(0.1, 0.6, fbm(160)) * 0.45
     base = base * (1 - sand[..., None]) + hexc('e3cf9f') * sand[..., None]
+    # a foot-worn darker path and a few cracked flags
+    path = sstep(0.18, 0.05, np.abs(((U + 0.08 * noise(260)) % 1.0) - 0.5) - 0.12)
+    base = base * (1 - 0.14 * path[..., None])
+    f1c, f2c, _, _, _ = voronoi(6, seed=97)
+    crk = sstep(0.018, 0.0, (f2c - f1c) + noise(30) * 0.03) * (per_id(uid, 64, 98) < 0.3)
+    base = base * (1 - 0.45 * crk[..., None])
     col = base * j[..., None] + hexc('8f7550') * (1 - j[..., None])
     col *= grime(220, 0.12)[..., None]
     h = j * (0.5 + 0.2 * bev) + fbm(20) * 0.04
