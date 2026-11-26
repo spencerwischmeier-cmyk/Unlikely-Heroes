@@ -99,7 +99,7 @@ static func _floor(L: Node3D, c: Vector3) -> void:
 	d.set_shader_parameter("tint", Color(0.52, 0.48, 0.45))
 	d.set_shader_parameter("side_tint", Color(0.5, 0.46, 0.43))
 	d.set_shader_parameter("oil", 1.0)
-	d.set_shader_parameter("puddles", 0.6)
+	d.set_shader_parameter("puddles", 0.3)
 	d.set_shader_parameter("edge_grime", 0.9)
 	d.set_shader_parameter("grime_col", Color(0.18, 0.14, 0.1))
 	d.set_shader_parameter("moss", 0.0)
@@ -135,10 +135,12 @@ static func _fx(L: Node3D, c: Vector3) -> void:
 	for s in stacks:
 		var top: Vector3 = c + s + Vector3(0, 22.6, 0)
 		_drop_particles_near(L, top + Vector3(0, 0.4, 0), 2.0)
-		C.column(top, 1.4, 34.0, 0.22)
+		C.column(top, 1.5, 50.0, 0.26)
 		print("[arena-look] stack column at ", top)
+	# the big heap burning behind the Foreman's Box sends up its own column
+	C.column(c + Vector3(-3.0, y0 + 1.6, -44.0), 1.5, 40.0, 0.3)
 	# burning scrap at the foundry and the stage's back corners
-	for f in [[Vector3(-19.5, y0, -28.0), 1.3], [Vector3(21.0, y0, -30.0), 1.1], [Vector3(-3.0, y0, -44.0), 1.5],
+	for f in [[Vector3(-19.5, y0, -28.0), 1.3], [Vector3(21.0, y0, -30.0), 1.1],
 			[Vector3(-23.5, 0.0, -14.5), 0.9], [Vector3(31.5, 0.0, 15.5), 0.8]]:
 		C.fire(c + f[0] + Vector3(0, 0.9, 0), f[1])
 	# a slow drift of embers over the whole stage, blown off the foundry
@@ -206,8 +208,10 @@ static func _dress(L: Node3D, c: Vector3) -> void:
 			var top := c + Vector3(x + (0.7 if x < 0 else -0.7), 12.6, z)
 			var bot: Vector3 = JK.chain(B, top, rng.randf_range(3.0, 6.5))
 			B.add("gear", "scrap", JK.xform(bot + Vector3(0, -0.2, 0), Vector3(PI / 2, 0, 0), Vector3.ONE * 0.45), Color(0.3, 0.3, 0.32))
-	# litter on the foundry floor
+	# litter on the foundry floor, and debris blown against the stage's rails (the middle stays clear)
 	JK.litter(B, rng, Rect2(c.x - 24, c.z - 48, 48, 22), y0, 90)
+	for r in [Rect2(c.x - 20.5, c.z - 16.6, 41, 1.6), Rect2(c.x - 20.5, c.z + 15.0, 41, 1.6), Rect2(c.x + 19.8, c.z - 15, 1.6, 30)]:
+		JK.litter(B, rng, r, 0.0, 26)
 	var host := Node3D.new(); host.name = "ArenaDress"; L.add_child(host)
 	B.flush(host, JK)
 	for mi in host.get_children():
