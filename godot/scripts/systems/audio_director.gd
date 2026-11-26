@@ -572,7 +572,8 @@ func _self_test() -> void:
 	var c_ok := combat and Snd.track.begins_with("combat_")
 	print("[audio-test] %s combat on: combat=%s track=%s" % ["PASS" if c_ok else "FAIL", combat, Snd.track])
 	ok = ok and c_ok
-	if is_instance_valid(bot): bot.queue_free()
+	if is_instance_valid(bot) and bot.has_method("die"): bot.die(true)
+	elif is_instance_valid(bot): bot.queue_free()
 	await get_tree().create_timer(6.5).timeout
 	var e_ok := not combat and Snd.track == "area_plaza"
 	print("[audio-test] %s combat off: combat=%s track=%s" % ["PASS" if e_ok else "FAIL", combat, Snd.track])
