@@ -12,6 +12,14 @@ S = {
                               "no clear words", 10.0),
     'panic_siren_loop': ("Distant city-wide evacuation siren slowly rising and falling, a long mournful wail echoing over rooftops "
                          "and open sky", 12.0),
+    # occasional sirens (replace the old always-on panic_siren_loop): bright, varied, short, never a low drone
+    'panic_siren_wail': ("Distant European style two-tone emergency siren, bright hi-lo nee-naw, echoing over a city from far away, "
+                         "plays a few cycles then stops", 7.0),
+    'panic_siren_whoop': ("Far-off cartoon emergency vehicle siren whooping quickly up and down, bright and urgent, bouncing off "
+                          "buildings, then cutting off", 5.0),
+    'panic_siren_klaxon': ("Distant harbor alarm klaxon, three short bright honking blasts with echo across open sky", 4.0),
+    'panic_siren_bell': ("Old mechanical fire alarm bell ringing fast and frantic for a few seconds in a distant tower, then stops", 4.5),
+    'panic_siren_rise': ("Single distant hand-cranked siren spinning up to a high bright wail and winding back down, airy, far away", 7.0),
     'panic_ship_takeoff': ("Passenger shuttle spaceship lifts off: engines spool up with a rising whine, then a powerful rumbling "
                            "thrust roar that climbs away and fades into the sky", 7.0),
     'panic_ship_idle_loop': ("Small passenger spaceship hovering at a dock, steady low engine hum with a soft turbine whine and "
@@ -45,8 +53,9 @@ def gen(name):
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 's16le', '-ar', '44100', '-ac', '1', '-i', '-',
                         '-c:a', 'libvorbis', '-q:a', '4', ogg], input=y.clip(-32768, 32767).astype(np.int16).tobytes(), check=True)
     else:
+        fo = 1.2 if name.startswith('panic_siren_') else 0.15   # sirens die away instead of cutting off
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', mp3, '-af',
-                        'silenceremove=start_periods=1:start_threshold=-50dB,afade=t=out:st=%.2f:d=0.15' % max(0.1, dur - 0.15),
+                        'silenceremove=start_periods=1:start_threshold=-50dB,afade=t=out:st=%.2f:d=%.2f' % (max(0.1, dur - fo), fo),
                         '-ac', '1', '-c:a', 'libvorbis', '-q:a', '5', ogg], check=True)
     print(name, os.path.getsize(ogg) // 1024, 'KB', flush=True)
 if __name__ == '__main__':
