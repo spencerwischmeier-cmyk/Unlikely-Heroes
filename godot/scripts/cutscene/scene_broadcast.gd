@@ -56,9 +56,9 @@ func run() -> void:
 	for i in 4:
 		C.tw(grudd, "holo_mat:shader_parameter/strength", 0.9 if i % 2 == 0 else 0.15, 0.08, 0.3 + i * 0.12)
 	C.tw(grudd, "holo_mat:shader_parameter/strength", 1.0, 0.3, 0.8)
-	var wide := stand - to_dish * 7.5 - side * 2.5 + Vector3(0, 1.2, 0)
-	C.cut(wide, holo_base + Vector3(0, 3.0, 0), 50.0)
-	C.move(wide - to_dish * 1.5 + Vector3(0, -0.4, 0), holo_base + Vector3(0, 3.6, 0), 7.0, 46.0)
+	var wide := stand - to_dish * 8.0 - side * 2.0 + Vector3(0, 0.9, 0)
+	C.cut(wide, holo_base + Vector3(0, 1.6, 0), 58.0)
+	C.move(wide - to_dish * 1.5 + Vector3(0, -0.5, 0), holo_base + Vector3(0, 2.2, 0), 7.0, 56.0)
 	await C.wait(1.0)
 	C.live_label.text = "●  LIVE BROADCAST  ·  ALL FREQUENCIES"
 	C.tw(C, "live_a", 1.0, 0.3)
@@ -94,7 +94,7 @@ func run() -> void:
 	await C.say("cs_bc_grudd_4", 0.3)
 	C.setv(C, "cam_roll", 0.0)
 	# 6. sign-off, then the hologram breaks up
-	C.cut(wide + Vector3(0, -0.6, 0) + to_dish * 2.0, holo_base + Vector3(0, 3.6, 0), 46.0)
+	C.cut(wide + Vector3(0, -0.6, 0) + to_dish * 1.0, holo_base + Vector3(0, 2.0, 0), 56.0)
 	grudd.gesture("fist")
 	await C.say("cs_bc_grudd_5", 0.2)
 	C.fx(func(): Snd.play("cutscenes_holo_off", -3, 0.0))
