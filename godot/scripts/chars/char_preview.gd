@@ -54,7 +54,7 @@ func _initialize() -> void:
 		"crane":
 			var c: Node3D = load("res://scripts/cranebot.gd").new(); root3.add_child(c)
 			actors.append(c)
-			_aim(cam, Vector3(7, 5, 11), Vector3(0, 2.5, 0))
+			_aim(cam, Vector3(10, 4.5, 13), Vector3(0, 3.2, 3))
 
 func _aim(cam: Camera3D, pos: Vector3, at: Vector3) -> void:
 	cam.transform = Transform3D(Basis.looking_at(at - pos), pos)
@@ -76,7 +76,7 @@ func _process(_dt: float) -> bool:
 	if which == "crane" and n == 3:
 		var c: Node3D = actors[0]
 		c.visible = true; c.magnet.visible = true
-		c.boom.rotation.x = -0.5; c.turn.rotation.y = 0.5
+		c.boom.rotation.x = -0.55; c.turn.rotation.y = 0.35; c.rail_path.visible = false
 		c.magnet.global_position = c.tip.global_position + Vector3(0, -1.6, 0)
 	if which == "gizmart" and n == 5 and actors.size() > 0: actors[0].mood("hello", 99.0)
 	if n == frames:
