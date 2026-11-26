@@ -130,10 +130,10 @@ static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
 # ---------------------------------------------------------------- home yard (z 96..112)
 static func _home(L, B, rng: RandomNumberGenerator, life) -> void:
 	# Vesk's shack, right behind the porch; front door faces the yard (north)
-	var shack: Node3D = JK.place(L, "shack", Vector3(-3, 0, 100.0), 0.0, 5.0)
+	var shack: Node3D = JK.place(L, "shack", Vector3(-3, 0, 100.0), PI, 5.0)
 	JK.box_collider(L, Vector3(-3, 2.0, 100.0), Vector3(5.2, 4.0, 3.6))
 	JK.omni(L, Vector3(-3, 1.9, 96.9), Color(1.0, 0.7, 0.38), 1.6, 7.0)
-	DocksDressing.steam(L, Vector3(-3.6, 5.2, 100.6), 0.6)
+	DocksDressing.steam(L, Vector3(-1.8, 5.0, 100.2), 0.6)
 	# string lights from the shack eaves out to the porch lamps
 	JK.bulbs(B, L, Vector3(-5.8, 3.3, 98.0), Vector3(-6.5, 3.2, 91.0), 0.5, 9)
 	JK.bulbs(B, L, Vector3(-0.2, 3.5, 98.0), Vector3(6.5, 3.2, 91.0), 0.6, 11)
@@ -324,10 +324,10 @@ static func _hull_dock(L, B, rng: RandomNumberGenerator, life) -> void:
 	L.checkpoints.append({ pos = Vector3(26.5, 0.1, 78.0), r = 2.0 })
 	# the half-built skiff on its trestles, bow north; boards laid across the gunwales to work from
 	var hc := Vector3(33.4, 0, 88.0)
-	var hull: Node3D = JK.place(L, "hull", hc, PI / 2, 4.2)
+	var hull: Node3D = JK.place(L, "hull", hc, -PI / 2, 4.2)
 	JK.box_collider(L, hc + Vector3(0, 1.15, 0), Vector3(3.2, 2.3, 7.4))
 	for i in 7:
-		L.box(hc + Vector3(rng.randf_range(-0.1, 0.1), 2.36, -2.4 + i * 0.75), Vector3(3.7, 0.08, 0.5), JK.mat("plank"), false).rotation.y = rng.randf_range(-0.05, 0.05)
+		L.box(hc + Vector3(rng.randf_range(-0.1, 0.1), 2.36, -2.4 + i * 0.75), Vector3(3.0, 0.08, 0.5), JK.mat("plank"), false).rotation.y = rng.randf_range(-0.05, 0.05)
 	life.welder(hc + Vector3(-1.75, 1.4, 1.2))
 	life.welder(hc + Vector3(1.75, 1.7, -1.8))
 	JK.omni(L, hc + Vector3(-2.6, 1.4, 1.2), Color(0.5, 0.8, 1.0), 0.8, 5.0)
