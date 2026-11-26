@@ -52,7 +52,7 @@ func _initialize() -> void:
 func _process(_dt: float) -> bool:
 	n += 1
 	if n == 3:
-		vesk.hold(clip, at, 0.0)
+		vesk.hold(clip, at, 0.0); vesk.hold_mug(true)
 		if look != Vector3.INF:
 			vesk.look_point = look
 			var b := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 0.12; sm.height = 0.24; b.mesh = sm; b.position = look; vesk.get_parent().add_child(b)

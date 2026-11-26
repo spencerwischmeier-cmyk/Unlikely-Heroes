@@ -192,7 +192,36 @@ func hold_mug(on: bool) -> void:
 		var top := CylinderMesh.new(); top.top_radius = 0.052; top.bottom_radius = 0.052; top.height = 0.005
 		var ti := MeshInstance3D.new(); ti.mesh = top; ti.position.y = 0.05; ti.material_override = M.std(Color(0.22, 0.12, 0.06), 0.0, 0.2); mug.add_child(ti)
 		mug.position = Vector3(0, 0.02, 0.02)
+		mug.add_child(_steam())
 	if mug: mug.get_parent().visible = on
+
+## A soft wisp of steam off the coffee (world-space, so it trails when the mug moves).
+func _steam() -> CPUParticles3D:
+	var p := CPUParticles3D.new(); p.name = "Steam"
+	p.amount = 16; p.lifetime = 2.4; p.local_coords = false; p.position.y = 0.06
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; p.emission_sphere_radius = 0.025
+	p.direction = Vector3.UP; p.spread = 12.0
+	p.initial_velocity_min = 0.03; p.initial_velocity_max = 0.07
+	p.gravity = Vector3(0.015, 0.09, 0.0)
+	p.damping_min = 0.02; p.damping_max = 0.05
+	p.angle_min = -180.0; p.angle_max = 180.0
+	p.scale_amount_min = 0.7; p.scale_amount_max = 1.2
+	var sc := Curve.new(); sc.add_point(Vector2(0, 0.35)); sc.add_point(Vector2(1, 1.6)); p.scale_amount_curve = sc
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	g.colors = PackedColorArray([Color(1, 1, 1, 0.0), Color(1, 0.98, 0.95, 0.32), Color(1, 1, 1, 0.0)])
+	p.color_ramp = g
+	var q := QuadMesh.new(); q.size = Vector2(0.07, 0.07)
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES; m.vertex_color_use_as_albedo = true
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var rg := Gradient.new(); rg.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	var tex := GradientTexture2D.new(); tex.gradient = rg; tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5); tex.fill_to = Vector2(1.0, 0.5); tex.width = 64; tex.height = 64
+	m.albedo_texture = tex
+	q.material = m; p.mesh = q
+	return p
 
 # ---------------------------------------------------------------- acting
 ## Freeze `n` at `at` seconds: a resting pose that breathing and the keyed beats play over.

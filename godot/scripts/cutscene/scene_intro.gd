@@ -184,7 +184,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cu(-60.0, 2.6, 45.0, -0.12)    # medium, well off his eyeline: Dodger stays out, the slurp reads in full
+	_cu(-78.0, 2.6, 45.0, -0.12)    # medium, well off his eyeline: Dodger stays out, the slurp reads in full
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
