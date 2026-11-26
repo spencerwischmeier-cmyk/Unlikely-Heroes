@@ -23,6 +23,10 @@ var t := randf() * 10.0
 var _flick := 0.0
 var _flick_on := false
 var jet_mats: Array = []
+var rotors: Array = []     # spinning prop pivots on the side pods (Meshy shell only)
+var spin := 1.0            # 0..1 rotor speed; follows hover so a crashed Dodger's props wind down
+const HUBS := [Vector3(-0.427, -0.03, 0.004), Vector3(0.423, -0.03, 0.006)]
+static var _stripped: Mesh
 
 # eye emotes: top lid close, bottom lid close, lid slant, brow tilt, brow lift, pupil size
 const FACES := {
@@ -79,6 +83,59 @@ func _reskin() -> void:
 	var body: Node3D = load("res://models/chars/dodger_body.glb").instantiate()
 	body.name = "DodgerBody"; body.position = BODY_OFFSET
 	model.add_child(body)
+	# the Meshy shell has its prop blades baked in; strip them and add real ones that spin
+	var shell := body.find_child("*", true, false) as MeshInstance3D
+	if body is MeshInstance3D: shell = body as MeshInstance3D
+	if shell == null:
+		for c in body.find_children("*", "MeshInstance3D", true, false): shell = c; break
+	if shell and shell.mesh:
+		if _stripped == null: _stripped = _strip_blades(shell.mesh)
+		shell.mesh = _stripped
+		for i in 2: rotors.append(_rotor(shell, HUBS[i], 1.0 if i == 0 else -1.0))
+
+## Drops the baked prop blades. models/chars/dodger_blades.json lists their triangle centres on a 2.5 mm grid
+## (found offline as the thin connected pieces fanning out from each pod hub), so the hub caps stay.
+static func _strip_blades(src: Mesh) -> Mesh:
+	var keys := {}
+	var raw = JSON.parse_string(FileAccess.get_file_as_string("res://models/chars/dodger_blades.json"))
+	if raw is Array:
+		for k in raw: keys[k] = true
+	if keys.is_empty(): return src
+	var out := ArrayMesh.new()
+	for si in src.get_surface_count():
+		var a: Array = src.surface_get_arrays(si)
+		var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+		if idx.is_empty():
+			idx = PackedInt32Array(); for k in v.size(): idx.append(k)
+		var keep := PackedInt32Array()
+		for k in range(0, idx.size(), 3):
+			var c := (v[idx[k]] + v[idx[k + 1]] + v[idx[k + 2]]) / 3.0
+			if absf(c.x) > 0.28 and c.y > -0.065 and c.y < 0.0:
+				var q := (c / 0.0025).round()
+				if keys.has("%d,%d,%d" % [int(q.x), int(q.y), int(q.z)]): continue
+			keep.append(idx[k]); keep.append(idx[k + 1]); keep.append(idx[k + 2])
+		a[Mesh.ARRAY_INDEX] = keep
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+		out.surface_set_material(si, src.surface_get_material(si))
+	return out
+
+## A two-blade prop plus a faint motion-blur disc, spinning about its hub's up axis.
+func _rotor(parent: Node3D, hub: Vector3, dir: float) -> Node3D:
+	var piv := Node3D.new(); piv.position = hub; piv.set_meta("dir", dir); parent.add_child(piv)
+	var bm := StandardMaterial3D.new(); bm.albedo_color = Color(0.92, 0.93, 0.95); bm.roughness = 0.35; bm.metallic = 0.2
+	for k in 2:
+		var b := MeshInstance3D.new(); var bx := BoxMesh.new(); bx.size = Vector3(0.115, 0.006, 0.034)
+		b.mesh = bx; b.material_override = bm
+		b.position = Vector3(0.068 if k == 0 else -0.068, 0, 0); b.rotation.x = 0.22 * (1.0 if k == 0 else -1.0)
+		piv.add_child(b)
+	var disc := MeshInstance3D.new(); var cm := CylinderMesh.new()
+	cm.top_radius = 0.13; cm.bottom_radius = 0.13; cm.height = 0.003; cm.radial_segments = 32
+	var dm := StandardMaterial3D.new(); dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	dm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; dm.albedo_color = Color(0.9, 0.95, 1.0, 0.0)
+	disc.mesh = cm; disc.material_override = dm; disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	piv.add_child(disc); piv.set_meta("disc", dm)
+	return piv
 
 func _build_lids() -> void:
 	var shell := StandardMaterial3D.new(); shell.albedo_color = Color(0.17, 0.19, 0.23); shell.metallic = 0.55; shell.roughness = 0.38
@@ -165,4 +222,8 @@ func _process(dt: float) -> void:
 	eye_mat.albedo_color = c * 0.2; eye_mat.emission = c; eye_mat.emission_energy_multiplier = e
 	eye_light.light_color = c; eye_light.light_energy = 0.8 * (1.0 - dim)
 	for jm in jet_mats: jm.emission_energy_multiplier = (2.0 + randf()) * hover
+	spin = move_toward(spin, clampf(hover, 0.0, 1.0), dt * 0.6)
+	for r in rotors:
+		r.rotation.y += dt * 38.0 * spin * float(r.get_meta("dir"))
+		(r.get_meta("disc") as StandardMaterial3D).albedo_color.a = 0.14 * spin
 	if lid_top: _tick_face(dt)

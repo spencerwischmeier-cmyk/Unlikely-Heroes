@@ -66,7 +66,7 @@ func _process(dt: float) -> void:
 			else: break
 		tk = lerpf(tk, float(OPEN.get(shp, 0.0)) * talk, 0.8)
 		if lip_t > float(lip_cues[-1][0]) + 0.3: lip_t = -1.0
-	r.x += tk * 0.06; p.y += tk * 0.03
+	# no body bob per syllable: the eye pulse carries his speech
 	# the body only re-sets y each frame (hover bob), so x/z are set outright, never accumulated
 	model.position = Vector3(p.x, model.position.y + p.y, p.z)
 	model.rotation += r

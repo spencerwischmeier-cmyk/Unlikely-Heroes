@@ -460,6 +460,7 @@ func _process(dt: float) -> void:
 		else: _held_key = ""; ap.advance(dt)
 		_seq_step()
 	if sk == null: return
+	_rg_restore()
 	if sit > 0.001: _sit_pose()
 	# head look (neck 40%, head 60%), plus talking nods
 	var want_y := 0.0
@@ -470,7 +471,10 @@ func _process(dt: float) -> void:
 	if tp != Vector3.INF and hb >= 0:
 		var hp := sk.global_transform * sk.get_bone_global_pose(hb).origin
 		var d := sk.global_transform.basis.inverse() * (tp - hp)
-		want_y = clampf(atan2(d.x, d.z), -1.0, 1.0)
+		var raw := atan2(d.x, d.z)
+		# a target behind him would flip the turn between left and right every frame: stay on the current side
+		if absf(raw) > 2.2: raw = (1.0 if _yaw >= 0.0 else -1.0) * 1.0
+		want_y = clampf(raw, -1.0, 1.0)
 		want_p = clampf(atan2(d.y, Vector2(d.x, d.z).length()), -0.45, 0.28)
 	var k := 1.0 - exp(-6.0 * dt)
 	_yaw = lerpf(_yaw, want_y + head_turn, k)
@@ -495,8 +499,20 @@ func _rot_global(bone: String, axis: Vector3, ang: float) -> void:
 	if i < 0: return
 	var p := sk.get_bone_parent(i)
 	var pg: Basis = sk.get_bone_global_pose(p).basis if p >= 0 else Basis()
-	var l := Basis(sk.get_bone_pose_rotation(i))
-	sk.set_bone_pose_rotation(i, (pg.inverse() * Basis(axis, ang) * pg * l).get_rotation_quaternion())
+	var q0: Quaternion = sk.get_bone_pose_rotation(i)
+	var q := (pg.inverse() * Basis(axis, ang) * pg * Basis(q0)).get_rotation_quaternion()
+	if not _rg.has(i): _rg[i] = [q0, q]
+	else: _rg[i][1] = q
+	sk.set_bone_pose_rotation(i, q)
+
+## Procedural offsets are layered on the animated pose each frame. When the clip doesn't rewrite a bone
+## (a finished one-shot, a held pose, a clip without that track), last frame's offset would still be there
+## and the next one would stack on it, so the upper body keeps turning. Undo whatever wasn't overwritten.
+var _rg := {}   # bone index -> [pose before our offsets, pose after them]
+func _rg_restore() -> void:
+	for i in _rg:
+		if sk.get_bone_pose_rotation(i).is_equal_approx(_rg[i][1]): sk.set_bone_pose_rotation(i, _rg[i][0])
+	_rg.clear()
 
 func _sit_pose() -> void:
 	var pel := sk.find_bone("pelvis")
