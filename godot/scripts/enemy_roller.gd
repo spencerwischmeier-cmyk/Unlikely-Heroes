@@ -22,6 +22,7 @@ var warn: Node3D
 var launch_dir := Vector3.ZERO
 var eye_mat: StandardMaterial3D
 var tilt := 0.0           # head leans into the roll
+var bulb_mat: StandardMaterial3D
 
 func _ready() -> void:
 	hp = 2.0; max_hp = 2.0; nuts = 4
@@ -37,6 +38,15 @@ func _ready() -> void:
 	eye_open = 0.1
 	if cap: break_parts = [cap]
 	scrap_count = 10
+	cable_on = true
+	# the night-shift paint job: rust orange, a bit bigger, with a bent antenna and a blinking bulb
+	if roll_variant() and cap:
+		apply_variant(Color(1.05, 0.74, 0.6), 1.08)
+		var ant := Node3D.new(); ant.position = Vector3(0.16, 1.0, -0.18); ant.rotation = Vector3(-0.35, 0, -0.3); cap.add_child(ant)
+		add_prop(ant, cyl(0.045, 0.08), Color(0.17, 0.19, 0.22), Vector3(0, 0.0, 0), Vector3.ZERO, 0.7)
+		add_prop(ant, cyl(0.014, 0.42), Color(0.6, 0.62, 0.66), Vector3(0, 0.22, 0), Vector3.ZERO, 0.85)
+		add_prop(ant, cyl(0.014, 0.16), Color(0.6, 0.62, 0.66), Vector3(0.05, 0.47, 0), Vector3(0, 0, -0.7), 0.85)
+		bulb_mat = add_prop(ant, ball_mesh(0.05), Color(1, 0.25, 0.12), Vector3(0.1, 0.54, 0), Vector3.ZERO, 0.0, 3.0).material_override
 	roll_snd = randf_range(0.5, 2.0)
 
 func center() -> Vector3:
@@ -121,6 +131,7 @@ func _physics_process(dt: float) -> void:
 	if is_on_floor() and not was and state == "chase": FX.puff(global_position + Vector3(0, 0.1, 0), Color(1, 0.75, 0.7))
 	clamp_to_zone()
 	_spin(dt)
+	if bulb_mat: bulb_mat.emission_energy_multiplier = (8.0 if fmod(t, 1.1) < 0.12 else 0.6) if state != "fuse" else (12.0 if sin(t * 50.0) > 0.0 else 0.5)
 	if global_position.y < -40.0: die(true)
 
 func _spin(dt: float) -> void:

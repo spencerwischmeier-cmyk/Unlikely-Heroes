@@ -20,6 +20,9 @@ var shoot_t := -1.0           # winding up a rivet when >= 0
 var bump_cd := 0.0
 var build_t := 0.0            # hammering animation while > 0
 var landed := false
+var chat_t := 0.0             # >0 while turned to grumble at a crewmate
+var chat_cd := 0.0
+var chat_dir := Vector3.ZERO
 
 func _ready() -> void:
 	hp = 3.0; max_hp = 3.0; nuts = 5
@@ -38,6 +41,17 @@ func _ready() -> void:
 	arm = _build_arm(head)
 	if cap: break_parts = [cap]
 	scrap_count = 9
+	cable_on = true
+	chat_cd = randf_range(2.0, 6.0)
+	# night-shift paint job: rust orange with a toolbox strapped to the back of the hat
+	if roll_variant() and cap:
+		apply_variant(Color(1.05, 0.74, 0.6), 1.05)
+		var tb := Node3D.new(); tb.position = Vector3(0.05, 0.72, -0.42); tb.rotation = Vector3(0.15, 0, 0); cap.add_child(tb)
+		add_prop(tb, box(Vector3(0.36, 0.2, 0.16)), Color(0.62, 0.2, 0.14), Vector3.ZERO)
+		add_prop(tb, box(Vector3(0.37, 0.04, 0.17)), Color(0.12, 0.13, 0.15), Vector3(0, 0.06, 0), Vector3.ZERO, 0.6)
+		add_prop(tb, box(Vector3(0.2, 0.025, 0.03)), Color(0.6, 0.62, 0.66), Vector3(0, 0.15, 0), Vector3.ZERO, 0.85)
+		add_prop(tb, box(Vector3(0.025, 0.06, 0.03)), Color(0.6, 0.62, 0.66), Vector3(-0.09, 0.12, 0), Vector3.ZERO, 0.85)
+		add_prop(tb, box(Vector3(0.025, 0.06, 0.03)), Color(0.6, 0.62, 0.66), Vector3(0.09, 0.12, 0), Vector3.ZERO, 0.85)
 
 ## The riveter arm (pivot at the shoulder; the crew swings it to hammer and cocks it back to fire).
 func _build_arm(head: Node3D) -> Node3D:
@@ -112,6 +126,8 @@ func _physics_process(dt: float) -> void:
 	if shoot_t >= 0.0 or face.length() < 0.1:
 		face = player.global_position - global_position; face.y = 0
 	if sp > 1.0 and shoot_t < 0.0 and build_t <= 0.0: face = flat
+	_chat(dt)
+	if chat_t > 0.0 and shoot_t < 0.0 and build_t <= 0.0: face = chat_dir
 	if cap and face.length() > 0.05:
 		cap.rotation.y = lerp_angle(cap.rotation.y, atan2(face.x, face.z), 1.0 - exp(-8.0 * dt))
 	# arm: hammering, winding up, or resting
@@ -134,6 +150,21 @@ func _physics_process(dt: float) -> void:
 		combat.hurt_player(1, global_position)
 		velocity -= Vector3(dp.x, 0, dp.z).normalized() * 4.0
 	if global_position.y < -40.0: die(true)
+
+## Crew chatter: now and then a crewmate turns to the nearest other one and grumbles.
+func _chat(dt: float) -> void:
+	chat_t -= dt; chat_cd -= dt
+	if chat_cd > 0.0 or shoot_t >= 0.0 or build_t > 0.0 or stun > 0.0: return
+	chat_cd = randf_range(4.0, 9.0)
+	var best: Node3D = null; var bd := 3.5
+	for b in get_tree().get_nodes_in_group("bots"):
+		if b == self or b.get_script() != get_script() or b.dead: continue
+		var d := global_position.distance_to(b.global_position)
+		if d < bd: bd = d; best = b
+	if best == null: return
+	chat_dir = best.global_position - global_position; chat_dir.y = 0
+	chat_t = 1.1; pop = 0.25
+	Snd.at("chars_crew_grumble", center(), -14, 0.15, 0.2)
 
 func _shoot() -> void:
 	var muzzle: Node3D = model.find_child("crew_muzzle", true, false)

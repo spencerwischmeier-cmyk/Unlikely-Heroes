@@ -35,6 +35,12 @@ func _initialize() -> void:
 			var b := _add_script("res://scripts/crew_barricade.gd", Vector3(2.9, 0, -0.4), 0.0)
 			b.set("rise", 1.0)
 			_aim(cam, Vector3(0.2, 1.7, 7.2), Vector3(0.2, 0.8, 0))
+		"variants":
+			Engine.set_meta("bot_variant", 1)
+			_add_script("res://scripts/enemy_roller.gd", Vector3(-2.6, 0, 0), 0.5)
+			_add_script("res://scripts/enemy_crew_roller.gd", Vector3(-0.6, 0, 0), -0.8)
+			_add_script("res://scripts/enemy_hornet.gd", Vector3(1.1, 1.3, 0), 0.3)
+			_aim(cam, Vector3(0.2, 1.9, 8.2), Vector3(0.2, 1.0, 0))
 		"break":
 			_add_script("res://scripts/enemy_roller.gd", Vector3(-1.6, 0, 0), 0.3)
 			_add_script("res://scripts/enemy_crew_roller.gd", Vector3(0.4, 0, 0), -0.4)
@@ -85,6 +91,12 @@ func _process(_dt: float) -> bool:
 		c.visible = true; c.magnet.visible = true
 		c.boom.rotation.x = -0.55; c.turn.rotation.y = 0.35; c.rail_path.visible = false; c.lamp_mat.emission_energy_multiplier = 9.0
 		c.magnet.global_position = c.tip.global_position + Vector3(0, -1.6, 0)
+	if which == "variants" and n == 2:
+		for a in actors:
+			var c = a.get("cable")
+			if c: c.queue_free(); a.set("cable", null)
+		Engine.set_meta("bot_variant", 0)
+		_add_script("res://scripts/enemy_roller.gd", Vector3(2.9, 1.6, -0.6), -0.3)
 	if which == "break" and n == 6:
 		for a in actors: a.call("_burst")
 		for a in actors: a.visible = false

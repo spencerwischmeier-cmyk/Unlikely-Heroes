@@ -25,6 +25,8 @@ var spin_v := 0.0
 var buzz_t := 0.0
 var wings: Array = []
 
+var beacon_mat: StandardMaterial3D
+
 func _ready() -> void:
 	hp = 4.0; max_hp = 4.0; nuts = 8
 	stagger_time = 0.3
@@ -38,6 +40,11 @@ func _ready() -> void:
 	wings = wings.filter(func(w): return w != null)
 	for x in [-0.14, 0.14]: add_eye(inner if inner else model, Vector3(x, 0.2, 0.56), 0.065, Color(1, 0.15, 0.08), 5.0)
 	scrap_count = 11
+	# night-shift paint job: rust orange, a touch smaller and quicker-looking, with a spinning beacon
+	if roll_variant() and inner:
+		apply_variant(Color(1.05, 0.74, 0.6), 0.9)
+		add_prop(inner, cyl(0.07, 0.05, 0.09), Color(0.17, 0.19, 0.22), Vector3(0, 0.5, 0.3), Vector3.ZERO, 0.7)
+		beacon_mat = add_prop(inner, ball_mesh(0.065), Color(1, 0.45, 0.1), Vector3(0, 0.55, 0.3), Vector3.ZERO, 0.0, 4.0).material_override
 	fire_t = randf_range(1.8, 3.0); orbit_a = randf() * TAU; orbit_r = randf_range(8, 12); height = randf_range(3, 5.5)
 	eye_light = OmniLight3D.new(); eye_light.light_color = Color(1, 0.2, 0.1); eye_light.light_energy = 0.5; eye_light.omni_range = 4
 	add_child(eye_light)
@@ -64,6 +71,7 @@ func _physics_process(dt: float) -> void:
 		if fall_t > 0.0: _fall(dt)
 		return
 	tick_common(dt)
+	if beacon_mat: beacon_mat.emission_energy_multiplier = 1.0 + 7.0 * maxf(0.0, sin(t * 9.0))
 	if paused(): aim_line.visible = false; return
 	if spawn_t > 0.0 and spawn_t + 0.02 >= 1.0: Snd.at("chars_hornet_dive", global_position, -6, 0.12, 0.2)
 	var hp_ := player.global_position
