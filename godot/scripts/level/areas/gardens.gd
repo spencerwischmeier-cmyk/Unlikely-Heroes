@@ -67,6 +67,13 @@ static func build(L: Node3D) -> void:
 	for p in [Vector3(-28.8, Y, 3.5), Vector3(-29.2, Y, -1.6), Vector3(-32.4, Y, -49.4), Vector3(-49.2, Y, -36.6),
 			Vector3(-46.5, Y, -40.5), Vector3(-35.2, GROVE_Y, -69.0), Vector3(-49.0, GROVE_Y, -56.8), Vector3(TREE.x + 1.6, CROWN_Y, TREE.y - 1.4)]:
 		K.pots(p, 3, 0.45)
+	# bunting and name boards
+	K.bunting(Vector3(-25.55, Y + 3.9, -21.7), Vector3(-20.45, Y + 3.9, -29.3), 0.5)
+	K.bunting(Vector3(-20.6, Y + 3.9, -6.5), Vector3(-39.5, Y + 3.9, 3.5), 1.0)
+	K.bunting(Vector3(-32.0, Y + 3.9, -40.2), Vector3(-46.0, Y + 3.9, -49.4), 1.0)
+	K.bunting(Vector3(-26.6, GROVE_Y + 3.9, -59.4), Vector3(-34.6, GROVE_Y + 3.9, -56.6), 0.5)
+	K.name_sign("CONSERVATORY", Vector3(-31.8, Y, -44.0), PI / 2)
+	K.name_sign("HIVE GROVE", Vector3(-43.6, GROVE_Y, -56.6), PI * 0.08, 2.8)
 	# Vesk and Dodger have opinions (once each)
 	life.add_quip(DOME, 2.6, ["gardens_dome_1", "gardens_dome_2"])
 	life.add_quip(Vector3(-48.5, Y, -43), 2.5, ["gardens_tree_1"])

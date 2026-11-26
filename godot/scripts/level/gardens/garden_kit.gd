@@ -459,6 +459,42 @@ func islet(c: Vector3, r: float) -> Node3D:
 	waterfall(c + Vector3(cos(wa) * r * 0.98, 0.3, sin(wa) * r * 0.98), Vector2(cos(wa), sin(wa)), r * 0.35, r * 6.0)
 	return n
 
+## a string of little pennant flags sagging between a and b
+var _pennant: ArrayMesh
+func bunting(a: Vector3, b: Vector3, sag := 0.6) -> void:
+	if _pennant == null:
+		var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for v in [Vector3(-0.5, 0, 0), Vector3(0.5, 0, 0), Vector3(0, -1.2, 0)]:
+			st.set_normal(Vector3(0, 0, 1)); st.add_vertex(v)
+		_pennant = st.commit()
+	var n := int(a.distance_to(b) / 0.45)
+	var prev := a
+	var cols := [Color(1.0, 0.4, 0.45), Color(1.0, 0.82, 0.3), Color(0.4, 0.75, 1.0), Color(0.55, 0.85, 0.45), Color(0.9, 0.55, 0.95)]
+	var yaw := atan2(b.x - a.x, b.z - a.z) - PI / 2
+	for i in n + 1:
+		var u := float(i) / n
+		var p := a.lerp(b, u) - Vector3(0, sin(u * PI) * sag, 0)
+		if i > 0:
+			var d := p - prev
+			add_inst("rope", box_mesh, plank_mat, Transform3D(Basis(Quaternion(Vector3.UP, d.normalized())).scaled_local(Vector3(0.02, d.length(), 0.02)), (p + prev) / 2), Color.WHITE, false)
+		if i > 0 and i < n:
+			var c: Color = cols[i % cols.size()]
+			add_inst("pennant_" + c.to_html(false), _pennant, _petal_mat(c), xf_at(p, Vector3(0.28, 0.28, 0.28), yaw, Vector3(rng.randf_range(-0.15, 0.15), 0, 0)), Color.WHITE, false)
+		prev = p
+
+## an upright sign on brass posts with a name board (both faces)
+func name_sign(text: String, pos: Vector3, yaw: float, w := 3.2) -> void:
+	var n := Node3D.new(); n.position = pos; n.rotation.y = yaw; root.add_child(n)
+	for sx in [-1, 1]: cylm(Vector3(sx * w / 2, 1.4, 0), 0.07, 0.09, 2.8, brass_mat, 8, n)
+	var bm := BoxMesh.new(); bm.size = Vector3(w, 0.6, 0.1)
+	mesh(bm, frame_mat, Vector3(0, 2.5, 0), n)
+	for zs in [-1, 1]:
+		var l := Label3D.new(); l.text = text; l.font_size = 56; l.pixel_size = 0.0075; l.outline_size = 10
+		l.modulate = Color(1.0, 0.9, 0.55); l.outline_modulate = Color(0.1, 0.18, 0.12)
+		l.position = Vector3(0, 2.5, zs * 0.06); l.rotation.y = 0.0 if zs > 0 else PI
+		n.add_child(l)
+	for i in 5: flower(n.position + Basis(Vector3.UP, yaw) * Vector3((i - 2) * w / 5.0, 2.85, 0), FLOWER_COLS[i % FLOWER_COLS.size()], 0.2)
+
 # ------------------------------------------------------------------ structures
 ## a glass dome (radius r) with brass ribs at centre c (floor y). Solid wall ring with door gaps at the
 ## given yaw angles (radians, 0 = +z). Returns the holder.
