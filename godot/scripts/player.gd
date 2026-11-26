@@ -89,6 +89,9 @@ var rope: MeshInstance3D
 var phase := 0.0
 var lean := 0.0
 var pitch_s := 0.0
+const HERO_SCALE := 0.9
+var arm_hold := 1.0          # 0..1: how much the right arm is posed to hold the blaster forward
+var arm_bones := []          # [upper, fore, hand] bone ids (right arm)
 var anim_t := 0.0
 
 func _ready() -> void:
@@ -104,6 +107,7 @@ func _ready() -> void:
 	model = Node3D.new(); add_child(model)
 	body = Node3D.new(); model.add_child(body)
 	var hero: Node3D = load("res://models/vesk.glb").instantiate()
+	hero.scale = Vector3.ONE * HERO_SCALE
 	body.add_child(hero)
 	_shadows(hero)
 	skel = hero.find_child("Skeleton3D", true, false)
@@ -113,9 +117,10 @@ func _ready() -> void:
 		anim.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 	anim.play("idle")
 	for b in ["pelvis", "spine", "chest", "neck", "head"]: bones[b] = skel.find_bone(b)
+	for b in ["RightArm", "RightForeArm", "RightHand"]: arm_bones.append(maxi(skel.find_bone("mixamorig_" + b), skel.find_bone("mixamorig:" + b)))
 	for sx in [-1, 1]:
 		var l := OmniLight3D.new(); l.light_color = Color(0.3, 0.9, 1); l.light_energy = 0.0; l.omni_range = 2.5
-		l.position = Vector3(0.15 * sx, 0.66, -0.3)
+		l.position = Vector3(0.17 * sx, 0.84, -0.36)
 		body.add_child(l); jets.append(l)
 	_build_weapons()
 	_build_flames()
@@ -429,6 +434,25 @@ func _face(dt: float) -> void:
 	turn_rate = lerpf(turn_rate, angle_difference(prev, face_yaw) / maxf(dt, 1e-4), 1.0 - exp(-10.0 * dt))
 	model.rotation.y = face_yaw
 
+## Holds the blaster out front with the right arm (the animation set has no gun-holding clips):
+## the upper arm hangs slightly forward and the forearm and hand point where Vesk aims.
+func _pose_gun_arm(dt: float, aiming: bool) -> void:
+	if arm_bones.size() < 3 or arm_bones[0] < 0: return
+	var want := 0.0 if (melee_t > 0.0 or swing_hook or riding) else 1.0
+	arm_hold = lerpf(arm_hold, want, 1.0 - exp(-14.0 * dt))
+	if arm_hold < 0.02: return
+	var p := pitch_s * 0.8 + (0.0 if aiming else -0.15)
+	var dirs := [Vector3(-0.18, -0.8, 0.45).normalized(), Vector3(0.12, sin(p), cos(p)).normalized(), Vector3(0.05, sin(p), cos(p)).normalized()]
+	var parent_b := skel.get_bone_global_pose(skel.get_bone_parent(arm_bones[0])).basis.orthonormalized()
+	for k in 3:
+		var i: int = arm_bones[k]
+		var anim_g := (parent_b * Basis(skel.get_bone_pose_rotation(i))).orthonormalized()
+		var cur_y := anim_g.y.normalized()
+		var q := Quaternion(cur_y, cur_y.slerp(dirs[k], arm_hold).normalized()) if cur_y.cross(dirs[k]).length() > 1e-4 else Quaternion()
+		var tgt := (Basis(q) * anim_g).orthonormalized()
+		skel.set_bone_pose_rotation(i, (parent_b.inverse() * tgt).get_rotation_quaternion())
+		parent_b = tgt
+
 func _play(n: String, blend := 0.15, spd := 1.0) -> void:
 	anim.speed_scale = spd
 	if n != cur_anim:
@@ -446,7 +470,7 @@ func _animate(dt: float) -> void:
 	land_play = maxf(0.0, land_play - dt)
 	if land_t > 0.55 and land_play <= 0.0 and grounded and speed < 4.0: land_play = 0.3
 	# pick the animation for what Vesk is doing
-	if melee_t > 0.0: _play("melee", 0.06)
+	if melee_t > 0.0: _play("melee", 0.06, 3.0)
 	elif swing_hook: _play("swing", 0.12)
 	elif riding: _play("grind", 0.15)
 	elif dashing and not grounded: _play("dash", 0.08)
@@ -462,9 +486,14 @@ func _animate(dt: float) -> void:
 	# aim: lean the upper body toward the crosshair (or hold the blaster low when not shooting)
 	var aim_pitch: float = cam.pitch if aiming else -0.25
 	pitch_s = lerpf(pitch_s, aim_pitch, 1.0 - exp(-(20.0 if aiming else 8.0) * dt))
+	# rotate about the model's sideways axis, expressed in each bone's own frame (the bones' rest axes vary)
 	for b in ["spine", "chest"]:
 		var i: int = bones[b]
-		skel.set_bone_pose_rotation(i, skel.get_bone_pose_rotation(i) * Quaternion(Vector3.RIGHT, -pitch_s * 0.5))
+		if i < 0: continue
+		var gb := skel.get_bone_global_pose(i).basis.orthonormalized()
+		var ax := (gb.inverse() * Vector3.RIGHT).normalized()
+		skel.set_bone_pose_rotation(i, skel.get_bone_pose_rotation(i) * Quaternion(ax, -pitch_s * 0.5))
+	_pose_gun_arm(dt, aiming)
 	# body: bank into turns, squash on landing
 	lean = lerpf(lean, clampf(-turn_rate * 0.09 * maxf(run, 0.3), -0.35, 0.35), 1.0 - exp(-10.0 * dt))
 	if riding or swing_hook: lean = lerpf(lean, 0.0, 1.0 - exp(-12.0 * dt))
@@ -474,7 +503,7 @@ func _animate(dt: float) -> void:
 	_update_jets(dt)
 
 # ---------- weapons in hand ----------
-const WEAPON_MODELS := { scatter_bloom = "res://models/wpn_scatter.glb", thump_lobber = "res://models/wpn_lobber.glb",
+const WEAPON_MODELS := { arc_lancer = "res://models/wpn_lancer.glb", scatter_bloom = "res://models/wpn_scatter.glb", thump_lobber = "res://models/wpn_lobber.glb",
 	seeker_hive = "res://models/wpn_seeker.glb" }
 
 func _build_weapons() -> void:
@@ -525,7 +554,7 @@ func _update_weapon(dt: float) -> void:
 	weapon_kick = maxf(0.0, weapon_kick - dt * 9.0)
 	var t := skel.global_transform * skel.get_bone_global_pose(gun_bone)
 	var f := t.basis.y.normalized()
-	var up := (t.basis * gun_up_axis).normalized()
+	var up := body.global_transform.basis.y.normalized()
 	var right := up.cross(f).normalized()
 	up = f.cross(right).normalized()
 	var b := Basis(right, up, f)
@@ -538,7 +567,6 @@ func _update_weapon(dt: float) -> void:
 		if int(h.get_meta("lv")) != lv: _weapon_look(h, id, lv)
 		h.global_transform = Transform3D(b.scaled(Vector3.ONE * float(h.get_meta("scale", 1.0))), origin)
 	# the Arc Lancer is skinned into the hero mesh: fold it away while another gun is out
-	skel.set_bone_pose_scale(gun_bone, Vector3.ONE if held_weapon == "arc_lancer" else Vector3.ONE * 0.001)
 	var llv: int = combat.level("arc_lancer")
 	lancer_fx.visible = held_weapon == "arc_lancer" and llv >= 2
 	if lancer_fx.visible:
@@ -565,7 +593,7 @@ func _build_flames() -> void:
 	var gr := Gradient.new(); gr.set_color(0, Color.WHITE); gr.set_color(1, Color(1, 1, 1, 0)); g.gradient = gr
 	spark_mat.albedo_texture = g
 	for sx in [-1, 1]:
-		var nozzle_body := Transform3D(Basis(), Vector3(0.15 * sx, 0.68, -0.3))
+		var nozzle_body := Transform3D(Basis(), Vector3(0.17 * sx, 0.86, -0.36))
 		jet_offsets.append(rest_chest.affine_inverse() * skel_in_body.affine_inverse() * nozzle_body)
 		var pivot := Node3D.new(); pivot.top_level = true; body.add_child(pivot)
 		var core := MeshInstance3D.new(); var cm := CylinderMesh.new()

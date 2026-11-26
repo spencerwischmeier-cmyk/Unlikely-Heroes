@@ -106,10 +106,31 @@ def seeker():
     return root
 
 
+def lancer():
+    # the Arc Lancer: Vesk's starting blaster (it used to be modelled into the old hero mesh)
+    reset(); c = common()
+    suit = mat('w_lancer_orange', 0xff6a1a, 0, 0.55, sheen=0.6, sheen_tint=0xffc890)
+    cyan = glowmat('w_lancer_glow', 0x40f0ff, 7)
+    cyanSoft = glowmat('w_lancer_tank', 0x40f6ff, 4)
+    root = empty('wpn_lancer')
+    part('body', bm_box(0.17, 0.17, 0.42), c['white'], root, at=(0, 0, 0), rounded=0.051)
+    part('top', bm_box(0.1, 0.06, 0.3), suit, root, at=(0, 0.1, 0.02), bevel=0.012)
+    part('sight', bm_box(0.04, 0.05, 0.08), c['dark'], root, at=(0, 0.15, -0.04), bevel=0.008)
+    part('barrel', bm_cyl(0.055, 0.045, 0.42, 20), c['dark'], root, at=(0, 0.02, 0.38), rot=rx)
+    for i in range(4):
+        part(f'coil_glow_{i}', bm_torus(0.07, 0.016, 24, 10), cyan, root, at=(0, 0.02, 0.24 + i * 0.075))
+    for s in (-1, 1):
+        part(f'prong_{s}', bm_box(0.04, 0.04, 0.18), c['brass'], root, at=(0.075 * s, 0.02, 0.6), rot=(0, -0.15 * s, 0), bevel=0.008)
+    part('tank_glow', bm_cyl(0.05, 0.05, 0.2, 16), cyanSoft, root, at=(0, -0.06, -0.08), rot=rx)
+    grip_and_stock(c, root, suit)
+    empty('muzzle_lancer', root, at=(0, 0.02, 0.72))
+    return root
+
+
 if __name__ == '__main__':
-    want = [a for a in sys.argv[1:] if not a.startswith('--')] or ['scatter', 'lobber', 'seeker']
+    want = [a for a in sys.argv[1:] if not a.startswith('--')] or ['scatter', 'lobber', 'seeker', 'lancer']
     for name in want:
-        root = {'scatter': scatter, 'lobber': lobber, 'seeker': seeker}[name]()
+        root = {'scatter': scatter, 'lobber': lobber, 'seeker': seeker, 'lancer': lancer}[name]()
         print(name, 'TRIS', tri_count(root))
         export(OUT + f'wpn_{name}.glb', root)
         if '--preview' in sys.argv:
