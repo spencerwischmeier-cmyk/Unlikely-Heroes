@@ -68,13 +68,12 @@ func _ready() -> void:
 			m.position.y = -aabb.position.y * s
 		ap = m.find_child("AnimationPlayer", true, false)
 		if ap:
-			var pick := ""
-			for n in ap.get_animation_list():
-				if n.to_lower().contains("talk") or (pick == "" and n.to_lower().contains("idle")): pick = n
-			if pick == "" and ap.get_animation_list().size() > 0: pick = ap.get_animation_list()[0]
-			if pick != "":
-				ap.get_animation(pick).loop_mode = Animation.LOOP_LINEAR; ap.play(pick)
-		head = m.find_child("*ead*", true, false) as Node3D
+			for n in ["idle", "talk", "talk_big", "hip"]:
+				if ap.has_animation(n): ap.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+			_glb_play("idle")
+		head = m.find_child("Head", true, false) as Node3D
+		stack = m.find_child("stack_top", true, false) as Node3D
+		mouth = m.find_child("mouth", true, false) as Node3D
 	else:
 		_build()
 	if holo: set_holo(true)
@@ -197,8 +196,17 @@ func _build() -> void:
 	for i in 6: _bx(board, Vector3(0.5 - (i % 3) * 0.1, 0.03, 0.01), dark, Vector3(-0.05, 0.3 - i * 0.13, 0.055))
 	arm_l.rotation.x = -0.15; arm_r.rotation.x = -0.35
 
+const GLB_GESTURE := {"fist": "talk_big", "point": "wag", "clipboard": "hip", "shrug": "agree", "stomp": "stomp", "cheer": "cheer"}
+var _glb_cur := ""
+
+func _glb_play(n: String, blend := 0.3) -> void:
+	if ap == null or not ap.has_animation(n) or n == _glb_cur: return
+	_glb_cur = n; ap.play(n, blend)
+
 func gesture(n: String) -> void:
 	gest = n; gest_t = 0.0
+	if from_glb and ap and ap.has_animation(GLB_GESTURE.get(n, "")):
+		_glb_cur = ""; _glb_play(GLB_GESTURE[n], 0.25)
 
 func _process(dt: float) -> void:
 	t += dt; gest_t += dt
@@ -220,7 +228,13 @@ func _process(dt: float) -> void:
 			head.rotation.y = lerp_angle(head.rotation.y, yaw, 1.0 - exp(-5.0 * dt))
 			head.rotation.x = lerpf(head.rotation.x, pitch, 1.0 - exp(-5.0 * dt))
 	if from_glb:
-		root.rotation.z = talk * sin(t * 3.0) * 0.03
+		# base clip follows the talking; gesture clips run their length, then hand back
+		if gest != "" and ap and ap.current_animation == GLB_GESTURE.get(gest, "") and ap.current_animation_position < ap.current_animation_length - 0.35:
+			pass
+		else:
+			gest = ""
+			_glb_play("talk" if talk > 0.5 else "idle", 0.4)
+		_smoke(dt)
 		return
 	# arms: idle sway, talking wave, gestures
 	var la := Vector3(-0.15 + sin(t * 1.3) * 0.04, 0, 0.1)
@@ -238,8 +252,12 @@ func _process(dt: float) -> void:
 	if gest_t > 2.2: gest = ""
 	arm_l.rotation = arm_l.rotation.lerp(la, 1.0 - exp(-8.0 * dt))
 	arm_r.rotation = arm_r.rotation.lerp(ra, 1.0 - exp(-8.0 * dt))
-	# smokestack puffs
+	_smoke(dt)
+
+## Smokestack puffs (not on the hologram).
+func _smoke(dt: float) -> void:
 	smoke_t -= dt
 	if smoke_t <= 0.0 and stack and is_inside_tree() and not holo and visible:
 		smoke_t = 0.5 + randf() * 0.4 - talk * 0.25
-		FX.puff(stack.global_position + Vector3(0, 0.95 * height / 3.6, 0), Color(0.35, 0.33, 0.33))
+		var top := stack.global_position + (Vector3.ZERO if from_glb else Vector3(0, 0.95 * height / 3.6, 0))
+		FX.puff(top, Color(0.35, 0.33, 0.33))
