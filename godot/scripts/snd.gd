@@ -196,6 +196,7 @@ func _setup_buses() -> void:
 	_fx(0, "AudioEffectHardLimiter", {"ceiling_db": -0.8, "pre_gain_db": 0.0, "release": 0.12})
 	var mu := _bus("Music", "Master")
 	_fx(mu, "AudioEffectAmplify", {"volume_db": 0.0})
+	_fx(mu, "AudioEffectLowPassFilter", {"cutoff_hz": 20500.0})
 	var sfx := _bus("SFX", "Master")
 	_fx(sfx, "AudioEffectCompressor", {"threshold": -14.0, "ratio": 2.5, "attack_us": 4000.0, "release_ms": 140.0, "gain": 0.0})
 	var vo := _bus("Voice", "Master")

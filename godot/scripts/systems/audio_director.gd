@@ -55,6 +55,10 @@ var weights := {}
 var debug := false
 var verb := 0.08
 var prev_swing := false
+var emit_t := 1.0
+var turbines_done := false
+var chat_t := 2.0
+var lowpass := 20500.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -65,6 +69,7 @@ func _ready() -> void:
 	Game.item_unlocked.connect(func(_id): Snd.sting("sting_unlock", -2.0))
 	Game.collectible_found.connect(func(_k, _id): Snd.sting("sting_secret", -3.0))
 	Game.bot_killed.connect(_on_bot_killed)
+	Game.zone_entered.connect(_on_zone_entered)
 	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0); alert_cd = 30.0)
 	if args.has("--audio-test"): _self_test.call_deferred()
 
@@ -193,6 +198,11 @@ func _on_zone_cleared(id: String) -> void:
 	Snd.sting("sting_clear", 0.0)
 	combat_t = maxf(combat_t, 3.5)   # let the combat music go soon after
 
+func _on_zone_entered(id: String) -> void:
+	if Game.story and "zones" in Game.story:
+		for z in Game.story.zones:
+			if z.get("id", "") == id and z.has("name"): Snd.play("area_whoosh", -8.0, 0.0, 1.0)
+
 func _on_bot_killed(_bot: Node, pos: Vector3, _kind: String) -> void:
 	Snd.at("bot_die", pos, -3.0, 0.1, 0.05)
 
@@ -244,6 +254,52 @@ func _update_world(dt: float) -> void:
 	Snd.loop_extra["wind_loop"] = clampf((y - 5.0) / 14.0, 0.0, 1.0) * 9.0
 	Snd.loop_extra["city_loop"] = -clampf((y - 8.0) / 12.0, 0.0, 1.0) * 6.0
 
+## bots mutter to each other during a fight
+func _update_chatter(dt: float) -> void:
+	chat_t -= dt
+	if chat_t > 0.0: return
+	chat_t = randf_range(1.6, 3.6)
+	if Game.input_locked: return
+	var pp: Vector3 = Game.player.global_position
+	var near := []
+	for b in get_tree().get_nodes_in_group("bots"):
+		if b is Node3D and not b.get("dead") and (b as Node3D).global_position.distance_to(pp) < 26.0: near.append(b)
+	if near.is_empty(): return
+	var b: Node3D = near.pick_random()
+	Snd.at("bot_chat", b.global_position + Vector3(0, 0.6, 0), -9.0, 0.15, 0.4)
+
+## looping 3D sounds stuck to things in the level (lifts, turbines, Dodger, Gizmart, the relay)
+func _attach(n: Node, sound: String, db: float, unit := 3.0, maxd := 28.0, offset := Vector3.ZERO) -> void:
+	if n == null or not is_instance_valid(n) or not (n is Node3D) or n.has_node("SndLoop"): return
+	if not Snd.streams.has(sound): return
+	var s: AudioStream = Snd.streams[sound].duplicate()
+	if "loop" in s: s.loop = true
+	var p := AudioStreamPlayer3D.new(); p.name = "SndLoop"; p.stream = s; p.volume_db = db; p.bus = "World"
+	p.unit_size = unit; p.max_distance = maxd; p.position = offset
+	p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	n.add_child(p)
+	p.play(randf() * maxf(s.get_length() - 0.5, 0.0))
+
+func _update_emitters() -> void:
+	for m in Game.level.get("movers") if Game.level.get("movers") != null else []:
+		if m is Dictionary and m.has("body"): _attach(m.body, "lift_move", -20.0, 2.5, 18.0)
+	if not turbines_done:
+		turbines_done = true
+		var found := 0
+		for t in Game.level.find_children("*wind_turbine*", "", true, false):
+			if found >= 8: break
+			_attach(t, "turbine_loop", -12.0, 4.0, 34.0, Vector3(0, 6.0, 0)); found += 1
+	if Game.main:
+		var dg: Node = Game.main.get_node_or_null("Dodger")
+		if dg and dg.get("drone") != null: _attach(dg.drone, "drone_hum", -18.0, 2.0, 16.0)
+		var gz: Node = Game.main.get_node_or_null("Gizmart")
+		if gz and "kiosks" in gz:
+			for k in gz.kiosks:
+				if k is Dictionary and k.has("node"): _attach(k.node, "vending_hum", -14.0, 2.0, 14.0, Vector3(0, 1.0, 0))
+		for c in Game.main.get_children():
+			if c.get_script() and (c.get_script() as Script).resource_path.ends_with("relay.gd"):
+				_attach(c, "relay_hum", -6.0, 5.0, 40.0, Vector3(0, 1.5, 0))
+
 # ------------------------------------------------------------------ hero
 func _update_hero() -> void:
 	var pl := Game.player
@@ -263,6 +319,18 @@ func _update_hero() -> void:
 	if gl and riding:
 		var rs: float = absf(pl.get("rail_speed")) if pl.get("rail_speed") != null else 10.0
 		gl.pitch_scale = clampf(0.85 + rs / 45.0, 0.85, 1.35)
+	Snd.loop("rail_spark", riding and not paused, -17.0)
+	var rsp: AudioStreamPlayer = Snd.loops.get("rail_spark")
+	if rsp and gl: rsp.pitch_scale = gl.pitch_scale
+	var gli: AudioStreamPlayer = Snd.loops.get("glide")
+	Snd.loop("glide_wind", gli != null and gli.get_meta("on") and not paused, -15.0)
+	# low hull: a heartbeat and the music goes muffled
+	var hull: int = Game.combat.get("hull") if Game.combat and Game.combat.get("hull") != null else 8
+	var low := hull > 0 and hull <= 2 and not paused
+	Snd.loop("lowhp_beat", low, -12.0)
+	lowpass = move_toward(lowpass, 1400.0 if low else 20500.0, get_process_delta_time() * (40000.0 if low else 9000.0))
+	var lp := Snd.bus_fx("Music", "AudioEffectLowPassFilter")
+	if lp: lp.cutoff_hz = lowpass
 	var swinging: bool = pl.get("swing_hook") != null
 	if swinging and not prev_swing: Snd.play("rope_swing", -10.0, 0.08, 0.3)
 	prev_swing = swinging
@@ -286,6 +354,9 @@ func _process(dt: float) -> void:
 		if debug and Engine.get_process_frames() % 120 < 12: _print_state()
 	_update_beds(dt)
 	_update_oneshots(dt)
+	_update_chatter(dt)
+	emit_t -= dt
+	if emit_t <= 0.0: emit_t = 2.0; _update_emitters()
 	_update_world(dt)
 	_update_hero()
 
@@ -311,6 +382,22 @@ func _self_test() -> void:
 		var good: bool = area == expect[k]
 		ok = ok and good
 		print("[audio-test] %s spot=%s area=%s island=%s surface=%s track=%s %s" % ["PASS" if good else "FAIL", k, area, cur_island, surface(), Snd.track, _beds_str()])
+	# combat: a bot next to the hero should bring in the combat track, and its death let it go
+	Game.player.global_position = spots.plaza[0]
+	await get_tree().create_timer(1.0).timeout
+	var bot: Node = Game.main.spawn_bot("roller", spots.plaza[0] + Vector3(6, 0, 0), Game.level.islands.plaza)
+	await get_tree().create_timer(1.5).timeout
+	var c_ok := combat and Snd.track.begins_with("combat_")
+	print("[audio-test] %s combat on: combat=%s track=%s" % ["PASS" if c_ok else "FAIL", combat, Snd.track])
+	ok = ok and c_ok
+	if is_instance_valid(bot): bot.queue_free()
+	await get_tree().create_timer(6.5).timeout
+	var e_ok := not combat and Snd.track == "area_plaza"
+	print("[audio-test] %s combat off: combat=%s track=%s" % ["PASS" if e_ok else "FAIL", combat, Snd.track])
+	ok = ok and e_ok
+	var emitters := 0
+	for p in get_tree().root.find_children("SndLoop", "AudioStreamPlayer3D", true, false): emitters += 1
+	print("[audio-test] emitters=%d" % emitters)
 	for n in ["blaster", "step_wood", "step_grass", "bot_die", "bolt_hit", "melee_hit"]:
 		var g: Array = Snd.groups.get(n, [n] if Snd.streams.has(n) else [])
 		print("[audio-test] %s group %s = %d" % ["PASS" if g.size() > 0 else "FAIL", n, g.size()])

@@ -6,6 +6,9 @@ release = 0.12
 
 [sub_resource type="AudioEffectAmplify" id="AudioEffectAmplify_g28q7"]
 
+[sub_resource type="AudioEffectLowPassFilter" id="AudioEffectLowPassFilter_j3pel"]
+cutoff_hz = 20500.0
+
 [sub_resource type="AudioEffectCompressor" id="AudioEffectCompressor_n8wo2"]
 threshold = -14.0
 ratio = 2.5
@@ -46,6 +49,8 @@ bus/1/volume_db = 0.0
 bus/1/send = &"Master"
 bus/1/effect/0/effect = SubResource("AudioEffectAmplify_g28q7")
 bus/1/effect/0/enabled = true
+bus/1/effect/1/effect = SubResource("AudioEffectLowPassFilter_j3pel")
+bus/1/effect/1/enabled = true
 bus/2/name = &"SFX"
 bus/2/solo = false
 bus/2/mute = false
