@@ -59,6 +59,12 @@ func _initialize() -> void:
 				d.position = Vector3((i - 1) * 0.9, 1.0, 0); d.rotation.y = 0.25
 				actors.append(d)
 			_aim(cam, Vector3(0, 1.15, 2.0), Vector3(0, 1.0, 0))
+		"dodger1":
+			for i in 4:
+				var d: Node3D = load("res://scripts/cutscene/drone_actor.gd").new(); root3.add_child(d)
+				d.position = Vector3((i - 1.5) * 0.62, 1.0, 0)
+				actors.append(d)
+			_aim(cam, Vector3(0, 1.05, 2.2), Vector3(0, 1.0, 0))
 		"grudd":
 			var m := _add_model("res://models/chars/grudd.glb", Vector3.ZERO)
 			var ap := m.find_child("AnimationPlayer", true, false) as AnimationPlayer
@@ -83,6 +89,9 @@ func _add_model(path: String, pos: Vector3) -> Node3D:
 
 func _process(_dt: float) -> bool:
 	n += 1
+	if which == "dodger1" and n == 5:
+		var moods := ["neutral", "sleepy", "angry", "happy"]
+		for i in actors.size(): actors[i].emote(moods[i], 99.0)
 	if which == "dodger" and n == 5:
 		var moods := ["happy", "angry", "sad"]
 		for i in actors.size(): if actors[i].has_method("emote"): actors[i].emote(moods[i], 99.0)

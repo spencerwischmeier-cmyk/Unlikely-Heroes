@@ -81,7 +81,7 @@ func _reskin() -> void:
 	model.add_child(body)
 
 func _build_lids() -> void:
-	var shell := StandardMaterial3D.new(); shell.albedo_color = Color(0.86, 0.88, 0.9); shell.metallic = 0.2; shell.roughness = 0.35
+	var shell := StandardMaterial3D.new(); shell.albedo_color = Color(0.17, 0.19, 0.23); shell.metallic = 0.55; shell.roughness = 0.38
 	var rim := StandardMaterial3D.new(); rim.albedo_color = Color(1.0, 0.45, 0.12); rim.roughness = 0.4
 	var band := StandardMaterial3D.new(); band.albedo_color = Color(1.0, 0.42, 0.1); band.roughness = 0.4
 	for top in [true, false]:
