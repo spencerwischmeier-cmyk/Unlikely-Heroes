@@ -110,6 +110,7 @@ func _physics_process(dt: float) -> void:
 		aim_line.visible = false
 		eye_open = 1.0
 		for e in eyes: (e.mat as StandardMaterial3D).emission_energy_multiplier = 5.0
+	if spawn_t > -0.1: _arrive()
 	if fire_t <= 0.0:
 		aiming = false; aim_line.visible = false
 		fire_t = randf_range(2.4, 3.6)
@@ -117,6 +118,17 @@ func _physics_process(dt: float) -> void:
 		combat.enemy_shot(from, aim_at)
 		FX.sparks(from, Color(1, 0.35, 0.2), 6, 3.0)
 		velocity -= (aim_at - global_position).normalized() * 2.0   # recoil
+
+## Arrival: it dives in tucked up in a spin, snaps its wings open, brakes and boots its eyes on.
+func _arrive() -> void:
+	var k := clampf(1.0 - spawn_t, 0.0, 1.0)          # 0 at spawn .. 1 when it takes up its orbit
+	var unfold := smoothstep(0.35, 0.7, k)
+	for w in wings: (w as Node3D).scale = Vector3.ONE * lerpf(0.15, 1.0, unfold)
+	if inner: inner.rotation.z += (1.0 - unfold) * k * TAU * 2.0
+	eye_open = 0.05 if k < 0.6 else minf(1.0, (k - 0.6) * 5.0)
+	if k >= 0.6 and not has_meta("booted"):
+		set_meta("booted", true); flash = 0.6; pop = 0.7
+		FX.sparks(center(), Color(1, 0.5, 0.3), 5, 2.0)
 
 ## Buzzing wings: a fast flap that the frame rate turns into a blur, flaring when it is knocked about.
 func _flap(k: float) -> void:

@@ -65,6 +65,12 @@ func _initialize() -> void:
 				d.position = Vector3((i - 1.5) * 0.62, 1.0, 0)
 				actors.append(d)
 			_aim(cam, Vector3(0, 1.05, 2.2), Vector3(0, 1.0, 0))
+		"hornet_in":
+			var pl := CharacterBody3D.new(); root3.add_child(pl); pl.position = Vector3(0, 0, 6)
+			for i in 3:
+				var h := _add_script("res://scripts/enemy_hornet.gd", Vector3((i - 1) * 1.8, 1.4, 0), 0.0)
+				h.set("player", pl); h.set("spawn_t", [1.15, 0.72, 0.45][i])
+			_aim(cam, Vector3(0, 1.6, 5.5), Vector3(0, 1.3, 0))
 		"grudd":
 			var m := _add_model("res://models/chars/grudd.glb", Vector3.ZERO)
 			var ap := m.find_child("AnimationPlayer", true, false) as AnimationPlayer
@@ -89,6 +95,8 @@ func _add_model(path: String, pos: Vector3) -> Node3D:
 
 func _process(_dt: float) -> bool:
 	n += 1
+	if which == "hornet_in":
+		for a in actors: a.velocity = Vector3.ZERO; a.set("orbit_r", 0.0)
 	if which == "dodger1" and n == 5:
 		var moods := ["neutral", "sleepy", "angry", "happy"]
 		for i in actors.size(): actors[i].emote(moods[i], 99.0)
