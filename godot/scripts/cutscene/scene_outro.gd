@@ -38,11 +38,11 @@ func run() -> void:
 	C.move(c + Vector3(1.5, 1.5, -1.6), c + Vector3(0.3, 1.25, 1), 9.0)
 	C.focus(0.6)
 	C.fx(smoke)
-	dodger.emote("nod")
+	dodger.act("nod")
 	await C.say("outro_02", 0.4)
 	vesk.gesture("cs_shrug", 0.25, "idle")
 	await C.say("outro_03", 0.3)
-	dodger.emote("squint")
+	dodger.act("squint")
 	await C.say("outro_04", 1.0)
 	# 3. a radio crackles in the wreck
 	var rp := radio.global_position + Vector3(0.9, 1.3, 1.1)
@@ -95,7 +95,7 @@ func run() -> void:
 	C.focus(1.0)
 	await C.say("sky_outro_eye_2", 0.2)
 	C.tw(dodger, "orange", 0.0, 0.4)
-	dodger.emote("shake")
+	dodger.act("shake")
 	await C.wait(0.8)
 	# 6. the chimney remark, and the road ahead
 	C.cut(c + Vector3(2.2, 1.6, -2.6), c + Vector3(0.3, 1.25, 1), 42.0)
@@ -103,7 +103,7 @@ func run() -> void:
 	vesk.gesture("cs_talk2", 0.3, "idle")
 	await C.say("cs_out_vesk_1", 0.4)
 	C.tw(dodger, "global_position", dodger.global_position + Vector3(0.3, 0.4, -0.3), 0.6)
-	dodger.emote("hop")
+	dodger.act("hop")
 	await C.say("outro_10", 0.4)
 	# 7. Nana Quill calls in with the coordinates
 	C.fx(func(): Snd.play("ui_select", -4))
@@ -135,7 +135,7 @@ func run() -> void:
 	await C.say("outro_11", 0.3)
 	C.cut(dodger.global_position + Vector3(0.6, 0.2, -1.4), dodger.global_position, 34.0)
 	C.tw(dodger, "global_position", dodger.global_position + Vector3(0, 0.6, 0), 0.3, 0.2, Tween.TRANS_BACK, Tween.EASE_OUT)
-	dodger.emote("spin")
+	dodger.act("spin")
 	await C.say("outro_12", 0.4)
 	C.focus(0.0)
 	# 9. the old hauler drops in on autopilot, Vesk climbs aboard
@@ -208,7 +208,7 @@ func _stinger() -> void:
 	C.tw(C, "fade", 0.0, 0.8)
 	await C.wait(1.4)
 	# close on the monitor: static and a blurry orange blob that is definitely Vesk
-	C.cut(desk + Vector3(1.4, 2.4, 0.9), desk + Vector3(0.4, 2.3, -0.4), 30.0)
+	C.cut(desk + Vector3(2.5, 2.35, 1.15), desk + Vector3(1.9, 2.2, 0.0), 30.0)
 	C.focus(0.8)
 	for i in 6:
 		C.tw(scr, "emission_energy_multiplier", 2.0 if i % 2 == 0 else 0.8, 0.1, i * 0.15)

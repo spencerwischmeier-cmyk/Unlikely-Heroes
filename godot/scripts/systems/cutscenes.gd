@@ -18,6 +18,7 @@ extends Node
 const M := preload("res://scripts/mats.gd")
 const VeskActor := preload("res://scripts/cutscene/vesk_actor.gd")
 const DroneActor := preload("res://scripts/cutscene/drone_actor.gd")
+const CutsceneDodger := preload("res://scripts/cutscene/cutscene_dodger.gd")
 const GruddActor := preload("res://scripts/cutscene/grudd_actor.gd")
 const Props := preload("res://scripts/cutscene/props.gd")
 const SCENES := {
@@ -237,7 +238,8 @@ func _process(dt: float) -> void:
 
 func _skip_input(dt: float) -> void:
 	if skipping or ct < 0.5: return
-	var held := Input.is_action_pressed("jump") or Input.is_action_pressed("pause") or Input.is_action_pressed("ui_accept")
+	var held := Input.is_action_pressed("jump") or Input.is_action_pressed("pause") or Input.is_action_pressed("ui_accept") \
+		or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	if held:
 		skip_hold += dt; hint_a = 1.0
 		if skip_hold >= SKIP_HOLD: _skip()
@@ -449,7 +451,7 @@ func make_vesk(pos: Vector3, yaw := PI) -> Node3D:
 	vesk = actor(VeskActor.new(), pos, yaw); cast["vesk"] = vesk; return vesk
 
 func make_dodger(pos: Vector3, yaw := PI) -> Node3D:
-	dodger = actor(DroneActor.new(), pos, yaw); cast["dodger"] = dodger; return dodger
+	dodger = actor(CutsceneDodger.new(), pos, yaw); cast["dodger"] = dodger; return dodger
 
 func make_grudd(pos: Vector3, yaw := 0.0, height := 3.6, holo := false) -> Node3D:
 	var g := GruddActor.new(); g.height = height; g.holo = holo
@@ -560,7 +562,7 @@ func _build_ui() -> void:
 	sub.add_child(sub_rt)
 	# skip prompt + hold bar
 	skip_hint = _label(16, Color(1, 1, 1))
-	skip_hint.text = "HOLD  JUMP / ESC  TO SKIP"
+	skip_hint.text = "HOLD  JUMP / ESC / CLICK  TO SKIP"
 	skip_hint.set_anchors_preset(Control.PRESET_TOP_RIGHT); skip_hint.position = Vector2(-300, 30); skip_hint.size = Vector2(270, 24)
 	skip_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; skip_hint.modulate.a = 0.0
 	root_ui.add_child(skip_hint)

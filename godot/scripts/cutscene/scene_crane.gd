@@ -50,7 +50,7 @@ func run() -> void:
 	C.cut(low, boss_pos + Vector3(0, 2.0, 0), 56.0)
 	vesk.look_point = boss_pos + Vector3(0, 8, 0)
 	dodger.look_target = null
-	dodger.emote("shock")
+	dodger.act("shock")
 	C.fx(func(): Snd.play("cutscenes_drop_whoosh", -2, 0.0))
 	await C.wait(0.9)
 	if boss:
@@ -85,7 +85,7 @@ func run() -> void:
 	await C.say("yard_intro_2", 0.2)
 	C.cut(stand - fwd * 2.2 - side * 1.2 + Vector3(0, 1.9, 0), cab, 44.0)
 	C.focus(0.0)
-	dodger.emote("shock")
+	dodger.act("shock")
 	vesk.look_target = null; vesk.look_point = cab
 	await C.say("yard_intro_3", 0.3)
 	# 6. Grudd on the yard loudspeakers. Dodger's eye flickers again.
@@ -101,7 +101,7 @@ func run() -> void:
 	C.tw(dodger, "orange", 0.0, 0.3)
 	C.tw(C, "live_a", 0.0, 0.4)
 	C.auto_look = true
-	dodger.emote("shake")
+	dodger.act("shake")
 	vesk.look_point = Vector3.INF
 	await C.say("cs_ci_dodger_2", 0.3)
 	# 7. "I'm retired, you know."
@@ -110,7 +110,7 @@ func run() -> void:
 	vesk.look_target = null; vesk.look_point = cab
 	vesk.gesture("cs_stomp", 0.25, "idle")
 	await C.say("cs_ci_vesk_2", 0.3)
-	dodger.emote("spin")
+	dodger.act("spin")
 	C.cut(stand - fwd * 3.0 + side * 1.8 + Vector3(0, 2.0, 0), boss_pos + Vector3(0, 1.5, 0), 48.0)
 	C.focus(0.0)
 	await C.say("cs_ci_dodger_3", 0.2)

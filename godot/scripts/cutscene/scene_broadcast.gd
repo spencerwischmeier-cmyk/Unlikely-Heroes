@@ -64,7 +64,7 @@ func run() -> void:
 	C.tw(C, "live_a", 1.0, 0.3)
 	vesk.look_point = Vector3.INF; vesk.look_target = grudd
 	dodger.look_target = grudd
-	dodger.emote("shock")
+	dodger.act("shock")
 	await C.say("cs_bc_dodger_1", 0.3)
 	# 3. "Good morning, Skyharbor!" low hero angle, slow push in
 	var low := stand + to_dish * 1.0 + side * 1.6 + Vector3(0, 0.3, 0)
@@ -114,7 +114,7 @@ func run() -> void:
 	C.tw(dodger, "tilt", Vector3(0.0, 0, 0), 0.3)
 	await C.say("cs_bc_dodger_2", 0.2)
 	C.tw(dodger, "orange", 0.0, 0.2)
-	dodger.emote("shake")
+	dodger.act("shake")
 	await C.wait(0.4)
 	# 8. "Your eye just went orange." two-shot, then singles
 	C.cut(stand + side * 2.6 + to_dish * 1.6 + Vector3(0, 1.4, 0), stand + side * 0.5 + Vector3(0, 1.5, 0), 40.0)
@@ -122,7 +122,7 @@ func run() -> void:
 	vesk.look_target = dodger; dodger.look_target = vesk
 	C.turn_to(vesk, dodger.global_position, 0.5)
 	await C.say("sky_shard_3", 0.3)
-	dodger.emote("squint")
+	dodger.act("squint")
 	await C.say("sky_shard_4", 0.3)
 	# 9. "You know him?" ... a long look at where the hologram was.
 	C.cut(dpos + to_dish * 1.0 + side * 0.4, dpos, 32.0)
@@ -139,7 +139,7 @@ func run() -> void:
 	C.cut(stand + side * 2.8 + to_dish * 2.0 + Vector3(0, 1.2, 0), stand + side * 0.5 + Vector3(0, 1.4, 0), 42.0)
 	C.focus(0.3)
 	vesk.look_point = Vector3.INF; vesk.look_target = dodger
-	dodger.emote("spin")
+	dodger.act("spin")
 	await C.say("cs_bc_dodger_4", 0.3)
 	vesk.gesture("cs_beckon", 0.3, "idle")
 	await C.say("cs_bc_vesk_2", 0.6)

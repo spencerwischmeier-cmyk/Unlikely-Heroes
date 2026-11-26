@@ -170,8 +170,10 @@ static func office() -> Node3D:
 	# a monitor showing the junkyard (static and a blurry orange blob)
 	var scr := M.glow(Color(0.35, 0.8, 0.9), 1.2)
 	n.set_meta("screen_mat", scr)
-	box(desk, Vector3(1.4, 0.9, 0.12), dark, Vector3(0.4, 2.3, -0.4), Vector3(0, -0.25, 0))
-	box(desk, Vector3(1.25, 0.75, 0.02), scr, Vector3(0.4, 2.3, -0.33), Vector3(0, -0.25, 0))
+	var mon := Node3D.new(); mon.position = Vector3(1.9, 2.2, 0.0); mon.rotation.y = -0.55; desk.add_child(mon)
+	box(mon, Vector3(1.2, 0.8, 0.12), dark, Vector3.ZERO)
+	box(mon, Vector3(1.05, 0.65, 0.02), scr, Vector3(0, 0, 0.07))
+	box(mon, Vector3(0.15, 0.5, 0.15), dark, Vector3(0, -0.45, -0.05))
 	n.set_meta("desk_pos", desk.position)
 	# posters: TEAMWORK, EMPLOYEE OF THE MONTH (him, twelve times), SAFETY FIRST (then productivity)
 	var ps := [["TEAMWORK", "Because you have\nno choice."], ["EMPLOYEE\nOF THE MONTH", "G. GRUDD"], ["SAFETY FIRST", "(Productivity\nsecond. Also first.)"],
