@@ -24,8 +24,8 @@ static func _load_bits() -> void:
 	root.free()
 
 ## Throw scrap from `pos`. `livery_mats` paint the panel shards (the bot's own materials look best);
-## `parts` are nodes of the bot's model to rip off and throw along with the scrap.
-static func burst(parent: Node, pos: Vector3, scale := 1.0, livery_mats: Array = [], count := 10, parts: Array = []) -> Node3D:
+## `parts` are nodes of the bot's model to rip off and throw along with the scrap; `eye` adds its glowing lens.
+static func burst(parent: Node, pos: Vector3, scale := 1.0, livery_mats: Array = [], count := 10, parts: Array = [], eye := false) -> Node3D:
 	if parent == null or not parent.is_inside_tree(): return null
 	_load_bits()
 	var b: Node3D = load("res://scripts/chars/scrap_burst.gd").new()
@@ -41,10 +41,11 @@ static func burst(parent: Node, pos: Vector3, scale := 1.0, livery_mats: Array =
 			c.emission_enabled = false; paint.append(c)
 		elif m is Material: paint.append(m)
 	livery_mats = paint
-	for i in count:
+	for i in count + (1 if eye else 0):
 		var mi := MeshInstance3D.new()
-		var plate := i % 3 == 2
+		var plate := i % 3 == 2 and i < count
 		var key: String = ("plate" if i % 2 == 0 else "plate_bent") if plate else SMALL[i % SMALL.size()]
+		if i == count: key = "eye_lens"     # the bot's eye pops out last
 		var bit: Array = _meshes.get(key, [])
 		if bit.is_empty():
 			var bm := BoxMesh.new(); bm.size = Vector3(0.18, 0.04, 0.14); mi.mesh = bm

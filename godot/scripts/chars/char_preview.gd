@@ -35,6 +35,13 @@ func _initialize() -> void:
 			var b := _add_script("res://scripts/crew_barricade.gd", Vector3(2.9, 0, -0.4), 0.0)
 			b.set("rise", 1.0)
 			_aim(cam, Vector3(0.2, 1.7, 7.2), Vector3(0.2, 0.8, 0))
+		"break":
+			_add_script("res://scripts/enemy_roller.gd", Vector3(-1.6, 0, 0), 0.3)
+			_add_script("res://scripts/enemy_crew_roller.gd", Vector3(0.4, 0, 0), -0.4)
+			_add_script("res://scripts/enemy_hornet.gd", Vector3(2.2, 1.3, 0), 0.0)
+			var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var bx := BoxShape3D.new(); bx.size = Vector3(40, 1, 40)
+			cs.shape = bx; cs.position.y = -0.5; sb.add_child(cs); root3.add_child(sb)
+			_aim(cam, Vector3(0.2, 2.2, 7.5), Vector3(0.2, 0.9, 0))
 		"gizmart":
 			var g: Node3D = load("res://scripts/chars/gizmart_actor.gd").new(); root3.add_child(g)
 			g.rotation.y = 0.35
@@ -78,6 +85,9 @@ func _process(_dt: float) -> bool:
 		c.visible = true; c.magnet.visible = true
 		c.boom.rotation.x = -0.55; c.turn.rotation.y = 0.35; c.rail_path.visible = false; c.lamp_mat.emission_energy_multiplier = 9.0
 		c.magnet.global_position = c.tip.global_position + Vector3(0, -1.6, 0)
+	if which == "break" and n == 6:
+		for a in actors: a.call("_burst")
+		for a in actors: a.visible = false
 	if which == "gizmart" and n == 5 and actors.size() > 0: actors[0].mood("hello", 99.0)
 	if n == frames:
 		var img := root.get_viewport().get_texture().get_image()
