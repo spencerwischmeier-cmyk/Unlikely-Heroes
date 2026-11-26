@@ -88,6 +88,15 @@ static func _rock_massif() -> void:
 	TK.cliff(Vector2(-80, 54), Vector2(-61.6, 54), -4.0, -0.15, Vector2(0, 1), 0.9)
 	TK.cliff(Vector2(-50.6, 54), Vector2(-50, 54), -4.0, -0.15, Vector2(0, 1), 0.9)
 	TK.cliff(Vector2(-80, 30), Vector2(-80, 54), -4.0, -0.15, Vector2(-1, 0), 0.9)
+	# ivy over the cliff edges
+	TK.vines(Vector3(-80.2, 3.55, 12), Vector3(-80.2, 3.55, 30), Vector3(-1, 0, 0), 1.0)
+	TK.vines(Vector3(-62, 3.55, 11.8), Vector3(-80, 3.55, 11.8), Vector3(0, 0, -1), 1.0)
+	TK.vines(Vector3(-62, 2.35, 13.8), Vector3(-50, 2.35, 13.8), Vector3(0, 0, -1), 0.8)
+	TK.vines(Vector3(-98, 7.75, 20.2), Vector3(-82, 7.75, 20.2), Vector3(0, 0, 1), 1.0)
+	TK.vines(Vector3(-98.2, 7.75, 6), Vector3(-98.2, 7.75, 20), Vector3(-1, 0, 0), 1.0)
+	TK.vines(Vector3(-80, -0.05, 54.2), Vector3(-62, -0.05, 54.2), Vector3(0, 0, 1), 0.9)
+	TK.vines(Vector3(-80.2, -0.05, 30), Vector3(-80.2, -0.05, 54), Vector3(-1, 0, 0), 0.8)
+	TK.vines(Vector3(-62, 4.75, 9.2), Vector3(-48, 4.75, 9.2), Vector3(0, 0, 1), 0.8)
 	# moss and bushes tucked along the ledges
 	for p in [Vector3(-80.6, 3.5, 13), Vector3(-80.6, 3.5, 22), Vector3(-62.5, 2.3, 13.6), Vector3(-50.4, 2.3, 15.5),
 			Vector3(-98.5, 7.7, 9), Vector3(-90, 7.7, 20.6), Vector3(-80.5, -0.1, 45), Vector3(-66, -0.1, 54.8), Vector3(-62.4, 4.7, 0)]:

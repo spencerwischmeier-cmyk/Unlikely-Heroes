@@ -597,3 +597,16 @@ static func mast(pos: Vector3, h: float, flag := "saffron") -> Vector3:
 	add(cloth_mesh(), mat("flutter"), tf(pos + Vector3(0.45, h - 0.05, 0), Vector3(0.9, 0.55, 1), Vector3(0, 0, PI / 2)), false, CLOTH[flag])
 	solid(pos + Vector3(0, h / 2, 0), Vector3(0.3, h, 0.3))
 	return pos + Vector3(0, h - 0.3, 0)
+
+## ivy hanging down a cliff edge from a to b (at the top of the face), pushed out toward `side`
+static func vines(a: Vector3, b: Vector3, side: Vector3, density := 1.2) -> void:
+	var len := a.distance_to(b)
+	var n := int(len * density)
+	var yaw := atan2(b.x - a.x, b.z - a.z) + PI / 2
+	for i in n:
+		var u := (i + _hash3(Vector3(i, a.x, b.z))) / n
+		var h := 0.8 + _hash3(Vector3(a.z, i, 4)) * 2.2
+		var p := a.lerp(b, u) + side * 0.35
+		var g := Color(0.3, 0.58, 0.24).lerp(Color(0.5, 0.75, 0.3), _hash3(Vector3(i, 7, a.x)))
+		add(cloth_mesh(), mat("flutter_soft"), tf(p, Vector3(0.35 + _hash3(Vector3(i, 1, 1)) * 0.3, h, 1), Vector3(0, yaw, 0)), false, g)
+		if i % 3 == 0: add(sphere_mesh(), mat("moss"), tf(p + Vector3(0, -0.05, 0), Vector3(0.7, 0.35, 0.6)), false)
