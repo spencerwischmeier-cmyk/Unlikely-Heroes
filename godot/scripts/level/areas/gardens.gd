@@ -30,6 +30,7 @@ const CROWN_Y := 18.8
 const CROWN_R := 3.0
 const LILY := [Vector3(-41, 9.0, -53.8)]
 const HIVES := [[Vector3(-37.0, 10.0, -60.5), 2.0], [Vector3(-38.5, 10.0, -66.3), 4.0]]   # climbable hives: base, height
+const WLEDGE := Vector3(-42.6, 6.6, 2.0)   # secret ledge beside the gardens waterfall
 const ZIP := [Vector3(-58.4, 19.25, -41.6), Vector3(-54.6, 18.6, -38.4), Vector3(-48.5, 17.2, -33.0), Vector3(-42, 15.2, -25.5),
 	Vector3(-36.5, 12.4, -18.5), Vector3(-33.0, 10.2, -12.6), Vector3(-31.0, 9.4, -8.5)]
 
@@ -84,6 +85,15 @@ static func _gardens(L: Node3D, K, life) -> void:
 	K.channel(Vector2(-39.9, 0.8), Vector2(-39.0, 0.8), Y, 0.8, 0.32)
 	K.waterfall(Vector3(-40.1, Y + 0.24, 0.8), Vector2(-1, 0), 1.4, 30.0)
 	life.loop_at("gardens_waterfall", Vector3(-40, Y + 0.5, 0.8), -6.0, 5.0, 35.0)
+	# secret: a mossy ledge just off the west edge beside the waterfall (drop down, double jump back up)
+	var wl: Node3D = K.solid(Vector3(WLEDGE.x, WLEDGE.y - 0.35, WLEDGE.z), Vector3(3.0, 0.7, 3.2), K.stone_mat)
+	K.cylm(Vector3(WLEDGE.x, WLEDGE.y - 1.6, WLEDGE.z), 1.3, 0.2, 2.0, M.std(Color(0.5, 0.42, 0.36), 0.0, 0.95), 7)
+	K.lawn(WLEDGE.x, WLEDGE.z, 2.8, 3.0, WLEDGE.y)
+	K.bush(Vector3(WLEDGE.x - 1.1, WLEDGE.y + 0.3, WLEDGE.z + 1.1), 0.5, Color(0.3, 0.62, 0.32))
+	for k in 3: K.vines(Vector3(WLEDGE.x - 1.2 + k * 1.2, WLEDGE.y - 0.7, WLEDGE.z + 1.62), randf_range(1.0, 2.0))
+	L.prop("gull_nest", Vector3(WLEDGE.x - 0.8, WLEDGE.y, WLEDGE.z - 1.0), 0.3, 1.0, false)
+	L.crate_spots.append(Vector3(WLEDGE.x + 0.5, WLEDGE.y, WLEDGE.z - 0.9))
+	life.sprocket_line(Vector3(-39.3, Y + 0.6, 2.2), Vector3(WLEDGE.x, WLEDGE.y + 1.0, WLEDGE.z + 0.5), 3)
 	# hedges: south-west corner and the north edge between the pillar landing and the promenade
 	K.hedge(Vector2(-38.6, 3.55), Vector2(-33.2, 3.55), Y, 1.0, 0.8)
 	K.hedge(Vector2(-31.0, -13.55), Vector2(-27.0, -13.55), Y, 1.0, 0.8)
@@ -414,4 +424,6 @@ static func traversal_cases(moves: Dictionary) -> Dictionary:
 	c["gd_hive1"] = [Vector3(h0.x - 6.0, GROVE_Y + 0.1, h0.z), PI / 2, moves.dj, t0, Rect2(h0.x - 1.2, h0.z - 1.2, 2.4, 2.4)]
 	var dh := Vector2(h1.x - h0.x, h1.z - h0.z).normalized()
 	c["gd_hive2"] = [Vector3(h0.x, t0 + 0.1, h0.z), atan2(dh.x, dh.y), moves.dj, t1, Rect2(h1.x - 1.2, h1.z - 1.2, 2.4, 2.4)]
+	c["gd_ledge_down"] = [Vector3(-38.8, Y + 0.1, WLEDGE.z), -PI / 2, moves.run, WLEDGE.y, Rect2(WLEDGE.x - 1.5, WLEDGE.z - 1.6, 3.0, 3.2)]
+	c["gd_ledge_up"] = [Vector3(WLEDGE.x - 0.6, WLEDGE.y + 0.1, WLEDGE.z), PI / 2, moves.dj, Y, Rect2(-40, -14, 20, 18)]
 	return c
