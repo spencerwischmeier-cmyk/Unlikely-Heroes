@@ -11,7 +11,8 @@ var bell: Node3D
 var chime_pos := Vector3.ZERO
 var pa_pos := Vector3.ZERO
 var spinners: Array = []        # [node, speed]
-var birds: Array = []           # { node, r, h, speed, phase, wing }
+var birds: Array = []
+var pigeons: Array = []         # { node, home, yaw, t, away, dir }           # { node, r, h, speed, phase, wing }
 var bird_center := Vector3.ZERO
 var t := 0.0
 var chime_t := 25.0
@@ -101,6 +102,7 @@ func _process(dt: float) -> void:
 		var flap := sin(t * 9.0 + b.phase) * 0.6
 		(b.wings[0] as Node3D).rotation.z = flap
 		(b.wings[1] as Node3D).rotation.z = -flap
+	_pigeons(dt)
 	# the bell swings after a chime
 	if bell:
 		ring = maxf(0.0, ring - dt * 0.25)
@@ -124,3 +126,28 @@ func _process(dt: float) -> void:
 				_chime.stream = ding; _chime.global_position = pa_pos; _chime.play()
 				_voice.stop(); get_tree().create_timer(1.6).timeout.connect(func(): if is_instance_valid(_voice): _voice.play())
 				get_tree().create_timer(4.0).timeout.connect(func(): if is_instance_valid(_chime): _chime.stream = load_ogg("res://audio/sfx/plaza_chime.ogg"))
+
+## Pigeons peck (a little bob), take off when Vesk comes within 3 m, and wander back later.
+func _pigeons(dt: float) -> void:
+	var hero: Node3D = Game.player
+	for pg in pigeons:
+		var n: Node3D = pg.node
+		if not is_instance_valid(n): continue
+		pg.t += dt
+		if pg.away:
+			if pg.t < 3.0:
+				pg.dir.y = maxf(pg.dir.y - dt * 0.5, 1.2)
+				n.position += pg.dir * dt * 6.0
+				n.get_child(0).scale = Vector3(0.8 + sin(pg.t * 40.0) * 0.3, 0.8, 1.2)
+			elif pg.t > 18.0 and (hero == null or hero.global_position.distance_to(pg.home) > 8.0):
+				pg.away = false; pg.t = 0.0; n.visible = true; n.position = pg.home; n.rotation.y = pg.yaw
+				n.get_child(0).scale = Vector3(0.8, 0.8, 1.2)
+			elif pg.t >= 3.0: n.visible = false
+			continue
+		n.rotation.x = maxf(0.0, sin(pg.t * 3.0 + pg.yaw * 5.0)) * 0.5   # pecking
+		if hero and hero.global_position.distance_to(n.global_position) < 3.0:
+			pg.away = true; pg.t = 0.0; n.rotation.x = 0.0
+			var a := randf() * TAU
+			pg.dir = Vector3(cos(a), 2.0, sin(a)).normalized() * 1.4
+			n.rotation.y = atan2(pg.dir.x, pg.dir.z)
+			Snd.at("gull_call", n.global_position, -14, 0.3, 1.0)

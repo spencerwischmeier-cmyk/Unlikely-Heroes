@@ -28,8 +28,8 @@ const SPOTS := {
 	plaza_gate = [Vector3(0, 0.1, 53.5), PI],          # arriving from the junkyard, looking at the arch
 	plaza_fountain = [Vector3(-9, 0.1, 38), PI * 0.8],
 	plaza_west = [Vector3(-6, 0.1, 25), -PI / 2 + 0.3],
-	plaza_roof = [Vector3(-20, H + 0.1, 30), PI * 0.7],
-	plaza_clock = [Vector3(13.6, GALLERY + 0.1, 19.4), PI * 0.6],
+	plaza_roof = [Vector3(-20, H + 0.1, 31), PI / 2 + 0.15],
+	plaza_clock = [Vector3(13.8, GALLERY + 0.1, 24.0), -1.1],
 	plaza_east = [Vector3(4, 0.1, 30), PI / 2 - 0.5],
 	plaza_park = [Vector3(-14.5, PARK_Y + 0.1, 57.0), -PI * 0.7],
 }
@@ -666,6 +666,10 @@ static func _props() -> void:
 		paper.rotation.z = randf_range(-0.08, 0.08)
 		text(n[0], Vector3(pp.x, pp.y, 0.075), 0.0, Color(0.15, 0.12, 0.1), 0.0017, nb).rotation.z = paper.rotation.z
 		sphere(Vector3(pp.x, pp.y + 0.2, 0.08), 0.03, "d9473f", nb)
+	# pigeons pecking about (they scatter when Vesk gets close)
+	for p in [Vector3(-4.6, 0, 33.2), Vector3(-5.1, 0, 33.9), Vector3(-4.2, 0, 34.3), Vector3(5.2, 0, 22.6), Vector3(5.8, 0, 23.3),
+			Vector3(-9.0, 0, 22.5), Vector3(-8.4, 0, 21.9), Vector3(3.0, 0, 42.4), Vector3(-2.6, 0, 18.4)]:
+		_pigeon(p, randf() * TAU)
 	# crates, barrels and sacks along the edges (Meshy dock props reused)
 	model("res://models/docks/crates.glb", Vector3(-8.2, 0, 16.0), 0.5, 1.5, 0.0, true)
 	model("res://models/docks/barrels.glb", Vector3(13.4, 0, 16.0), 1.2, 1.2, 0.0, true)
@@ -777,6 +781,8 @@ static func _park() -> void:
 
 static func _pigeon(p: Vector3, yaw: float) -> void:
 	var f := frame(p, yaw)
+	f.set_meta("plaza_anim", true)
+	life.pigeons.append({ node = f, home = p, yaw = yaw, t = 0.0, away = false, dir = Vector3.ZERO })
 	sphere(Vector3(0, 0.13, 0), 0.12, "9aa3ad", f).scale = Vector3(0.8, 0.8, 1.2)
 	sphere(Vector3(0, 0.26, 0.11), 0.07, "6f7a86", f)
 	bx(Vector3(0, 0.25, 0.19), Vector3(0.03, 0.03, 0.06), "e8a83a", false, f)
