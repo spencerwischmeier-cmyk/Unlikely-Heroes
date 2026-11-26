@@ -44,9 +44,9 @@ func _init(level: Node3D) -> void:
 	flower_mat.rim_enabled = true; flower_mat.rim = 0.3; flower_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	flower_mat.emission_enabled = true; flower_mat.emission = Color(0.12, 0.08, 0.1); flower_mat.emission_energy_multiplier = 1.0
 	soil_mat = M.std(Color(0.3, 0.2, 0.13), 0.0, 1.0)
-	bark_mat = M.wood(Color(0.62, 0.45, 0.36))
+	bark_mat = M.std(Color(0.42, 0.29, 0.2), 0.0, 0.9); bark_mat.rim_enabled = true; bark_mat.rim = 0.2
 	plank_mat = M.wood(Color(0.95, 0.78, 0.62))
-	stone_mat = M.std(Color(0.78, 0.74, 0.66), 0.0, 0.85)
+	stone_mat = M.std(Color(0.62, 0.58, 0.52), 0.0, 0.9)
 	brass_mat = M.brass()
 	frame_mat = M.paint(Color(0.16, 0.34, 0.27))
 	glass_mat = M.glass(Color(0.7, 0.95, 0.92))
@@ -180,8 +180,20 @@ func _vary(c: Color, amt := 0.08) -> Color:
 
 ## one flower head (5 cupped petals and a dot in the middle)
 func flower(p: Vector3, col: Color, size := 0.22) -> void:
-	add_inst("petal", petal_mesh, flower_mat, xf_at(p, Vector3.ONE * size, rng.randf() * TAU, Vector3(rng.randf_range(-0.3, 0.3), 0, rng.randf_range(-0.3, 0.3))), col, false)
-	add_inst("dot", dot_mesh, flower_mat, xf_at(p + Vector3(0, 0.03, 0), Vector3.ONE * size * 0.28), Color(1.0, 0.85, 0.25), false)
+	var key := col.to_html(false)
+	add_inst("petal_" + key, petal_mesh, _petal_mat(col), xf_at(p, Vector3.ONE * size, rng.randf() * TAU, Vector3(rng.randf_range(-0.3, 0.3), 0, rng.randf_range(-0.3, 0.3))), Color.WHITE, false)
+	add_inst("dot", dot_mesh, _petal_mat(Color(1.0, 0.82, 0.2)), xf_at(p + Vector3(0, 0.03, 0), Vector3.ONE * size * 0.28), Color.WHITE, false)
+
+var _petal_mats := {}
+## one material per flower colour (instance colours are not reliable for every renderer)
+func _petal_mat(col: Color) -> StandardMaterial3D:
+	var key := col.to_html(false)
+	if not _petal_mats.has(key):
+		var m := StandardMaterial3D.new(); m.albedo_color = col; m.roughness = 0.6; m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.emission_enabled = true; m.emission = col * 0.25; m.emission_energy_multiplier = 1.0
+		m.rim_enabled = true; m.rim = 0.25
+		_petal_mats[key] = m
+	return _petal_mats[key]
 
 ## a patch of flowers and leaves filling a rect (x0..x1, z0..z1) at height y
 func flower_patch(x0: float, z0: float, x1: float, z1: float, y: float, density := 6.0, palette: Array = []) -> void:
@@ -260,7 +272,7 @@ func tree(base: Vector3, h := 4.5, crown := 1.8, col := Color(0.34, 0.7, 0.34), 
 	for i in 5:
 		var a := rng.randf() * TAU
 		var p := prev + Vector3(cos(a) * crown * 0.85, crown * rng.randf_range(0.2, 0.9), sin(a) * crown * 0.85)
-		add_inst("fruit", dot_mesh, flower_mat, xf_at(p, Vector3.ONE * 0.13), Color(1.0, 0.55, 0.15), false)
+		add_inst("fruit", dot_mesh, _petal_mat(Color(1.0, 0.55, 0.15)), xf_at(p, Vector3.ONE * 0.13), Color.WHITE, false)
 
 var _trunk: CylinderMesh
 func _trunk_mesh() -> CylinderMesh:
@@ -286,6 +298,22 @@ func lawn(cx: float, cz: float, w: float, d: float, y: float) -> void:
 			3: p += Vector3(w / 2, 0, rng.randf_range(-d / 2, d / 2))
 		var r := rng.randf_range(0.12, 0.22)
 		add_inst("leaf", blob_mesh, foliage_mat, xf_at(p, Vector3(r * 1.4, r * 0.45, r * 1.4), rng.randf() * TAU), _vary(Color(0.36, 0.68, 0.3)))
+
+## irregular paving stones along a polyline (visual, laid on a lawn)
+var _pave: CylinderMesh
+func stone_path(pts: Array, y: float, width := 1.4) -> void:
+	if _pave == null:
+		_pave = CylinderMesh.new(); _pave.top_radius = 1.0; _pave.bottom_radius = 1.0; _pave.height = 1.0; _pave.radial_segments = 7; _pave.rings = 1
+	for i in pts.size() - 1:
+		var a: Vector2 = pts[i]; var b: Vector2 = pts[i + 1]
+		var n := maxi(1, int(a.distance_to(b) / 0.55))
+		var side := (b - a).normalized().orthogonal()
+		for k in n:
+			var p := a.lerp(b, (k + 0.5) / n)
+			for j in 2:
+				var q := p + side * (j - 0.5) * width * 0.5 + Vector2(rng.randf_range(-0.12, 0.12), rng.randf_range(-0.12, 0.12))
+				var r := rng.randf_range(0.26, 0.36)
+				add_inst("pave", _pave, stone_mat, xf_at(Vector3(q.x, y + 0.04, q.y), Vector3(r, 0.06, r * rng.randf_range(0.8, 1.1)), rng.randf() * TAU), Color.WHITE, false)
 
 # ------------------------------------------------------------------ water
 ## a water surface quad (flows along `flow` in world xz)
@@ -411,6 +439,25 @@ func garden_tools(base: Vector3, yaw := 0.0) -> void:
 		var leg := mesh(box_mesh, frame_mat, Vector3(sx * 0.28, 0.2, -0.35), wb); leg.scale = Vector3(0.05, 0.4, 0.05)
 		var arm := mesh(box_mesh, frame_mat, Vector3(sx * 0.3, 0.55, -0.75), wb); arm.scale = Vector3(0.05, 0.05, 0.7)
 	bush(base + Basis(Vector3.UP, yaw) * (Vector3(0.6, 0.85, -0.9)), 0.22, Color(0.35, 0.7, 0.32), 2)
+
+## a small floating garden islet for the skyline: rock cone, grass cap, a couple of trees, a waterfall
+func islet(c: Vector3, r: float) -> Node3D:
+	var n := Node3D.new(); n.position = c; root.add_child(n)
+	var rock := M.std(Color(0.5, 0.42, 0.36), 0.0, 0.95)
+	var cone := cylm(Vector3(0, -r * 0.9, 0), r, r * 0.12, r * 1.8, rock, 9, n)
+	cone.rotation.y = rng.randf() * TAU
+	for k in 4:
+		var a := k * TAU / 4 + rng.randf()
+		var chunk := cylm(Vector3(cos(a) * r * 0.55, -r * 0.5, sin(a) * r * 0.55), r * 0.35, r * 0.05, r * 1.0, rock, 6, n)
+		chunk.rotation.y = rng.randf() * TAU
+	var cap := cylm(Vector3(0, 0.15, 0), r * 1.02, r, 0.4, M.leaf(Color(0.36, 0.66, 0.3)), 18, n)
+	cap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for k in int(r * 1.5):
+		var a := rng.randf() * TAU; var d := rng.randf_range(0.0, r * 0.75)
+		tree(c + Vector3(cos(a) * d, 0.3, sin(a) * d), rng.randf_range(3.0, 5.0) * r / 4.0, rng.randf_range(1.2, 1.8) * r / 4.0, _vary(Color(0.38, 0.7, 0.34)), false)
+	var wa := rng.randf() * TAU
+	waterfall(c + Vector3(cos(wa) * r * 0.98, 0.3, sin(wa) * r * 0.98), Vector2(cos(wa), sin(wa)), r * 0.35, r * 6.0)
+	return n
 
 # ------------------------------------------------------------------ structures
 ## a glass dome (radius r) with brass ribs at centre c (floor y). Solid wall ring with door gaps at the

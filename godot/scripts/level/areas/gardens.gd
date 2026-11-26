@@ -14,7 +14,6 @@ extends RefCounted
 
 const Kit := preload("res://scripts/level/gardens/garden_kit.gd")
 const Life := preload("res://scripts/level/gardens/garden_life.gd")
-const DD := preload("res://scripts/level/docks_dressing.gd")
 const M := preload("res://scripts/mats.gd")
 
 const Y := 8.8
@@ -160,6 +159,12 @@ static func _conservatory(L: Node3D, K, life) -> void:
 		for i in 6: K.bush(Vector3(-30.6 + i * 0.85, Y + 0.95, z), 0.22, Color(0.32, 0.64, 0.3), 2)
 		K.vines(Vector3(-28.5, Y - 0.6, z), 2.0)
 	life.sprocket_line(Vector3(-25.0, Y + 1.0, -37.5), Vector3(-31.5, Y + 1.0, -37.5), 3)
+	# lawn over most of the isle with stone paths: bridge -> dome, round the dome to the lily pads and the tree
+	K.lawn(-40.5, -43.0, 18.2, 13.2, Y)
+	K.stone_path([Vector2(-31.2, -37.5), Vector2(-33.5, -39.5), Vector2(-35.0, -43.0), Vector2(-36.8, -43.0)], Y)
+	K.stone_path([Vector2(-46.2, -43.0), Vector2(-49.6, -43.0)], Y)
+	K.stone_path([Vector2(-35.0, -43.0), Vector2(-35.4, -46.8), Vector2(-38.0, -48.8), Vector2(-41.0, -49.4)], Y)
+	K.stone_path([Vector2(-41.0, -49.4), Vector2(-44.5, -48.6), Vector2(-47.8, -46.0), Vector2(-49.0, -43.0)], Y)
 	# the glass dome: doors east (to the bridge) and west (to the Sky Tree)
 	K.glass_dome(DOME, DOME_R, [PI / 2, -PI / 2])
 	K.light(DOME + Vector3(0, 3.5, 0), Color(1.0, 0.85, 0.6), 2.0, 8.0)
@@ -292,9 +297,10 @@ static func _sky_tree(L: Node3D, K, life) -> void:
 	var u := 1.5
 	while u < length - 1.0:
 		var p := curve.sample_baked(u)
-		K.add_inst("leaf", K.blob_mesh, K.foliage_mat, K.xf_at(p + Vector3(0, -0.25, 0), Vector3(0.22, 0.3, 0.22)), Color(0.3, 0.62, 0.3))
-		if int(u) % 4 == 0: K.vines(p + Vector3(0, -0.3, 0), randf_range(0.6, 1.4))
-		u += 1.1
+		K.add_inst("leaf", K.blob_mesh, K.foliage_mat, K.xf_at(p + Vector3(randf_range(-0.1, 0.1), -0.22, randf_range(-0.1, 0.1)), Vector3(0.15, 0.12, 0.15)), Color(0.3, 0.62, 0.3))
+		if randf() < 0.3: K.flower(p + Vector3(0, -0.2, 0), Kit.FLOWER_COLS[randi() % Kit.FLOWER_COLS.size()], 0.14)
+		if int(u * 3.0) % 7 == 0: K.vines(p + Vector3(0, -0.3, 0), randf_range(0.6, 1.4))
+		u += 0.45
 	for k in [8.0, 14.0, 20.0, 26.0, 32.0]:
 		if k < length: life.add_sprocket(curve.sample_baked(k) + Vector3(0, 0.8, 0))
 	for i in 3: life.add_butterfly(T + Vector3(0, CROWN_Y + 0.5, 0), 3.5)
@@ -361,14 +367,13 @@ static func _vista(L: Node3D, K, life) -> void:
 	life.add_bird(Vector3(-55, 28, -45), 9.0, 0.0)
 	life.add_bird(Vector3(-41, 17, -62), 8.0, 0.0)
 	life.add_bird(Vector3(-30, 16, -5), 12.0, 1.0)
-	for v in [[Vector3(-96, 6, -38), 26.0, 0.6], [Vector3(-84, 9, -82), 18.0, 2.4], [Vector3(-112, 14, 0), 16.0, 4.1], [Vector3(-70, 22, -88), 12.0, 1.3]]:
-		var n: Node3D = DD.place(L, "island", v[0], v[2], v[1], false)
-		life.add_bobber(n, 0.6, 0.25)
+	for v in [[Vector3(-92, 14, -36), 6.0], [Vector3(-82, 20, -78), 4.5], [Vector3(-108, 22, -4), 5.0], [Vector3(-66, 27, -86), 3.5], [Vector3(-104, 9, -62), 4.0]]:
+		K.islet(v[0], v[1])
 
 # ------------------------------------------------------------------ debug spots (--at=<name>)
 static func _debug_spots(L: Node3D) -> void:
 	var spots := {
-		gd_gardens = [Vector3(-30, Y + 0.1, -12), 0.0],
+		gd_gardens = [Vector3(-23.5, Y + 0.1, -13.0), -0.6],
 		gd_promenade = [Vector3(-23, Y + 0.1, -15), PI],
 		gd_cons = [Vector3(-28.5, Y + 0.1, -37.5), -PI / 2],
 		gd_dome = [Vector3(-36.0, Y + 0.1, -43), -PI / 2],
