@@ -482,6 +482,9 @@ func _animate(dt: float) -> void:
 	elif land_play > 0.0: _play("land", 0.05)
 	elif speed > 0.6: _play("run", 0.12, clampf(speed / 8.4, 0.6, 1.7))
 	else: _play("idle", 0.2)
+	# bones we add to procedurally go back to rest first, so clips that don't key them can't let our offsets pile up
+	for i in [bones.get("spine", -1), bones.get("chest", -1)] + arm_bones:
+		if i >= 0: skel.reset_bone_pose(i)
 	anim.advance(dt)
 	# aim: lean the upper body toward the crosshair (or hold the blaster low when not shooting)
 	var aim_pitch: float = cam.pitch if aiming else -0.25
