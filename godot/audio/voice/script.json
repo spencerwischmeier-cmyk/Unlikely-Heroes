@@ -112,7 +112,8 @@
  ["gardens_crown_1","dodger","[excited] Look at that view! You can see your junkyard from here! ...It still looks like a junkyard."],
  ["gardens_zip_1","vesk","[yelling] I am too old for vines!"],
  ["gardens_hive_1","dodger","[whispering] Pollinator drones. Don't make eye contact. They only respect flowers."],
- ["gardens_bot_1","dodger","[curious] That gardening bot hasn't gone haywire. Probably too busy judging your boots."]
+ ["gardens_bot_1","dodger","[curious] That gardening bot hasn't gone haywire. Probably too busy judging your boots."],
+ ["gardens_look_1","dodger","[nervous] A rope bridge, way up here. Cool. I'll just hover. Like I always do. Because I'm smart."]
 ],
 "dodger": {
  "spawn": ["Hey, bolt-brains! Over here! No, the other over here!", "Incoming bots. Try to look busy.", "More of them? Somebody's factory is working overtime.", "Rust buckets at twelve o'clock. Also two, four and nine.", "Bots inbound. I'll supervise.", "Oh good, a crowd. I love an audience."],

@@ -20,7 +20,7 @@ const Y := 8.8
 const CONS := Rect2(-50, -50, 19, 14)          # Conservatory Isle
 const DOME := Vector3(-41.5, 8.8, -43)
 const DOME_R := 4.6
-const GROVE := Rect2(-50, -70, 17, 14)         # Hive Grove
+const GROVE := Rect2(-50, -70, 24, 14)         # Hive Grove
 const GROVE_Y := 10.0
 const TREE := Vector2(-60.8, -43)              # Sky Tree trunk axis
 const PAD_R := 5.2
@@ -30,6 +30,9 @@ const CROWN_Y := 18.8
 const CROWN_R := 3.0
 const LILY := [Vector3(-41, 9.0, -53.8)]
 const HIVES := [[Vector3(-37.0, 10.0, -60.5), 2.0], [Vector3(-38.5, 10.0, -66.3), 4.0]]   # climbable hives: base, height
+const LOOK := Vector3(-61.0, 18.8, -62.0)   # Lookout Tree crown, over a rope bridge north of the Canopy Crown
+const LOOK_R := 2.8
+const CHOOKS := [Vector3(-54.0, 25.3, -63.3), Vector3(-44.0, 25.3, -63.3)]   # hook swing down to the Hive Grove
 const WLEDGE := Vector3(-42.6, 6.6, 2.0)   # secret ledge beside the gardens waterfall
 const ZIP := [Vector3(-58.4, 19.25, -41.6), Vector3(-54.6, 18.6, -38.4), Vector3(-48.5, 17.2, -33.0), Vector3(-42, 15.2, -25.5),
 	Vector3(-36.5, 12.4, -18.5), Vector3(-33.0, 10.2, -12.6), Vector3(-31.0, 9.4, -8.5)]
@@ -47,7 +50,11 @@ static func build(L: Node3D) -> void:
 	_conservatory(L, K, life)
 	_sky_tree(L, K, life)
 	_hive_grove(L, K, life)
+	_canopy_walk(L, K, life)
 	_vista(L, K, life)
+	# garden terraces, not steel decks
+	for n in ["gardens", "promenade", "conservatory", "hive_grove"]:
+		K.reskin_island(L.islands[n], L.heights[n])
 	K.petals(Vector3(-30, Y + 4.0, -5), Vector3(10, 1.5, 9), 30)
 	K.petals(Vector3(-23, Y + 4.0, -27), Vector3(3, 1.5, 12), 20, Color(1.0, 0.85, 0.4))
 	K.petals(Vector3(-40.5, Y + 4.0, -43), Vector3(9, 1.5, 7), 24)
@@ -58,7 +65,7 @@ static func build(L: Node3D) -> void:
 	K.garden_tools(Vector3(-36.4, Y, -47.6), 0.4)
 	K.garden_tools(Vector3(-44.5, GROVE_Y, -68.6), PI * 0.1)
 	for p in [Vector3(-28.8, Y, 3.5), Vector3(-29.2, Y, -1.6), Vector3(-32.4, Y, -49.4), Vector3(-49.2, Y, -36.6),
-			Vector3(-46.5, Y, -40.5), Vector3(-35.2, GROVE_Y, -69.0), Vector3(-49.0, GROVE_Y, -56.8), Vector3(TREE.x - 1.2, CROWN_Y, TREE.y - 1.8)]:
+			Vector3(-46.5, Y, -40.5), Vector3(-35.2, GROVE_Y, -69.0), Vector3(-49.0, GROVE_Y, -56.8), Vector3(TREE.x + 1.6, CROWN_Y, TREE.y - 1.4)]:
 		K.pots(p, 3, 0.45)
 	# Vesk and Dodger have opinions (once each)
 	life.add_quip(DOME, 2.6, ["gardens_dome_1", "gardens_dome_2"])
@@ -315,6 +322,65 @@ static func _sky_tree(L: Node3D, K, life) -> void:
 		if k < length: life.add_sprocket(curve.sample_baked(k) + Vector3(0, 0.8, 0))
 	for i in 3: life.add_butterfly(T + Vector3(0, CROWN_Y + 0.5, 0), 3.5)
 
+# ------------------------------------------------------------------ Canopy Walk: rope bridge to the Lookout Tree, hooks down to the grove
+static func _canopy_walk(L: Node3D, K, life) -> void:
+	var z0 := TREE.y - CROWN_R + 0.3
+	var z1 := LOOK.z + LOOK_R - 0.3
+	var bx := TREE.x - 0.2
+	var len := absf(z1 - z0)
+	var zc := (z0 + z1) / 2
+	# the walkway: one flat collider, sagging planks and rope rails (solid so nobody walks off)
+	var deck := Node3D.new(); deck.position = Vector3(bx, CROWN_Y, zc); K.root.add_child(deck)
+	K.collider(deck, Vector3(1.8, 0.3, len), Vector3(0, -0.15, 0))
+	for sx in [-1, 1]: K.collider(deck, Vector3(0.2, 1.2, len), Vector3(sx * 1.0, 0.6, 0))
+	var n := int(len / 0.45)
+	for i in n:
+		var u := (i + 0.5) / n
+		var sag := sin(u * PI) * 0.12
+		var z := lerpf(z0, z1, u)
+		K.add_inst("plank", K.box_mesh, K.plank_mat, K.xf_at(Vector3(bx, CROWN_Y - 0.06 - sag, z), Vector3(1.7, 0.08, 0.36), randf_range(-0.04, 0.04)))
+	var rope := M.std(Color(0.72, 0.6, 0.42), 0.0, 0.9)
+	for sx in [-1, 1]:
+		for k in 5:
+			var u := float(k) / 4
+			K.cylm(Vector3(bx + sx * 0.95, CROWN_Y + 0.55, lerpf(z0, z1, u)), 0.06, 0.07, 1.2, K.bark_mat, 6)
+		var segs := 10
+		for k in segs:
+			var u0 := float(k) / segs; var u1 := float(k + 1) / segs
+			var p0 := Vector3(bx + sx * 0.95, CROWN_Y + 1.05 - sin(u0 * PI) * 0.25, lerpf(z0, z1, u0))
+			var p1 := Vector3(bx + sx * 0.95, CROWN_Y + 1.05 - sin(u1 * PI) * 0.25, lerpf(z0, z1, u1))
+			var d := p1 - p0
+			K.add_inst("rope", K.box_mesh, rope, Transform3D(Basis(Quaternion(Vector3.UP, d.normalized())).scaled_local(Vector3(0.05, d.length(), 0.05)), (p0 + p1) / 2))
+			if k % 2 == 0: K.vines(p0, randf_range(0.5, 1.2))
+	# the Lookout Tree
+	var lt := Vector3(LOOK.x, 0, LOOK.z)
+	var trunk: Node3D = K.cylm(lt + Vector3(0, -4.0, 0), 1.0, 1.8, 45.0, K.bark_mat, 12)
+	K.cyl_collider(trunk, 1.2, 45.0)
+	var top: Node3D = K.cylm(LOOK - Vector3(0, 0.3, 0), LOOK_R, LOOK_R * 0.85, 0.6, K.bark_mat, 18)
+	K.cyl_collider(top, LOOK_R, 0.6)
+	var cdeck: Node3D = K.cylm(LOOK + Vector3(0, 0.01, 0), LOOK_R - 0.05, LOOK_R - 0.05, 0.02, K.plank_mat, 18)
+	cdeck.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for k in 9:
+		var a := k * TAU / 9
+		K.bush(LOOK + Vector3(cos(a) * 2.7, -0.9, sin(a) * 2.7), 1.0, Color(0.42, 0.72, 0.32), 3, 0.7)
+	for k in 5:
+		var a := k * TAU / 5 + 0.5
+		K.bush(LOOK + Vector3(cos(a) * 3.0, 5.2 + randf() * 1.0, sin(a) * 3.0), 1.8, Color(0.46, 0.74, 0.3), 4, 0.75)
+	K.bush(LOOK + Vector3(0, 7.0, 0), 2.6, Color(0.5, 0.78, 0.32), 5, 0.7)
+	for i in 40:
+		var u := float(i) / 40
+		var a := u * TAU * 2.5 + 1.0
+		var p := lt + Vector3(cos(a) * 1.2, 4.0 + u * 14.0, sin(a) * 1.2)
+		K.add_inst("leaf", K.blob_mesh, K.foliage_mat, K.xf_at(p, Vector3.ONE * randf_range(0.22, 0.35)), Color(0.3, 0.62, 0.3))
+		if i % 5 == 0: K.flower(p + Vector3(cos(a) * 0.25, 0, sin(a) * 0.25), Color(1.0, 0.82, 0.2), 0.2)
+	K.light(LOOK + Vector3(0, 2.8, 0), Color(1.0, 0.8, 0.5), 1.6, 6.0)
+	L.checkpoints.append({ pos = LOOK + Vector3(-0.5, 0.1, 0.5), r = 1.6 })
+	L.hint_sign("SWING DOWN TO THE HIVE GROVE", LOOK + Vector3(-1.2, 0, -1.6), -PI * 0.75)
+	life.sprocket_line(Vector3(bx, CROWN_Y + 1.0, z0 - 1.5), Vector3(bx, CROWN_Y + 1.0, z1 + 1.5), 5)
+	# hooks from the Lookout down to the grove
+	for h in CHOOKS: L.hook(h)
+	life.add_quip(LOOK, 2.6, ["gardens_look_1"])
+
 # ------------------------------------------------------------------ Hive Grove (x -48..-34, z -68..-56)
 static func _hive_grove(L: Node3D, K, life) -> void:
 	L.island("hive_grove", GROVE, GROVE_Y, Color(0.95, 0.92, 0.8))
@@ -329,7 +395,7 @@ static func _hive_grove(L: Node3D, K, life) -> void:
 		life.add_sprocket(p + Vector3(0, 1.0, 0))
 	life.add_sprocket(Vector3(-41, Y + 1.0, -49.0))
 	# meadow carpet with paths left clear between the hives
-	K.lawn(-41.5, -63, 16.0, 13.0, GROVE_Y)
+	K.lawn(-38.0, -63, 23.0, 13.0, GROVE_Y)
 	K.flower_patch(-47.4, -67.4, -43.5, -60.5, GROVE_Y, 3.5)
 	K.flower_patch(-35.5, -60.0, -34.6, -56.6, GROVE_Y, 5.0)
 	K.flower_patch(-44.0, -67.5, -42.5, -66.0, GROVE_Y, 5.0)
@@ -383,13 +449,14 @@ static func _vista(L: Node3D, K, life) -> void:
 # ------------------------------------------------------------------ debug spots (--at=<name>)
 static func _debug_spots(L: Node3D) -> void:
 	var spots := {
-		gd_gardens = [Vector3(-23.5, Y + 0.1, -13.0), -0.6],
+		gd_gardens = [Vector3(-22.0, Y + 0.1, -4.0), -PI / 2 - 0.3],
 		gd_promenade = [Vector3(-23, Y + 0.1, -15), PI],
 		gd_cons = [Vector3(-28.5, Y + 0.1, -37.5), -PI / 2],
 		gd_dome = [Vector3(-36.0, Y + 0.1, -43), -PI / 2],
 		gd_tree = [Vector3(-47.5, Y + 0.1, -41.0), -PI * 0.6],
 		gd_crown = [Vector3(TREE.x + 1.8, CROWN_Y + 0.1, TREE.y + 1.4), PI * 0.75],
-		gd_grove = [Vector3(-41, Y + 0.1, -48.5), PI],
+		gd_grove = [Vector3(-40, GROVE_Y + 0.1, -57.0), PI + 0.3],
+		gd_lookout = [LOOK + Vector3(0, 0.1, 1.5), PI],
 		gd_vista = [Vector3(-26.5, Y + 0.1, -24), -PI * 0.6],
 	}
 	for k in spots: L.debug_spots[k] = spots[k]
@@ -424,6 +491,8 @@ static func traversal_cases(moves: Dictionary) -> Dictionary:
 	c["gd_hive1"] = [Vector3(h0.x - 6.0, GROVE_Y + 0.1, h0.z), PI / 2, moves.dj, t0, Rect2(h0.x - 1.2, h0.z - 1.2, 2.4, 2.4)]
 	var dh := Vector2(h1.x - h0.x, h1.z - h0.z).normalized()
 	c["gd_hive2"] = [Vector3(h0.x, t0 + 0.1, h0.z), atan2(dh.x, dh.y), moves.dj, t1, Rect2(h1.x - 1.2, h1.z - 1.2, 2.4, 2.4)]
+	c["gd_bridge"] = [Vector3(TREE.x - 0.2, CROWN_Y + 0.1, TREE.y), PI, moves.run, CROWN_Y, Rect2(TREE.x - 1.2, LOOK.z + LOOK_R, 2.0, (TREE.y - CROWN_R) - (LOOK.z + LOOK_R))]
+	c["hooks_gd_grove"] = [Vector3(-60.6, CROWN_Y + 0.1, CHOOKS[0].z), PI / 2, moves.hooks2, GROVE_Y, GROVE]
 	c["gd_ledge_down"] = [Vector3(-38.8, Y + 0.1, WLEDGE.z), -PI / 2, moves.run, WLEDGE.y, Rect2(WLEDGE.x - 1.5, WLEDGE.z - 1.6, 3.0, 3.2)]
 	c["gd_ledge_up"] = [Vector3(WLEDGE.x - 0.6, WLEDGE.y + 0.1, WLEDGE.z), PI / 2, moves.dj, Y, Rect2(-40, -14, 20, 18)]
 	return c

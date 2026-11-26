@@ -208,12 +208,12 @@ func flower_patch(x0: float, z0: float, x1: float, z1: float, y: float, density 
 		add_inst("leaf", blob_mesh, foliage_mat, xf_at(p, Vector3(r, r * 0.6, r), rng.randf() * TAU), _vary(Color(0.3, 0.62, 0.3)))
 	for i in mini(n, 30):
 		var p := Vector3(rng.randf_range(x0, x1), y + 0.1, rng.randf_range(z0, z1))
-		add_inst("leafy", leaf_mesh, flower_mat, xf_at(p, Vector3.ONE * rng.randf_range(0.6, 1.0), rng.randf() * TAU), _vary(Color(0.32, 0.66, 0.3)), false)
+		add_inst("leafy", leaf_mesh, _petal_mat(Color(0.3, 0.6, 0.28)), xf_at(p, Vector3.ONE * rng.randf_range(0.6, 1.0), rng.randf() * TAU), _vary(Color(0.32, 0.66, 0.3)), false)
 	var col: Color = pal[rng.randi() % pal.size()]
 	for i in n:
 		if rng.randf() < 0.3: col = pal[rng.randi() % pal.size()]
 		var p := Vector3(rng.randf_range(x0, x1), y + rng.randf_range(0.25, 0.5), rng.randf_range(z0, z1))
-		flower(p, col, rng.randf_range(0.16, 0.26))
+		flower(p, col, rng.randf_range(0.22, 0.34))
 
 ## a raised wooden bed (top of the soil at y0 + h) full of flowers. collide=true makes it solid.
 func flower_bed(cx: float, cz: float, w: float, d: float, y0: float, h := 0.5, collide := true, density := 6.0, palette: Array = []) -> void:
@@ -400,14 +400,14 @@ func pots(c: Vector3, n := 3, spread := 0.6) -> void:
 			add_inst("leaf", blob_mesh, foliage_mat, xf_at(p + Vector3(0, r * 1.5, 0), Vector3(r, r * 0.9, r)), _vary(Color(0.3, 0.62, 0.3)))
 			flower(p + Vector3(0, r * 2.0, 0), FLOWER_COLS[rng.randi() % FLOWER_COLS.size()], 0.18)
 		else:
-			add_inst("leafy", leaf_mesh, flower_mat, xf_at(p + Vector3(0, r * 1.2, 0), Vector3.ONE * r * 3.0, rng.randf() * TAU), _vary(Color(0.32, 0.66, 0.3)), false)
+			add_inst("leafy", leaf_mesh, _petal_mat(Color(0.3, 0.6, 0.28)), xf_at(p + Vector3(0, r * 1.2, 0), Vector3.ONE * r * 3.0, rng.randf() * TAU), _vary(Color(0.32, 0.66, 0.3)), false)
 
 var pot_mat: StandardMaterial3D
 var _pot: CylinderMesh
 func _pot_mesh() -> CylinderMesh:
 	if _pot == null:
 		_pot = CylinderMesh.new(); _pot.top_radius = 1.0; _pot.bottom_radius = 0.7; _pot.height = 1.0; _pot.radial_segments = 10; _pot.rings = 1
-		pot_mat = M.std(Color(1, 1, 1), 0.0, 0.85); pot_mat.vertex_color_use_as_albedo = true
+		pot_mat = M.std(Color(0.8, 0.42, 0.26), 0.0, 0.85)
 	return _pot
 
 ## gardening gear the bots left lying around: watering can, rake, seed sacks, a wheelbarrow of soil
@@ -606,6 +606,29 @@ func vines(p: Vector3, len := 2.5) -> void:
 		add_inst("leaf", blob_mesh, foliage_mat, xf_at(q, Vector3(r, r * 1.3, r)), _vary(Color(0.3, 0.6, 0.3)))
 		if rng.randf() < 0.12: flower(q, FLOWER_COLS[rng.randi() % FLOWER_COLS.size()], 0.12)
 
+## Re-skin a deck built by L.island() (found by position) as a garden terrace: flagstone deck, sandstone
+## coping over the hazard edging, earthy rock underneath. Gameplay geometry is untouched.
+var flag_mat: ShaderMaterial
+var rock_mat: StandardMaterial3D
+var coping_mat: StandardMaterial3D
+func reskin_island(r: Rect2, y: float) -> void:
+	if flag_mat == null:
+		flag_mat = ShaderMaterial.new(); flag_mat.shader = _flag_shader()
+		rock_mat = M.std(Color(0.47, 0.38, 0.32), 0.0, 0.95)
+		coping_mat = M.std(Color(0.86, 0.78, 0.64), 0.0, 0.8)
+	var g := r.grow(0.6)
+	for c in L.get_children():
+		if not (c is MeshInstance3D): continue
+		var mi := c as MeshInstance3D
+		var p := mi.position
+		if not g.has_point(Vector2(p.x, p.z)) or p.y > y + 0.1 or p.y < y - 30.0: continue
+		if mi.mesh is BoxMesh:
+			var sz := (mi.mesh as BoxMesh).size
+			if is_equal_approx(sz.y, 0.22) and absf(p.y - (y - 0.08)) < 0.01: mi.material_override = coping_mat
+			elif absf(p.y - y + sz.y / 2) < 0.01 and sz.x > 3.0 and sz.z > 3.0: mi.material_override = flag_mat
+		elif mi.mesh is CylinderMesh and (mi.mesh as CylinderMesh).radial_segments == 8:
+			mi.material_override = rock_mat
+
 # ------------------------------------------------------------------ meshes and shaders
 func _make_flower_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -723,6 +746,44 @@ void fragment() {
 	vec3 c = mix(vec3(0.5, 0.85, 0.95), vec3(1.0), smoothstep(0.45, 0.85, streak));
 	ALBEDO = c;
 	ALPHA = edge * fade * (0.35 + 0.55 * streak);
+}
+"""
+	return s
+
+static func _flag_shader() -> Shader:
+	var s := Shader.new()
+	s.code = """
+shader_type spatial;
+varying vec3 wpos;
+varying vec3 wnrm;
+void vertex() { wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz); }
+float h2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 h22(vec2 p) { return vec2(h2(p), h2(p + 19.19)); }
+float n2(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h2(i), h2(i + vec2(1, 0)), f.x), mix(h2(i + vec2(0, 1)), h2(i + vec2(1, 1)), f.x), f.y); }
+void fragment() {
+	vec2 uv = abs(wnrm.y) > 0.5 ? wpos.xz : vec2(wpos.x + wpos.z, wpos.y * 1.6);
+	uv *= 1.25;
+	// voronoi flagstones
+	vec2 i = floor(uv); vec2 f = fract(uv);
+	float d1 = 9.0; float d2 = 9.0; vec2 id = vec2(0.0);
+	for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+		vec2 g = vec2(float(x), float(y));
+		vec2 o = h22(i + g) * 0.8 + 0.1;
+		float d = length(g + o - f);
+		if (d < d1) { d2 = d1; d1 = d; id = i + g; } else if (d < d2) { d2 = d; }
+	}
+	float edge = d2 - d1;
+	float grout = 1.0 - smoothstep(0.03, 0.09, edge);
+	float tone = h2(id);
+	float n = n2(uv * 6.0);
+	vec3 stone = mix(vec3(0.62, 0.57, 0.49), vec3(0.76, 0.7, 0.6), tone) * mix(0.88, 1.06, n);
+	stone = mix(stone, vec3(0.62, 0.66, 0.5), step(0.82, tone) * 0.4);
+	vec3 moss = vec3(0.3, 0.46, 0.22) * mix(0.8, 1.1, n);
+	ALBEDO = mix(stone, moss, grout * 0.85);
+	ROUGHNESS = mix(0.85, 1.0, grout);
+	SPECULAR = 0.25;
+	NORMAL_MAP = normalize(vec3((n - 0.5) * 0.3, (n2(uv * 6.0 + 3.0) - 0.5) * 0.3, 1.0) - vec3(0.0, 0.0, grout * 0.5)) * 0.5 + 0.5;
 }
 """
 	return s
