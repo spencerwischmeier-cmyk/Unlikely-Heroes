@@ -241,7 +241,7 @@ static func tarp(L: Node3D, pos: Vector3, size: Vector3, yaw: float, c: Color) -
 	cs.shape = sh; cs.position.y = size.y / 2; sb.add_child(cs); n.add_child(sb)
 
 ## A rusty sign board on two posts with chunky lettering (both sides readable).
-static func sign(L: Node3D, text: String, pos: Vector3, yaw: float, w: float, h: float, lift: float, c := Color(1.0, 0.86, 0.5), board := Color(0.5, 0.3, 0.18)) -> Node3D:
+static func sign(L: Node3D, text: String, pos: Vector3, yaw: float, w: float, h: float, lift: float, c := Color(1.0, 0.86, 0.5), board := Color(0.5, 0.3, 0.18), text_scale := 0.32) -> Node3D:
 	var n := Node3D.new(); n.position = pos; n.rotation.y = yaw; L.add_child(n)
 	for s in [-1, 1]:
 		var p := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(0.16, lift + h, 0.16); p.mesh = bm
@@ -253,7 +253,7 @@ static func sign(L: Node3D, text: String, pos: Vector3, yaw: float, w: float, h:
 		var t := MeshInstance3D.new(); var tb := BoxMesh.new(); tb.size = Vector3(w + 0.06, 0.1, 0.16); t.mesh = tb
 		t.material_override = mat("rust_obj"); t.position = Vector3(0, y, 0); n.add_child(t)
 	for side in [1.0, -1.0]:
-		var l := Label3D.new(); l.text = text; l.font_size = 64; l.pixel_size = h / 64.0 * 0.32
+		var l := Label3D.new(); l.text = text; l.font_size = 64; l.pixel_size = h / 64.0 * text_scale
 		l.modulate = c; l.outline_size = 12; l.outline_modulate = Color(0.15, 0.08, 0.04)
 		l.width = w / l.pixel_size * 0.92; l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.position = Vector3(0, lift + h / 2, 0.075 * side); l.rotation.y = 0.0 if side > 0 else PI

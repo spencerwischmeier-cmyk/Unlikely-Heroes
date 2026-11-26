@@ -49,7 +49,7 @@ static func build(L) -> void:
 	_chatter(L, life)
 	L.debug_spots["junk_home"] = [Vector3(0, 0.1, 104), PI]
 	L.debug_spots["junk_heap"] = [Vector3(-25, 0.1, 82), -PI * 0.6]
-	L.debug_spots["junk_hull"] = [Vector3(25, 0.1, 80), PI * 0.6]
+	L.debug_spots["junk_hull"] = [Vector3(26.5, 0.1, 79.5), 0.84]
 	L.debug_spots["junk_lookout"] = [Vector3(0, 0.1, 133), PI]
 	L.debug_spots["junk_summit"] = [Vector3(-38.4, 6.1, 86.6), PI / 2]
 	L.debug_spots["junk_shack"] = [Vector3(-1, 0.1, 86.5), 0.0]
@@ -130,16 +130,16 @@ static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
 # ---------------------------------------------------------------- home yard (z 96..112)
 static func _home(L, B, rng: RandomNumberGenerator, life) -> void:
 	# Vesk's shack, right behind the porch; front door faces the yard (north)
-	var shack: Node3D = JK.place(L, "shack", Vector3(-3, 0, 100.0), PI, 5.0)
-	JK.box_collider(L, Vector3(-3, 2.0, 100.0), Vector3(5.2, 4.0, 3.6))
-	JK.omni(L, Vector3(-3, 1.9, 96.9), Color(1.0, 0.7, 0.38), 1.6, 7.0)
-	DocksDressing.steam(L, Vector3(-1.8, 5.0, 100.2), 0.6)
+	var shack: Node3D = JK.place(L, "shack", Vector3(-3, 0, 98.7), PI, 5.4)
+	JK.box_collider(L, Vector3(-3, 2.0, 98.7), Vector3(5.6, 4.0, 3.9))
+	JK.omni(L, Vector3(-3, 1.9, 95.4), Color(1.0, 0.7, 0.38), 1.6, 7.0)
+	DocksDressing.steam(L, Vector3(-1.7, 5.4, 98.9), 0.6)
 	# string lights from the shack eaves out to the porch lamps
-	JK.bulbs(B, L, Vector3(-5.8, 3.3, 98.0), Vector3(-6.5, 3.2, 91.0), 0.5, 9)
-	JK.bulbs(B, L, Vector3(-0.2, 3.5, 98.0), Vector3(6.5, 3.2, 91.0), 0.6, 11)
+	JK.bulbs(B, L, Vector3(-5.8, 3.3, 96.6), Vector3(-6.5, 3.2, 91.0), 0.5, 9)
+	JK.bulbs(B, L, Vector3(-0.2, 3.5, 96.6), Vector3(6.5, 3.2, 91.0), 0.6, 11)
 	JK.bulbs(B, L, Vector3(-6.5, 3.2, 91.0), Vector3(6.5, 3.2, 91.0), 0.4, 14)
 	# the shop sign
-	JK.sign(L, "VESK'S SALVAGE & REPAIR\nNO REFUNDS. NO RETURNS. NO VISITORS.", Vector3(5.0, 0, 98.2), 0.0, 4.2, 1.3, 2.0)
+	JK.sign(L, "VESK'S SALVAGE & REPAIR\nNO REFUNDS. NO RETURNS. NO VISITORS.", Vector3(5.0, 0, 98.2), 0.0, 4.6, 1.3, 2.0, Color(1.0, 0.86, 0.5), Color(0.5, 0.3, 0.18), 0.16)
 	# the radio on a crate by the generator, playing to nobody
 	L.prop("crate_small", Vector3(8.0, 0, 97.8), 0.2)
 	var radio: MeshInstance3D = L.box(Vector3(8.0, 1.2, 97.8), Vector3(0.6, 0.38, 0.26), JK.paint(JK.TEAL), false)
@@ -452,7 +452,7 @@ static func _lookout(L, B, rng: RandomNumberGenerator, life) -> void:
 		var l := Label3D.new(); l.text = "R.I.P.\n" + names[i]; l.font_size = 40; l.pixel_size = 0.004; l.modulate = Color(1, 0.9, 0.7)
 		l.outline_size = 8; l.position = gp + Vector3(0, 0.45, -0.09); l.rotation.y = PI; L.add_child(l)
 		B.add("gear", "scrap", JK.xform(gp + Vector3(0, 0.05, -0.5), Vector3(0, i, 0), Vector3.ONE * 0.4), JK.YELLOW)
-	JK.sign(L, "VESK'S THINKING SPOT. NO TALKING. NO DRONES.", Vector3(-5.0, 0, 132.4), PI, 2.8, 0.8, 1.0)
+	JK.sign(L, "VESK'S THINKING SPOT. NO TALKING. NO DRONES.", Vector3(-5.0, 0, 132.4), PI, 2.8, 0.9, 1.0, Color(1.0, 0.86, 0.5), Color(0.5, 0.3, 0.18), 0.17)
 	DocksDressing.place(L, "fuel_tanks", Vector3(5.4, 0, 136.4), 0.0, 2.4, true)
 	L.lamp(-6.6, 132.6, Color(1, 0.72, 0.42))
 	L.crate_spots.append(Vector3(-1.0, 0, 141.4))
