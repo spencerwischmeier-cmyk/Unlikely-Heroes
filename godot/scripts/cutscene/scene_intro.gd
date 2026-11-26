@@ -184,7 +184,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cu(70.0, 1.7, 55.0, -0.06)     # near profile, so Dodger isn't between us and him; the mug comes up for the slurp
+	_cu(-28.0, 1.45, 70.0, 0.0)     # same framing as his last line
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
@@ -359,8 +359,12 @@ func run() -> void:
 	C.hand = 0.0
 	C.mblur = 0.55
 	# 14. Dodger picks up the signal, looking north to the mast
-	C.cut(seat + Vector3(-0.42, 1.32, 0.42), dspot); C.lens(40.0)   # back over Vesk's shoulder, same as their first exchange
-	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.7)
+	# his line plays over the mast: long lens, the dish pulsing, a slow push
+	var scam := _clear(mast + Vector3(0, 0.8, 0), mcands)
+	C.cut(scam, mast + Vector3(0, 0.8, 0)); C.lens(140.0)
+	C.move(scam + mdir * 0.6 + Vector3(0, 0.2, 0), mast + Vector3(0, 1.0, 0), 6.0)
+	C.lens(200.0, 6.0)
+	C.fx(func(): FX.ring(mast + Vector3(0, 1.5, 0), Color(1, 0.5, 0.15), 4.0))
 	C.light(dodger, "tension", 1.0, 0.0)
 	C.tw(dodger, "rotation:y", PI, 0.6)
 	dodger.look_target = null
@@ -412,12 +416,12 @@ func run() -> void:
 		C.tw(chair, "scale", Vector3(1, 0.75, 1), 0.3)
 	await C.wait(0.6)
 	dodger.look_target = vesk
-	var dpp: Vector3 = dodger.global_position
+	# over Vesk's shoulder onto what's left of the chair (Dodger's line plays over it)
 	var vhe: Vector3 = vh.global_position
-	var away := ((vhe - dpp) * Vector3(1, 0, 1)).normalized()
-	C.cut(vhe + away * 0.55 + away.cross(Vector3.UP) * 0.35 + Vector3(0, 0.12, 0), dpp); C.lens(40.0)   # over Vesk's shoulder
-	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.9)
-	C.light(dodger, "soft", 1.0, 0.0)
+	var away := ((vhe - chair_pos) * Vector3(1, 0, 1)).normalized()
+	C.cut(vhe + away * 0.6 + away.cross(Vector3.UP) * 0.35 + Vector3(0, 0.1, 0), chair_pos + Vector3(0, 0.4, 0)); C.lens(40.0)
+	if chair: C.focus_on(chair, Vector3(0, 0.4, 0), 0.0, 0.8)
+	else: C.focus(0.0)
 	await C.say("intro_12", 0.4)
 	# 17. "...That was a good chair." A slow push-in that widens the background (dolly zoom), then the facepalm
 	C.mark("good_chair")
