@@ -3,7 +3,8 @@ extends Node
 ## - Works out which area the hero is in from Game.level.islands (island name -> area, unknown islands
 ##   take the area of the nearest known one), with a short hysteresis so borders don't flap.
 ## - Music: while Snd.music("skyharbor") is asked for, plays the area's theme (audio/music/area_<area>)
-##   and crossfades between themes as the hero moves; when live bots are close it swaps to the area's
+##   and crossfades between themes as the hero moves (frantic panic themes while the city is under attack,
+##   the calmer area_<a>_calm themes once the Crane Bot is down or with `-- --calm-music`); when live bots are close it swaps to the area's
 ##   combat track with an alert stinger, and back a few seconds after the fight.
 ## - Ambience: one looping bed per area (audio/sfx/amb_<area>), each faded by distance to that area's
 ##   islands, plus random positional one-shots (birds, gulls, horns, clanks), more wind up high, and
@@ -65,6 +66,7 @@ var chat_t := 2.0
 var lowpass := 20500.0
 var fountain_done := false
 var boss_phase2 := false
+var calm := false           # the Crane Bot is down: the panic themes give way to the calmer area_<a>_calm ones
 var cut_id := ""
 var listen_pos := Vector3.ZERO
 var listen_area := ""
@@ -81,6 +83,7 @@ func _ready() -> void:
 	Snd.director = self
 	var args := OS.get_cmdline_user_args()
 	debug = args.has("--audio-debug")
+	calm = args.has("--calm-music")
 	Game.zone_cleared.connect(_on_zone_cleared)
 	Game.item_unlocked.connect(func(_id): Snd.sting("sting_unlock", -2.0))
 	Game.collectible_found.connect(func(_k, _id): Snd.sting("sting_secret", -3.0))
@@ -90,6 +93,7 @@ func _ready() -> void:
 	Game.player_respawned.connect(func(_p): Snd.play("area_whoosh", -12.0, 0.05, 0.5))
 	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0; boss_phase2 = false)
 	Game.boss_health.connect(_on_boss_health)
+	Game.boss_defeated.connect(func(n: String): if n == "CRANE BOT": calm = true)
 	get_tree().node_added.connect(_on_node_added)
 	for t in [0.5, 3.0]: get_tree().create_timer(t).timeout.connect(_route_all)
 	if args.has("--audio-test"): _self_test.call_deferred()
@@ -243,6 +247,7 @@ func _music_for() -> String:
 	if _shop_open() and Snd.has_music("shop"): return "shop"
 	var a := area if AREAS.has(area) else "plaza"
 	if combat: return AREAS[a].combat
+	if calm and Snd.has_music("area_%s_calm" % a): return "area_%s_calm" % a
 	return "area_" + a
 
 func pick_track(fade := 2.0) -> void:
@@ -566,6 +571,7 @@ func _self_test() -> void:
 		print("[audio-test] %s spot=%s area=%s island=%s surface=%s track=%s %s" % ["PASS" if good else "FAIL", k, area, cur_island, surface(), Snd.track, _beds_str()])
 	# combat: a bot next to the hero should bring in the combat track, and its death let it go
 	Game.player.global_position = spots.plaza[0]
+	Game.input_locked = false   # a headless run can still be inside the opening cutscene's lock
 	await get_tree().create_timer(1.0).timeout
 	var bot: Node = Game.main.spawn_bot("roller", spots.plaza[0] + Vector3(6, 0, 0), Game.level.islands.plaza)
 	await get_tree().create_timer(1.5).timeout
