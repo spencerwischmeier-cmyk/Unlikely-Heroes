@@ -56,66 +56,87 @@ func _build_environment() -> void:
 	var we := WorldEnvironment.new()
 	env = Environment.new()
 	var sky := Sky.new()
-	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color(0.08, 0.3, 0.72)
-	sm.sky_horizon_color = Color(0.55, 0.76, 0.92)
-	sm.sky_curve = 0.12
-	sm.ground_horizon_color = Color(0.62, 0.80, 0.93)
-	sm.ground_bottom_color = Color(0.25, 0.42, 0.58)
-	sm.sun_angle_max = 18.0
-	sm.sun_curve = 0.08
-	sm.sky_energy_multiplier = 1.0
+	var sm := ShaderMaterial.new()
+	sm.shader = load("res://shaders/sky_skyharbor.gdshader")
+	sky.radiance_size = Sky.RADIANCE_SIZE_256
 	sky.sky_material = sm
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 1.0
+	env.ambient_light_sky_contribution = 0.85
+	env.ambient_light_color = Color(0.62, 0.7, 0.9)
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 0.92
+	env.tonemap_exposure = 0.9
 	env.tonemap_white = 6.0
 	env.ssao_enabled = true
 	env.ssao_radius = 1.2
-	env.ssao_intensity = 1.6
+	env.ssao_intensity = 2.0
+	env.ssao_light_affect = 0.15
 	env.ssil_enabled = true
 	env.sdfgi_enabled = true
 	env.sdfgi_use_occlusion = true
-	env.sdfgi_energy = 1.0
+	env.sdfgi_energy = 1.25
+	env.sdfgi_bounce_feedback = 0.6
 	env.sdfgi_cascades = 4
 	env.sdfgi_min_cell_size = 0.2
 	env.glow_enabled = true
-	env.glow_intensity = 0.7
-	env.glow_bloom = 0.08
-	env.glow_hdr_threshold = 1.2
+	env.glow_intensity = 0.8
+	env.glow_bloom = 0.12
+	env.glow_hdr_threshold = 1.0
+	env.glow_strength = 1.1
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
-	env.fog_light_color = Color(0.55, 0.74, 0.92)
-	env.fog_depth_begin = 140.0
-	env.fog_depth_end = 1400.0
+	env.fog_light_color = Color(0.93, 0.84, 0.74)
+	env.fog_sun_scatter = 0.15
+	env.fog_depth_begin = 90.0
+	env.fog_depth_end = 900.0
 	env.fog_depth_curve = 1.6
 	env.fog_aerial_perspective = 0.85
 	env.fog_sky_affect = 0.0
 	env.volumetric_fog_enabled = true
-	env.volumetric_fog_density = 0.0012
-	env.volumetric_fog_albedo = Color(0.85, 0.92, 1.0)
-	env.volumetric_fog_anisotropy = 0.6
+	env.volumetric_fog_density = 0.0014
+	env.volumetric_fog_albedo = Color(1.0, 0.92, 0.82)
+	env.volumetric_fog_anisotropy = 0.7
+	env.volumetric_fog_sky_affect = 0.0
 	env.volumetric_fog_length = 120.0
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.2
-	env.adjustment_contrast = 1.05
+	env.adjustment_saturation = 1.18
+	env.adjustment_contrast = 1.14
+	env.adjustment_color_correction = _grade()
 	we.environment = env
 	add_child(we)
 
 	sun = DirectionalLight3D.new()
-	sun.light_color = Color(1.0, 0.9, 0.76)
-	sun.light_energy = 2.2
+	sun.light_color = Color(1.0, 0.84, 0.66)
+	sun.light_energy = 2.6
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.shadow_normal_bias = 1.2
 	sun.shadow_enabled = true
 	sun.shadow_blur = 1.5
-	sun.directional_shadow_max_distance = 120.0
+	sun.directional_shadow_max_distance = 160.0
 	sun.light_volumetric_fog_energy = 1.4
-	sun.rotation_degrees = Vector3(-38, 155, 0)
+	sun.rotation_degrees = Vector3(-30, 150, 0)
 	add_child(sun)
+	# soft cool fill from the opposite side, standing in for sky bounce in the shadows
+	var fill := DirectionalLight3D.new()
+	fill.light_color = Color(0.55, 0.68, 0.95)
+	fill.light_energy = 0.35
+	fill.shadow_enabled = false
+	fill.light_specular = 0.1
+	fill.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
+	fill.rotation_degrees = Vector3(-50, -30, 0)
+	add_child(fill)
+
+## A gentle golden-hour grade: lifted warm highlights, slightly cool shadows.
+func _grade() -> GradientTexture1D:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.35, 0.7, 1.0])
+	g.colors = PackedColorArray([Color(0.04, 0.05, 0.12), Color(0.33, 0.34, 0.4), Color(0.74, 0.7, 0.64), Color(1.0, 0.97, 0.9)])
+	var t := GradientTexture1D.new(); t.gradient = g; t.width = 256
+	return t
 
 func spawn_bot(kind: String, pos: Vector3, zone := Rect2()) -> Node3D:
 	if kind == "crew": return load("res://scripts/enemy_crew.gd").spawn(self, combat, player, pos, zone)
