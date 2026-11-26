@@ -125,7 +125,7 @@ static func mat(key: String) -> Material:
 		"glass": m = M.std(Color(0.1, 0.14, 0.18), 0.6, 0.12)
 		"leaf": m = M.leaf(Color(0.33, 0.68, 0.35))
 		"water": m = _water()
-		"lantern": m = M.glow(Color(1.0, 0.62, 0.25), 4.5)
+		"lantern": m = M.glow(Color(1.0, 0.5, 0.16), 2.2)
 		"bulb": m = M.glow(Color(1.0, 0.85, 0.55), 5.0)
 		"cable": m = M.std(Color(0.12, 0.12, 0.14), 0.3, 0.6)
 		"clockface": m = M.std(Color(0.98, 0.95, 0.86), 0.0, 0.5)
@@ -614,15 +614,15 @@ static func _stalls() -> void:
 
 # ---------------------------------------------------------------- the cafe terrace
 static func _cafe() -> void:
-	for t: Vector3 in [Vector3(-14.2, 0, 21.8), Vector3(-11.8, 0, 24.9), Vector3(-14.4, 0, 24.6)]:
+	for t: Vector3 in [Vector3(-13.2, 0, 21.6), Vector3(-10.6, 0, 25.0), Vector3(-13.4, 0, 24.8)]:
 		cy(t + Vector3(0, 0.38, 0), 0.06, 0.28, 0.76, "dark", 10)
 		var top := cy(t + Vector3(0, 0.78, 0), 0.55, 0.55, 0.06, "cream", 18)
 		top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		solid(t + Vector3(0, 0.4, 0), Vector3(1.0, 0.8, 1.0))
-		cy(t + Vector3(0, 1.6, 0), 0.03, 0.03, 1.7, "dark", 6)
-		var um := cy(t + Vector3(0, 2.5, 0), 0.06, 1.35, 0.5, "cloth_e0533a" if t.z < 23 else "cloth_2a8c8a", 12)
+		cy(t + Vector3(0, 1.4, 0), 0.03, 0.03, 1.4, "dark", 6)
+		var um := cy(t + Vector3(0, 2.25, 0), 0.06, 1.25, 0.45, "cloth_e0533a" if t.z < 23 else "cloth_2a8c8a", 12)
 		um.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		cy(t + Vector3(0, 2.26, 0), 1.36, 1.36, 0.1, "cloth_f2e6c8", 12)
+		cy(t + Vector3(0, 2.02, 0), 1.26, 1.26, 0.1, "cloth_f2e6c8", 12)
 		for i in 2:
 			var a := i * PI + 0.6
 			var ch: Vector3 = t + Vector3(sin(a) * 0.85, 0, cos(a) * 0.85)
