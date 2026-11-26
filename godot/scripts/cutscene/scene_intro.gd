@@ -119,6 +119,9 @@ func run() -> void:
 	vesk.act("content_sigh")
 	C.fx(func(): C.foley("chair_creak", chair_pos, -10))
 	await C.say("intro_04", 0.5)
+	# the sip: cut wider, from the side away from the mug arm, so the mug doesn't wipe across his face
+	_cu(40.0, 2.3, 50.0, -0.08)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 0.7)
 	if seated: C.fx(func(): C.foley("mug_sip", seat + Vector3(0, 1.0, 0), -6)); vesk.sip(1.4)
 	await C.wait(0.6)
 	await C.say("cs_intro_sip", 0.9)
@@ -181,7 +184,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cu(-35.0, 2.3, 50.0, -0.05)    # a little wider: the mug comes up for the slurp
+	_cu(70.0, 1.7, 55.0, -0.06)     # near profile, so Dodger isn't between us and him; the mug comes up for the slurp
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
@@ -356,10 +359,7 @@ func run() -> void:
 	C.hand = 0.0
 	C.mblur = 0.55
 	# 14. Dodger picks up the signal, looking north to the mast
-	var dgp: Vector3 = dodger.global_position
-	var dgd := ((mast - dgp) * Vector3(1, 0, 1)).normalized()
-	var dgs := dgd.cross(Vector3.UP)
-	C.cut(dgp - dgd * 1.5 + dgs * 0.55 + Vector3(0, 0.15, 0), dgp.lerp(mast, 0.04)); C.lens(30.0)   # over his shoulder, mast beyond
+	C.cut(seat + Vector3(-0.42, 1.32, 0.42), dspot); C.lens(40.0)   # back over Vesk's shoulder, same as their first exchange
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.7)
 	C.light(dodger, "tension", 1.0, 0.0)
 	C.tw(dodger, "rotation:y", PI, 0.6)
@@ -413,8 +413,9 @@ func run() -> void:
 	await C.wait(0.6)
 	dodger.look_target = vesk
 	var dpp: Vector3 = dodger.global_position
-	C.cut(_clear(dpp, _ring(dpp, 1.6, 0.2, 0.6, 8)), dpp); C.lens(45.0)
-	C.look_node = dodger; C.look_off = Vector3.ZERO
+	var vhe: Vector3 = vh.global_position
+	var away := ((vhe - dpp) * Vector3(1, 0, 1)).normalized()
+	C.cut(vhe + away * 0.55 + away.cross(Vector3.UP) * 0.35 + Vector3(0, 0.12, 0), dpp); C.lens(40.0)   # over Vesk's shoulder
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.9)
 	C.light(dodger, "soft", 1.0, 0.0)
 	await C.say("intro_12", 0.4)
@@ -521,12 +522,12 @@ func _ride(bot: Node3D, n: Node3D, off: Vector3, sc: float) -> void:
 ## target or look point, clamped to how far his head can turn), so the camera always sees his face.
 func _cu(az: float, dist: float, mm: float, dy := 0.0) -> void:
 	var e: Vector3 = C.head_of(_vesk).global_position
-	C.cut(e + _gaze_dir(az) * dist + Vector3(0, dy, 0), e + Vector3(0, -0.04, 0)); C.lens(mm)
+	C.cut(e + _gaze_dir(az) * dist + Vector3(0, dy, 0), e + Vector3(0, -0.08, 0)); C.lens(mm)
 
 ## Slow push-in to `dist` along the same angle.
 func _push(az: float, dist: float, dur: float) -> void:
 	var e: Vector3 = C.head_of(_vesk).global_position
-	C.move(e + _gaze_dir(az) * dist, e + Vector3(0, -0.04, 0), dur)
+	C.move(e + _gaze_dir(az) * dist, e + Vector3(0, -0.08, 0), dur)
 
 ## Candidate camera spots on a ring around `c` (radius r, height h above c), starting at angle a0.
 func _ring(c: Vector3, r: float, h: float, a0 := 0.0, n := 10) -> Array:
