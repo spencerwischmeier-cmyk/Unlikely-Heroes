@@ -50,6 +50,19 @@ static func place(parent: Node3D, name: String, pos: Vector3, rot_y := 0.0, heig
 		sb.add_child(cs); holder.add_child(sb)
 	return holder
 
+## Place a model with its base centre at pos, stretched to exactly `size` (x along the model's own x).
+static func place_fit(parent: Node3D, name: String, pos: Vector3, rot_y: float, size: Vector3) -> Node3D:
+	var n := _load(name)
+	if n == null: return null
+	var ab := _aabb(name, n)
+	var holder := Node3D.new(); holder.name = "D_" + name
+	parent.add_child(holder)
+	holder.position = pos; holder.rotation.y = rot_y
+	holder.add_child(n)
+	n.scale = Vector3(size.x / ab.size.x, size.y / ab.size.y, size.z / ab.size.z)
+	n.position = -Vector3(ab.get_center().x, ab.position.y, ab.get_center().z) * n.scale
+	return holder
+
 ## Fit a model exactly into a box (used to skin the gameplay containers, which keep their own colliders).
 static func skin_box(box_mi: MeshInstance3D, name: String, tint: Color) -> void:
 	var n := _load(name)

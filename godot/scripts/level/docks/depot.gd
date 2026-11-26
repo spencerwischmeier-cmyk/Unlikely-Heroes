@@ -223,7 +223,11 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	L.fence(pd, 0.0, [["w", 27, 33], ["n", 71, 77], ["s", 66, 72]], "nsw")
 	L.railing(84, 10, 84, 14, 0.0); L.railing(84, 46, 84, 50, 0.0)
 	# gangway from Pier A
-	L.walkway(50, 27.5, 56, 32.5, 0.0)
+	# a plank-and-rope gangway (invisible flat collider so the sag never trips you)
+	var gw: MeshInstance3D = L.box(Vector3(53, -0.3, 30), Vector3(6.2, 0.6, 3.4), L.mat_dark)
+	gw.visible = false
+	if DocksDressing.place_fit(L, "rope_bridge", Vector3(53, -0.25, 30), 0.0, Vector3(6.6, 2.3, 3.6)) == null: gw.visible = true
+	for zz in [28.2, 31.8]: L.railing(50.2, zz, 55.8, zz, 0.0)
 	L.label("CONTAINER CANYON", Vector3(61, 0, 30), 2.6, Color(1, 0.8, 0.45), PI / 2)
 	L.hint_sign("FREIGHT DEPOT 7. HARD HATS REQUIRED. SOFT HEADS DISCOURAGED.", Vector3(57.5, 0, 26.6), PI * 0.5)
 	L.checkpoints.append({ pos = Vector3(58, 0.1, 30), r = 2.5 })
@@ -378,6 +382,22 @@ static func _warehouse(L: Node3D, A: Node3D) -> void:
 	for z in [20.5, 28.5, 36.5]:
 		var glass: MeshInstance3D = L.box(Vector3(98, H + 0.05, z), Vector3(28, 0.08, 3.0), M.glass(Color(0.75, 0.9, 1.0)), false)
 		glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# on the roof: vent stacks puffing steam, a water tank, a lit billboard and a beacon mast
+	for v in [Vector3(88, H + 0.25, 18), Vector3(93, H + 0.25, 44), Vector3(108, H + 0.25, 42)]:
+		L.prop("vent_stack", v, randf() * TAU, 1.3, false)
+		DocksDressing.steam(L, v + Vector3(0, 4.0, 0), 1.2)
+	L.prop("water_tower", Vector3(106, H + 0.25, 17), 0.3, 1.2, false)
+	L.prop("antenna", Vector3(88.5, H + 0.25, 42), 0.0, 1.6, false)
+	beacon(L, A, Vector3(88.5, H + 8.6, 42), Color(1, 0.25, 0.2), 1.6, 0.0, 0.3, 0.3, false)
+	var bb := Node3D.new(); bb.position = Vector3(98, H + 0.25, 15.2); L.add_child(bb)
+	for sx in [-5.5, 5.5]: L.box(Vector3(sx, 2.0, 0), Vector3(0.3, 4.0, 0.3), L.mat_dark, false, bb)
+	L.box(Vector3(0, 4.6, 0), Vector3(13, 3.2, 0.3), M.paint(Color(0.16, 0.2, 0.28)), false, bb)
+	L.box(Vector3(0, 3.0, 0), Vector3(13.2, 0.12, 0.4), L.glow_warm, false, bb)
+	L.box(Vector3(0, 6.2, 0), Vector3(13.2, 0.12, 0.4), L.glow_warm, false, bb)
+	for side in [-1, 1]:
+		var t := Label3D.new(); t.text = "GRUDDCO FREIGHT\nWE MOVE IT. YOU DON'T." if side > 0 else "GRUDDCO FREIGHT\nDELIVERING DISAPPOINTMENT SINCE NOW"
+		t.font_size = 96; t.pixel_size = 0.012; t.modulate = Color(1, 0.72, 0.3); t.outline_size = 14
+		t.position = Vector3(0, 4.6, side * 0.17); t.rotation.y = 0.0 if side > 0 else PI; t.double_sided = false; bb.add_child(t)
 	# loading bay doors: bay 1 rolls up as you come down the canyon, bay 2 from the yard, bay 3 by the mezzanine switch
 	shutter(L, A, "bay1", Vector3(84.3, 0, 39.5), 5.0, 5.2, false, AABB(Vector3(76, -1, 36.5), Vector3(14, 6, 6.5)))
 	shutter(L, A, "bay2", Vector3(84.3, 0, 20.5), 5.0, 5.2, false, AABB(Vector3(78, -1, 17.5), Vector3(12, 6, 6)))
