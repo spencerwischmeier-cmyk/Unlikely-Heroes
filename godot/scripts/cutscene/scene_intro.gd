@@ -47,98 +47,188 @@ func run() -> void:
 		h.position = Vector3(0, 1.05 if b != mail_bot else 0.55, 0); h.scale = Vector3.ONE * 0.001
 		b.add_child(h); hats.append(h)
 
-	# 1. the sky city, from far out
+	var seated: bool = vesk.has_method("hold") and vesk.has("cs_sit_drink")
+	if seated: vesk.hold("cs_sit_drink", 2.6, 0.0)
+	var vh: Node3D = C.head_of(vesk)            # his eyes, for focus pulls and the light rig
+	var dh: Node3D = dodger
+	C.score("open", 0.0)
+	C.grade("golden", 0.0)
+	C.mblur = 0.55
+
+	# 1. the sky city, from far out: a slow crane down through the haze
+	C.mark("city")
 	Snd.loop("wind_loop", true, -12)
-	C.cut(Vector3(34, 46, 175), Vector3(4, 4, 30), 48.0)
-	C.move(Vector3(22, 30, 138), Vector3(0, 2, 40), 15.0, 44.0)
-	C.tw(C, "fade", 0.0, 3.0)
+	C.cut(Vector3(40, 58, 190), Vector3(4, 6, 30)); C.lens(24.0)
+	C.move(Vector3(22, 30, 138), Vector3(0, 2, 40), 16.0, -1.0, Tween.TRANS_CUBIC, Tween.EASE_OUT)
+	C.lens(28.0, 16.0)
+	C.tw(C, "fade", 0.0, 3.5)
 	C.show_location("SKYHARBOR", "Planet 1  ·  The sky city  ·  Golden hour", 5.0)
 	await C.wait(2.6)
 	await C.say("intro_01", 0.6)
-	# 2. low over the docks: airship moorings, cranes, a bot hauling crates (still a nice bot, for now)
-	C.cut(pier + Vector3(-22, 7, 18), pier + Vector3(0, 1.5, 0), 46.0)
-	C.move(pier + Vector3(-6, 4.5, 16), pier + Vector3(4, 1.0, -2), 9.0, 42.0)
+	# 2. low along the docks, tracking the dock bot as it hauls crates (still a nice bot, for now)
+	C.mark("docks")
+	var dbp: Vector3 = dock_bot.global_position
+	C.cut(dbp + Vector3(-3.5, 1.1, 4.2), dbp + Vector3(0, 0.9, 0)); C.lens(35.0)
 	C.tw(dock_bot, "global_position", pier + Vector3(5, 0, 1), 9.0, 0.0, Tween.TRANS_LINEAR)
+	C.follow_node = dock_bot; C.follow_off = Vector3(-3.2, 1.2, 4.4)
+	C.look_node = dock_bot; C.look_off = Vector3(1.5, 0.9, 0)
+	C.focus_on(dock_bot, Vector3(0, 0.8, 0), 0.0, 0.5)
 	await C.say("cs_intro_city", 0.6)
-	# 3. over the gardens and out to the junkyard
-	C.cut(Vector3(-66, 24, 34), Vector3(-10, 3, 44), 50.0)
-	C.move(Vector3(-30, 12, 70), Vector3(-2, 1.5, 86), 9.5)
+	# 3. over the gardens and out to the junkyard: a long glide, the porch light catching the sun
+	C.mark("glide")
+	C.cut(Vector3(-66, 24, 34), Vector3(-10, 3, 44)); C.lens(30.0)
+	C.move(Vector3(-30, 12, 70), Vector3(-2, 1.5, 86), 9.5, -1.0, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
+	C.lens(40.0, 9.5)
 	await C.say("intro_02", 1.0)
-	# 4. the porch: start on the brass gear on the workbench (shallow focus), drift over to Vesk
-	C.cut(bench + Vector3(-0.35, 0.3, -1.1), bench + Vector3(0, 0.02, 0), 34.0)
-	C.focus(1.0)
-	C.sway = 0.5
-	C.move(seat + Vector3(1.6, 1.15, -3.4), seat + Vector3(0, 0.85, 0), 8.0, 40.0)
-	C.tw(C, "dof", 0.35, 3.0, 2.0)
-	await C.wait(1.4)
-	await C.say("intro_03", 1.4)
-	# 5. "Finally. Nothing left to fix." A long sip.
-	C.cut(seat + Vector3(0.55, 1.0, -1.55), seat + Vector3(0, 0.95, 0.1), 38.0)
-	C.focus(0.8)
-	C.move(seat + Vector3(0.45, 1.0, -1.3), seat + Vector3(0, 0.95, 0.1), 9.0)
-	vesk.look_point = chair_pos + Vector3(3, 1.6, -8)
-	await C.say("intro_04", 0.8)
-	await C.say("cs_intro_sip", 1.0)
-	# 6. Dodger swoops in from the yard
-	C.cut(seat + Vector3(3.2, 1.4, -4.6), seat + Vector3(0.8, 0.9, 0), 46.0)
+	# 4. the porch. Macro on the brass gear on the workbench, then rack focus to Vesk in his chair
+	C.mark("porch")
+	C.grade("porch", 2.0)
+	C.score("porch", 2.5)
+	C.room_tone("porch_tone", -16.0, 3.0)
+	C.light(vh, "golden", 1.0)
+	C.cut(bench + Vector3(-0.32, 0.16, -0.75), seat + Vector3(0, 0.95, 0)); C.lens(85.0)
+	var gear_mark: Node3D = C.actor(Node3D.new(), bench + Vector3(0, 0.05, 0))
+	C.focus_on(gear_mark, Vector3.ZERO, 0.0, 1.0)
+	C.move(bench + Vector3(-0.5, 0.2, -0.95), seat + Vector3(0, 0.95, 0), 9.0)
+	C.sway = 0.4
+	vesk.mood("content", 0.1)
+	vesk.look_point = chair_pos + Vector3(3, 1.4, -8)
+	await C.wait(1.6)
+	C.focus_on(vh, Vector3.ZERO, 2.2, 1.0)          # rack: gear soft, Vesk sharp
+	await C.say("intro_03", 0.9)
+	# 5. "Ahhh. Finally. Nothing left to fix." Eyes shut, the long happy sigh, then the sip
+	C.mark("sigh")
+	C.cut(seat + Vector3(0.62, 1.02, -1.5), seat + Vector3(0, 1.0, 0.1)); C.lens(65.0)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 0.8)
+	C.light(vh, "golden", -1.0)
+	C.move(seat + Vector3(0.48, 1.0, -1.22), seat + Vector3(0, 1.0, 0.1), 12.0)   # slow push-in
+	vesk.mood("content", 0.6)
+	vesk.act("content_sigh")
+	C.fx(func(): C.foley("chair_creak", chair_pos, -10))
+	await C.say("intro_04", 0.5)
+	if seated: C.fx(func(): C.foley("mug_sip", seat + Vector3(0, 1.0, 0), -6)); vesk.sip(1.4)
+	await C.wait(0.6)
+	await C.say("cs_intro_sip", 0.9)
+	# 6. Dodger swoops in over the yard: wide from behind the chair, whip-panning with him
+	C.mark("dodger_in")
+	C.cut(seat + Vector3(-1.4, 1.5, 1.6), seat + Vector3(-6, 3.0, -10)); C.lens(24.0)
 	C.focus(0.0)
+	C.light(vh, "soft", 1.0)
 	C.setv(dodger, "global_position", chair_pos + Vector3(-9, 5, -14))
 	C.tw(dodger, "global_position", chair_pos + Vector3(4, 3.0, -6), 1.2, 0.0, Tween.TRANS_SINE, Tween.EASE_OUT)
 	C.tw(dodger, "global_position", seat + Vector3(1.25, 1.55, -0.3), 1.1, 1.2, Tween.TRANS_BACK, Tween.EASE_OUT)
 	C.tw(dodger, "rotation:y", PI + 0.6, 0.8, 1.2)
+	C.look_node = dodger; C.look_off = Vector3(0, -0.3, 0)
 	C.fx(func(): Snd.play("cutscenes_whoosh", -6); Snd.at("dash", dodger.global_position, -8))
+	vesk.mood("tired", 0.8)                              # he doesn't even look
 	await C.wait(2.4)
+	C.look_node = null
 	dodger.look_target = vesk
 	dodger.act("spin")
-	await C.say("intro_05", 0.5)
-	# 7. "Dodger. It's my day off." (he doesn't even look)
-	C.cut(seat + Vector3(-0.6, 1.05, -1.6), seat + Vector3(0.3, 1.0, 0), 40.0)
-	C.focus(0.8)
+	# Dodger, close: Vesk soft over his shoulder
+	C.cut(seat + Vector3(1.0, 1.75, -1.75), seat + Vector3(1.25, 1.55, -0.3)); C.lens(50.0)
+	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.9)
+	C.light(dodger, "soft", -1.0, 0.0)
+	await C.say("intro_05", 0.4)
+	# 7. "Dodger. It's my day off." Close on Vesk, Dodger a soft blur at the frame edge
+	C.mark("day_off")
+	C.cut(seat + Vector3(1.05, 1.08, -1.3), seat + Vector3(0.05, 1.0, 0.05)); C.lens(85.0)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
+	C.light(vh, "golden", 1.0)
+	C.move(seat + Vector3(0.95, 1.06, -1.18), seat + Vector3(0.05, 1.0, 0.05), 10.0)
 	C.auto_look = false
 	vesk.look_point = chair_pos + Vector3(2, 1.4, -8)
-	await C.say("intro_06", 1.2)
-	# 8. the customer at the gate
-	C.cut(seat + Vector3(2.6, 1.7, -2.6), seat + Vector3(0.6, 1.2, 0), 44.0)
-	C.move(seat + Vector3(2.2, 1.6, -2.2), seat + Vector3(0.6, 1.2, 0), 10.0)
-	C.focus(0.5)
+	vesk.mood("annoyed", 0.4)
+	vesk.act("sigh")
+	var l6: float = C.say_async("intro_06")
+	await C.wait(1.6)
+	vesk.look_target = dodger                            # turns to him for the explanation
+	vesk.mood("skeptical", 0.5)
+	await C.wait(3.2)
+	vesk.act("nod_small")
+	await C.wait(maxf(0.5, l6 - 4.8) - 1.6)
+	vesk.look_target = null; vesk.look_point = chair_pos + Vector3(2, 1.4, -8)
+	vesk.mood("tired", 0.6); vesk.act("settle")
+	await C.wait(1.6 + 1.0)
+	# 8. the customer at the gate: shot / reverse shot
+	C.mark("gate")
+	C.cut(seat + Vector3(2.5, 1.45, -2.4), seat + Vector3(0.7, 1.2, 0)); C.lens(35.0)
+	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.5)
+	C.light(dodger, "soft", 1.0, 0.0)
+	C.move(seat + Vector3(2.1, 1.4, -2.0), seat + Vector3(0.7, 1.2, 0), 6.0)
 	dodger.act("hop")
-	await C.say("cs_intro_gate_1", 0.3)
+	await C.say("cs_intro_gate_1", 0.25)
+	C.cut(seat + Vector3(0.7, 1.05, -1.45), seat + Vector3(0, 1.0, 0.1)); C.lens(75.0)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
+	C.light(vh, "golden", -1.0)
+	vesk.mood("tired", 0.3)
 	await C.say("cs_intro_gate_2", 0.3)
+	C.cut(seat + Vector3(1.6, 1.62, -1.6), seat + Vector3(1.25, 1.55, -0.3)); C.lens(60.0)
+	C.focus_on(dodger, Vector3.ZERO, 0.0, 1.0)
+	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	await C.say("cs_intro_gate_4", 1.2)
+	C.cut(seat + Vector3(0.7, 1.05, -1.45), seat + Vector3(0, 1.0, 0.1)); C.lens(75.0)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
+	C.light(vh, "golden", -1.0)
+	var sp4 := 0.0
+	if seated: sp4 = vesk.sip(0.6)
+	C.fx(func(): C.foley("mug_slurp", seat + Vector3(0, 1.0, 0), -4))
+	await C.wait(1.2)
+	vesk.mood("smug", 0.3)
+	await C.say("cs_intro_gate_4", 0.2)
+	await C.wait(maxf(0.0, sp4 - 3.2))
+	dodger.act("sad")
+	await C.wait(0.9)
 	C.auto_look = true
-	# 9. 7:59:57 ... 8:00:00, the relay dish on the Signal Mast pulses, a voice on the wind
-	C.cut(seat + Vector3(2.4, 1.3, -3.6), seat + Vector3(0.5, 0.9, 0), 46.0)
+	# 9. 7:59:57 ... 8:00:00. The relay dish on the Signal Mast pulses; a voice on the wind
+	C.mark("clock")
+	C.score("tension", 1.5)
+	C.grade("tension", 3.0)
+	C.cut(seat + Vector3(2.4, 1.3, -3.6), seat + Vector3(0.5, 0.9, 0)); C.lens(40.0)
+	C.move(seat + Vector3(2.0, 1.2, -3.0), seat + Vector3(0.5, 0.95, 0), 3.4)
 	C.focus(0.0)
+	C.light(vh, "tension", 1.0)
 	C.clock_label.text = "SKYHARBOR   7:59:57 AM"
 	C.tw(C, "clock_a", 1.0, 0.6)
 	for s in ["58", "59"]:
 		await C.wait(1.0)
+		C.fx(func(): C.foley("clock_tick", seat, -8))
 		C.clock_label.text = "SKYHARBOR   7:59:%s AM" % s
 	await C.wait(1.0)
 	C.clock_label.text = "SKYHARBOR   8:00:00 AM"
 	C.fx(func(): Snd.play("cutscenes_factory_whistle", -2, 0.0); Snd.play("checkpoint", -6))
-	C.cut(Vector3(-3, 3.2, 73), mast + Vector3(0, 0.5, 0), 16.0)
-	C.move(Vector3(-2.6, 3.4, 72), mast + Vector3(0, 1.2, 0), 7.0, 11.0)
+	# long lens on the mast: heat haze, the dish pulsing
+	C.cut(Vector3(-3, 3.2, 73), mast + Vector3(0, 0.5, 0)); C.lens(180.0)
+	C.move(Vector3(-2.6, 3.4, 72), mast + Vector3(0, 1.2, 0), 7.0)
+	C.lens(240.0, 7.0)
+	C.hand = 0.5
 	C.tw(C, "clock_a", 0.0, 1.0, 1.2)
 	for i in 4:
 		C.fx(func(): FX.ring(mast + Vector3(0, 1.5, 0), Color(1, 0.5, 0.15), 3.0 + i))
 		await C.wait(0.5)
 	var cl: float = C.say_async("cs_intro_clock")
 	await C.wait(cl + 0.4)
+	C.hand = 0.0
 	vesk.look_point = mast
 	dodger.look_target = null
 	C.tw(dodger, "rotation:y", C.face_to(dodger, mast), 0.6)
+	# both of them turn to the mast, framed small against it
+	C.cut(seat + Vector3(-1.2, 1.2, 1.9), mast); C.lens(35.0)
+	C.focus(0.0)
+	vesk.mood("skeptical", 0.4)
 	await C.say("intro_07", 0.6)
-	# 10. the coffee maker clocks in
+	# 10. the coffee maker clocks in (macro, low; Vesk racks into focus behind it)
+	C.mark("coffee")
 	var cm_eye: StandardMaterial3D = coffee.get_meta("eye")
 	var card: Node3D = coffee.find_child("Card", true, false)
 	var stamp: Node3D = coffee.find_child("Stamp", true, false)
 	var hat: Node3D = coffee.find_child("Hat", true, false)
 	var cpos := coffee.global_position
-	C.cut(cpos + Vector3(-0.55, 0.42, -0.95), cpos + Vector3(0, 0.25, 0), 34.0)
-	C.focus(1.0)
+	C.cut(cpos + Vector3(-0.5, 0.2, -0.82), cpos + Vector3(0, 0.3, 0)); C.lens(50.0)
+	C.focus_on(coffee, Vector3(0, 0.3, 0), 0.0, 1.0)
+	C.light(coffee, "tension", 1.0, 0.3)
+	vesk.look_point = Vector3.INF; vesk.look_target = coffee
 	await C.wait(0.8)
 	cm_eye.emission = Color(1, 0.3, 0.1)
 	C.fx(func(): Snd.at("ui_select", cpos, -4))
@@ -146,7 +236,7 @@ func run() -> void:
 	await C.wait(0.6)
 	C.tw(stamp, "position:y", 0.39, 0.08, 0.0, Tween.TRANS_EXPO, Tween.EASE_IN)
 	await C.wait(0.1)
-	C.fx(func(): Snd.at("melee_hit", cpos, -6); FX.sparks(cpos + Vector3(0, 0.45, 0), Color(1, 0.8, 0.4), 6, 2.0))
+	C.fx(func(): Snd.at("melee_hit", cpos, -6); C.foley("punch_clock", cpos, -2); FX.sparks(cpos + Vector3(0, 0.45, 0), Color(1, 0.8, 0.4), 6, 2.0); C.shake = 0.25)
 	C.tw(stamp, "position:y", 0.46, 0.2, 0.05)
 	C.tw(card, "position:y", 0.33, 0.3, 0.4)
 	await C.wait(0.5)
@@ -154,20 +244,28 @@ func run() -> void:
 	C.tw(hat, "position:y", 0.45, 0.3, 0.0, Tween.TRANS_BACK, Tween.EASE_OUT)
 	C.fx(func(): Snd.at("cell_pickup", cpos, -8))
 	await C.wait(0.6)
-	vesk.look_target = coffee; dodger.look_target = coffee
+	dodger.look_target = coffee
 	dodger.act("shock")
+	vesk.mood("shocked", 0.15); vesk.act("flinch")
+	C.focus_on(vh, Vector3.ZERO, 0.6)                  # rack to Vesk's face over the hat
 	await C.say("sky_intro_coffee_1", 0.3)
-	C.cut(seat + Vector3(0.5, 1.05, -1.45), seat + Vector3(0, 1.0, 0.1), 38.0)
-	C.focus(0.8)
+	C.cut(seat + Vector3(0.55, 1.05, -1.4), seat + Vector3(0, 1.0, 0.1)); C.lens(75.0)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
+	C.light(vh, "tension", -1.0)
+	vesk.mood("annoyed", 0.25); vesk.act("lean_in")
 	await C.say("sky_intro_coffee_2", 0.4)
-	C.cut(cpos + Vector3(-0.35, 0.32, -0.6), cpos + Vector3(0, 0.38, 0), 30.0)
-	C.focus(1.0)
+	C.cut(cpos + Vector3(-0.32, 0.36, -0.55), cpos + Vector3(0, 0.38, 0)); C.lens(85.0)
+	C.focus_on(coffee, Vector3(0, 0.4, 0), 0.0, 1.0)
 	await C.say("sky_intro_coffee_3", 0.6)
-	# 11. the toaster growls
+	# 11. the toaster growls (dutch angle)
 	var tpos := toaster.global_position
 	var t_eye: StandardMaterial3D = toaster.get_meta("eye")
-	C.cut(tpos + Vector3(0.5, 0.35, -0.8), tpos + Vector3(0, 0.12, 0), 34.0)
+	C.cut(tpos + Vector3(0.48, 0.24, -0.72), tpos + Vector3(0, 0.12, 0)); C.lens(40.0)
+	C.cam_roll = -0.18
+	C.focus_on(toaster, Vector3(0, 0.12, 0), 0.0, 1.0)
+	C.light(toaster, "angry", 1.0, 0.15)
 	C.tw(t_eye, "emission_energy_multiplier", 4.0, 0.5)
+	C.fx(func(): C.foley("toaster_growl", tpos, -4))
 	for i in 6:
 		C.tw(toaster, "rotation:z", 0.08 if i % 2 == 0 else -0.08, 0.08)
 		await C.wait(0.1)
@@ -179,20 +277,31 @@ func run() -> void:
 	C.tw(toast, "position:y", 0.0, 0.3, 0.3, Tween.TRANS_QUAD, Tween.EASE_IN)
 	await C.wait(0.8)
 	C.focus(0.0)
-	# 12. montage: all over town, bots put on hard hats. The dock worker...
-	C.cut(dock_bot.global_position + Vector3(2.2, 1.4, 3.0), dock_bot.global_position + Vector3(0, 0.8, 0), 40.0)
-	C.move(dock_bot.global_position + Vector3(1.6, 1.2, 2.2), dock_bot.global_position + Vector3(0, 0.9, 0), 2.6, 34.0)
+	C.light_off()
+	# 12. montage: all over town, bots put on hard hats. Whip-pans between them
+	C.mark("montage")
+	C.score("haywire", 0.4)
+	C.grade("chaos", 1.0)
+	C.mblur = 0.9
+	C.cut(dock_bot.global_position + Vector3(2.2, 1.4, 3.0), dock_bot.global_position + Vector3(0, 0.8, 0)); C.lens(35.0)
+	C.move(dock_bot.global_position + Vector3(1.6, 1.2, 2.2), dock_bot.global_position + Vector3(0, 0.9, 0), 2.6)
+	C.lens(45.0, 2.6)
 	await C.wait(0.5)
 	C.tw(hats[0], "scale", Vector3.ONE, 0.25, 0.0, Tween.TRANS_BACK, Tween.EASE_OUT)
 	C.fx(func(): Snd.at("cell_pickup", dock_bot.global_position, -6); FX.sparks(dock_bot.global_position + Vector3(0, 1, 0), Color(1, 0.8, 0.3), 6, 2.0))
 	C.tw(dock_bot, "rotation:y", dock_bot.rotation.y + PI, 0.5, 0.4, Tween.TRANS_BACK, Tween.EASE_OUT)
-	await C.wait(1.4)
+	await C.wait(1.2)
+	C.tw(C, "cam_look", C.cam_look + Vector3(8, 0, -6), 0.22, 0.0, Tween.TRANS_QUAD, Tween.EASE_IN)   # whip out
+	C.fx(func(): Snd.play("cutscenes_whoosh", -10))
+	await C.wait(0.22)
 	# ...and the mail hornet over the plaza
 	var mp: Vector3 = mail_bot.global_position
-	C.cut(mp + Vector3(-2.5, 0.2, 3.5), mp, 40.0)
+	C.cut(mp + Vector3(-2.5, 0.2, 3.5), mp + Vector3(3, 0, -2)); C.lens(40.0)
+	C.tw(C, "cam_look", mp, 0.25, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)   # whip in
 	C.tw(mail_bot, "global_position", mp + Vector3(-2, 0.4, -1), 3.5, 0.0, Tween.TRANS_SINE)
+	await C.wait(0.25)
 	C.look_node = mail_bot
-	await C.wait(0.4)
+	await C.wait(0.2)
 	C.tw(hats[1], "scale", Vector3.ONE, 0.25, 0.0, Tween.TRANS_BACK, Tween.EASE_OUT)
 	C.fx(func(): Snd.at("cell_pickup", mp, -6))
 	await C.say("cs_intro_mail", 0.2)
@@ -202,14 +311,17 @@ func run() -> void:
 	if giz.size() > 0:
 		var gp: Vector3 = giz[0]; var gf: Vector3 = giz[1]
 		var gside := gf.cross(Vector3.UP)
-		C.cut(gp + gf * 3.6 + gside * 1.2 + Vector3(0, 1.5, 0), gp + Vector3(0, 1.5, 0), 40.0)
-		C.move(gp + gf * 2.8 + gside * 0.8 + Vector3(0, 1.5, 0), gp + Vector3(0, 1.6, 0), 9.0, 36.0)
+		C.cut(gp + gf * 3.6 + gside * 1.2 + Vector3(0, 1.5, 0), gp + Vector3(0, 1.5, 0)); C.lens(40.0)
+		C.move(gp + gf * 2.8 + gside * 0.8 + Vector3(0, 1.5, 0), gp + Vector3(0, 1.6, 0), 9.0)
+		C.lens(50.0, 9.0)
 		C.fx(func(): Snd.at("gizmart_chime", gp, -2))
 		await C.say("cs_intro_gizmart", 0.2)
 		await C.say("cs_intro_gizmart_2", 0.4)
-	# 13. every bot goes haywire: rollers in the yard, a hornet over the wall, sparks from the generator
-	C.cut(Vector3(3, 5.5, 98.5), Vector3(-3, 0.5, 79), 52.0)
+	# 13. every bot goes haywire: handheld, rollers in the yard, a hornet over the wall, the generator sparking
+	C.mark("haywire")
+	C.cut(Vector3(3, 5.5, 98.5), Vector3(-3, 0.5, 79)); C.lens(24.0)
 	C.move(Vector3(1, 6.5, 99.5), Vector3(-4, 0.5, 77), 7.0)
+	C.hand = 1.0
 	C.tw(hats[2], "scale", Vector3.ONE, 0.2)
 	C.tw(roller, "global_position", Vector3(-6, 0, 80), 5.0, 0.0, Tween.TRANS_LINEAR)
 	C.tw(roller, "rotation:y", 2.4, 5.0)
@@ -219,97 +331,151 @@ func run() -> void:
 	await C.wait(0.5)
 	await C.say("intro_09", 0.5)
 	C.fx(func(): FX.sparks(Vector3(10, 1.4, 94.5), Color(1, 0.7, 0.3), 10, 4.0))
+	C.hand = 0.0
+	C.mblur = 0.55
 	# 14. Dodger picks up the signal, looking north to the mast
-	C.cut(dodger.global_position + Vector3(0.5, 0.35, 1.4), mast, 30.0)
+	C.cut(dodger.global_position + Vector3(0.5, 0.35, 1.4), mast); C.lens(30.0)
+	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.7)
+	C.light(dodger, "tension", 1.0, 0.0)
 	C.tw(dodger, "rotation:y", PI, 0.6)
 	dodger.look_target = null
 	dodger.act("hop")
 	await C.say("intro_10", 0.4)
-	# 15. "Somebody else's problem." (back to the coffee)
-	C.cut(seat + Vector3(0.5, 1.05, -1.45), seat + Vector3(0, 1.0, 0.1), 38.0)
-	C.focus(0.8)
+	# 15. "Somebody else's problem." Back to the coffee, the sky going orange behind him
+	C.mark("not_my_problem")
+	C.grade("porch", 1.5)
+	C.score("porch_b", 1.5)
+	C.cut(seat + Vector3(0.5, 1.04, -1.4), seat + Vector3(0, 1.0, 0.1)); C.lens(75.0)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
+	C.light(vh, "golden", 1.0)
 	vesk.look_target = null; vesk.look_point = chair_pos + Vector3(2, 1.2, -8)
-	await C.say("intro_11", 0.6)
+	vesk.mood("smug", 0.4)
+	await C.say("intro_11", 0.2)
+	var sp11 := 0.0
+	if seated: sp11 = vesk.sip(1.2)
+	await C.wait(0.9)
 	# 16. a roller (in a hard hat) trundles up the porch steps and eats the chair
-	C.cut(chair_pos + Vector3(4.0, 1.7, -4.2), chair_pos + Vector3(-0.3, 0.6, 0), 46.0)
+	C.mark("chair")
+	C.score("sting", 0.2)
+	C.grade("chaos", 0.6)
+	C.cut(chair_pos + Vector3(4.0, 1.7, -4.2), chair_pos + Vector3(-0.3, 0.6, 0)); C.lens(28.0)
 	C.focus(0.0)
+	C.light(vh, "soft", 1.0)
 	C.setv(roller, "global_position", chair_pos + Vector3(-5, porch_y - 0.4, -4))
 	C.tw(roller, "global_position", chair_pos + Vector3(-1.4, porch_y, -0.9), 1.6, 0.0, Tween.TRANS_LINEAR)
 	C.tw(roller, "rotation:y", 0.9, 1.6)
 	C.fx(func(): Snd.at("roller_roll", chair_pos, -2))
 	await C.wait(1.0)
-	# Vesk hops out of the chair
+	# Vesk hops out of the chair, mug still in hand
 	vesk.look_target = roller
+	vesk.mood("shocked", 0.1)
 	vesk.play("jump", 0.1)
 	C.tw(vesk, "sit", 0.0, 0.3); C.tw(vesk, "slump", 0.0, 0.3)
 	C.tw(vesk, "global_position", chair_pos + Vector3(1.6, porch_y - 0.4 + 0.02, -0.9), 0.55, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)
 	await C.wait(0.55)
 	vesk.play("land", 0.05)
-	C.fx(func(): Snd.at("land", vesk.global_position, -4))
+	C.fx(func(): Snd.at("land", vesk.global_position, -4); C.foley("boot_land", vesk.global_position, -4))
 	await C.wait(0.35)
 	vesk.play("idle", 0.3)
 	C.setv(vesk, "rotation:y", C.face_to(vesk, chair_pos))
 	C.tw(roller, "global_position", chair_pos + Vector3(-0.2, porch_y, -0.3), 0.5)
 	await C.wait(0.5)
-	C.fx(func(): Snd.at("crate_break", chair_pos, -2); FX.puff(chair_pos + Vector3(0, 0.6, 0), Color(0.6, 0.5, 0.4)); FX.shake(0.3))
+	C.fx(func(): Snd.at("crate_break", chair_pos, -2); C.foley("chair_crunch", chair_pos, 0); FX.puff(chair_pos + Vector3(0, 0.6, 0), Color(0.6, 0.5, 0.4)); FX.shake(0.3); C.shake = 0.6)
 	if chair:
 		C.tw(chair, "rotation:z", 1.45, 0.35, 0.0, Tween.TRANS_BOUNCE, Tween.EASE_OUT)
 		C.tw(chair, "position", chair.position + Vector3(0.35, -0.05, -0.2), 0.35)
 		C.tw(chair, "scale", Vector3(1, 0.75, 1), 0.3)
 	await C.wait(0.6)
 	dodger.look_target = vesk
+	C.cut(dodger.global_position + Vector3(0.9, 0.2, 1.2), dodger.global_position); C.lens(50.0)
+	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.9)
+	C.light(dodger, "soft", 1.0, 0.0)
 	await C.say("intro_12", 0.4)
-	# 17. "...That was a good chair." Then the long-suffering decision.
-	C.cut(vesk.global_position + Vector3(0.9, 1.25, -1.5), vesk.global_position + Vector3(0, 1.3, 0), 36.0)
-	C.focus(1.0)
+	# 17. "...That was a good chair." A slow push-in that widens the background (dolly zoom), then the facepalm
+	C.mark("good_chair")
+	C.score("", 1.0)                                    # the music drops out for the line
+	C.grade("tension", 2.0)
+	var vp: Vector3 = vesk.global_position
+	var fwd := Vector3(sin(vesk.rotation.y), 0, cos(vesk.rotation.y))
+	var side := fwd.cross(Vector3.UP)
+	C.cut(vp + fwd * 2.2 + side * 0.5 + Vector3(0, 1.32, 0), vp + Vector3(0, 1.38, 0)); C.lens(50.0)
+	C.move(vp + fwd * 1.15 + side * 0.25 + Vector3(0, 1.34, 0), vp + Vector3(0, 1.38, 0), 4.0, -1.0, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
+	C.lens(28.0, 4.0)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
+	C.light(vh, "angry", 1.0)
 	vesk.look_target = null; vesk.look_point = chair_pos
-	await C.wait(0.4)
-	await C.say("cs_intro_chair", 0.5)
+	vesk.mood("stunned", 0.4)
+	await C.wait(0.6)
+	var lc: float = C.say_async("cs_intro_chair")
+	await C.wait(lc * 0.45)
+	vesk.mood("furious", 0.5)
+	await C.wait(lc * 0.55 + 0.5)
 	var fp: float = vesk.gesture("cs_facepalm", 0.25, "idle")
 	await C.wait(minf(fp, 2.2) if fp > 0.0 else 0.6)
-	C.cut(vesk.global_position + Vector3(-1.2, 1.15, -1.6), vesk.global_position + Vector3(0, 1.0, 0), 40.0)
+	# 18. "Fine. Let's go unplug it." Low angle, hard rim light, the hero shot
+	C.mark("fine")
+	C.score("hero", 0.3)
+	C.grade("hero", 1.0)
 	C.setv(vesk, "rotation:y", C.face_to(vesk, vesk.global_position + Vector3(-1, 0, -2)))
+	vp = vesk.global_position
+	fwd = Vector3(sin(vesk.rotation.y), 0, cos(vesk.rotation.y)); side = fwd.cross(Vector3.UP)
+	C.cut(vp + fwd * 1.7 - side * 0.6 + Vector3(0, 0.55, 0), vp + Vector3(0, 1.45, 0)); C.lens(24.0)
+	C.move(vp + fwd * 1.45 - side * 0.5 + Vector3(0, 0.5, 0), vp + Vector3(0, 1.45, 0), 4.0)
+	C.focus_on(vh, Vector3.ZERO, 0.0, 0.6)
+	C.light(vh, "hero", -1.0)
 	vesk.look_point = Vector3.INF
 	vesk.look_target = dodger
 	C.tw(roller, "global_position", Vector3(-8, 0.0, 79), 2.4, 0.4, Tween.TRANS_QUAD, Tween.EASE_IN)
+	vesk.mood("furious", 0.2)
+	vesk.act("puff_up")
+	await C.wait(0.3)
 	vesk.gesture("cs_talk2", 0.3, "idle")
 	await C.say("intro_13", 0.3)
+	vesk.mood("annoyed", 0.6)
 	vesk.hold_mug(false)
-	# 18. Dodger cheers, zooms off for the scrap pile... and crashes
+	# 19. Dodger cheers, zooms off for the scrap pile... and crashes
+	C.mark("crash")
 	var dp: Vector3 = dodger.global_position
-	C.cut(dp + Vector3(1.8, 0.4, 2.2), dp, 44.0)
-	C.focus(0.6)
+	C.cut(dp + Vector3(1.8, 0.4, 2.2), dp); C.lens(40.0)
+	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.6)
+	C.light(dodger, "hero", 1.0, 0.0)
 	dodger.look_target = null
 	dodger.act("spin")
 	C.tw(dodger, "rotation:y", C.face_to(dodger, crash), 0.4)
 	await C.say("intro_14", 0.1)
 	C.focus(0.0)
+	C.light_off()
+	C.mblur = 0.9
 	var fly: float = C.line_len("sky_intro_crash_1")
 	if not C.ffwd(): Snd.voice("sky_intro_crash_1", true)
-	C.cut(Vector3(1.5, 2.6, 93.5), dp, 46.0)
+	C.cut(Vector3(1.5, 2.6, 93.5), dp); C.lens(28.0)
 	C.look_node = dodger
 	C.tw(dodger, "global_position", dp + Vector3(-1, 2.5, -3), 0.7, 0.0, Tween.TRANS_SINE, Tween.EASE_OUT)
 	C.tw(dodger, "global_position", crash + Vector3(0.4, 1.8, 2.5), fly * 0.55, 0.7, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
 	C.tw(dodger, "tilt", Vector3(0.4, 0, 0.3), 0.6, 0.7)
-	C.tw(C, "cam_fov", 34.0, fly * 0.7)
+	C.lens(55.0, fly * 0.7)
 	C.fx(func(): Snd.at("dash", dp, -4); Snd.play("cutscenes_whoosh", -8))
 	await C.wait(0.7 + fly * 0.55)
 	C.tw(dodger, "global_position", crash + Vector3(0, 0.25, 0), 0.25, 0.0, Tween.TRANS_QUAD, Tween.EASE_IN)
 	await C.wait(0.25)
-	C.fx(func(): Snd.at("explode_small", crash, -4); FX.sparks(crash + Vector3(0, 0.3, 0), Color(1, 0.7, 0.3), 18, 5.0); FX.puff(crash + Vector3(0, 0.4, 0), Color(0.5, 0.45, 0.4)); FX.shake(0.4))
+	C.fx(func(): Snd.at("explode_small", crash, -4); C.foley("scrap_crash", crash, 0); FX.sparks(crash + Vector3(0, 0.3, 0), Color(1, 0.7, 0.3), 18, 5.0); FX.puff(crash + Vector3(0, 0.4, 0), Color(0.5, 0.45, 0.4)); FX.shake(0.4); C.shake = 0.5)
 	C.setv(dodger, "tilt", Vector3(0.9, 0.4, 1.2)); dodger.hover = 0.0; dodger.dim = 0.6
 	await C.wait(maxf(0.4, fly * 0.45 - 0.25) + 1.0)
-	# 19. hand over: Vesk on the porch steps, looking out at the yard
+	# 20. hand over: crane down behind Vesk on the porch steps, settling into the gameplay camera
+	C.mark("handover")
+	C.mblur = 0.55
 	C.look_node = null
 	vesk.look_target = null
+	vesk.mood("annoyed", 0.3)
 	C.setv(vesk, "global_position", start + Vector3(0, -0.1, 0.9))
 	C.setv(vesk, "rotation:y", PI)
 	vesk.play("idle")
-	C.cut(start + Vector3(0.7, 2.0, 4.6), start + Vector3(0, 1.2, -3.0), 50.0)
+	C.cut(start + Vector3(0.9, 2.8, 5.8), start + Vector3(0, 1.0, -3.0)); C.lens(35.0)
+	C.move(start + Vector3(0.6, 2.0, 4.4), start + Vector3(0, 1.2, -3.0), 2.6, -1.0, Tween.TRANS_SINE, Tween.EASE_OUT)
 	C.walk(vesk, start + Vector3(0, -0.1, 0), 2.0)
 	await C.wait(0.6)
 	vesk.play("idle", 0.3)
-	await C.wait(0.4)
+	await C.wait(0.9)
 	if chair:  # the chewed chair stays knocked over
 		chair.rotation.z = 1.45; chair.scale = Vector3(1, 0.75, 1)
 

@@ -13,6 +13,17 @@ var look_target: Node3D
 var talk := 0.0
 var _look := Vector2.ZERO
 var act_name := ""
+var lip_cues: Array = []
+var lip_t := -1.0
+const OPEN := {"X": 0.0, "A": 0.1, "B": 0.4, "C": 0.75, "D": 1.0, "E": 0.7, "F": 0.35, "G": 0.3, "H": 0.6}
+
+## Eye pulses follow the syllables of his line (same mouth-shape data as Vesk's lip sync).
+func lip(id: String) -> void:
+	var VA = load("res://scripts/cutscene/vesk_actor.gd")
+	if VA.lip_data.is_empty() and FileAccess.file_exists(VA.LIPSYNC):
+		var d = JSON.parse_string(FileAccess.get_file_as_string(VA.LIPSYNC))
+		if d is Dictionary: VA.lip_data = d
+	lip_cues = VA.lip_data.get(id, []); lip_t = 0.0
 var act_t := 9.0
 
 func act(n: String) -> void:
@@ -47,6 +58,14 @@ func _process(dt: float) -> void:
 		"nod": if u < 0.9: r.x += sin(u / 0.9 * TAU * 2.0) * 0.25
 		"shake": if u < 0.9: r.y += sin(u / 0.9 * TAU * 2.0) * 0.35
 	var tk := talk * (0.5 + 0.5 * sin(t * 17.0) * sin(t * 5.3))
+	if lip_t >= 0.0 and not lip_cues.is_empty():
+		lip_t += dt
+		var shp := "X"
+		for c in lip_cues:
+			if float(c[0]) <= lip_t: shp = String(c[1])
+			else: break
+		tk = lerpf(tk, float(OPEN.get(shp, 0.0)) * talk, 0.8)
+		if lip_t > float(lip_cues[-1][0]) + 0.3: lip_t = -1.0
 	r.x += tk * 0.06; p.y += tk * 0.03
 	model.position += p
 	model.rotation += r

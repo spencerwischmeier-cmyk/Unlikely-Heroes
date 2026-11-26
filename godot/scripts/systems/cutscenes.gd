@@ -66,6 +66,24 @@ var orbit_h := 2.0
 var orbit_a := 0.0
 var dof := 0.0          # 0..1 depth of field strength
 var focus_d := -1.0     # focus distance; <= 0 focuses on the look point
+var focus_node: Node3D  # when set, focus follows this node (+ focus_off); rack() blends from the old subject
+var focus_off := Vector3.ZERO
+var focus_prev_d := -1.0
+var focus_k := 1.0      # 0..1 rack blend (old subject -> focus_node)
+var hand := 0.0         # handheld rotation shake amount (0 calm .. 1 run-and-gun)
+var mblur := 0.0        # camera motion blur strength (shutter)
+var _hn := FastNoiseLite.new()
+var _prev_vp := Projection.IDENTITY
+var _post: MeshInstance3D
+var _post_mat: ShaderMaterial
+# per-shot lighting rig (see light())
+var rig_subject: Node3D
+var rig_h := 1.4
+var rig_side := 1.0
+var rig_lights: Array = []   # key, rim, fill
+var rig_preset := ""
+var env_saved := {}
+var grade_name := ""
 
 # overlay state (tracked)
 var fade := 0.0
@@ -200,6 +218,8 @@ func cut(pos: Vector3, look: Vector3, fov := -1.0) -> void:
 	cam_pos = pos; cam_look = look; cam_roll = 0.0
 	if fov > 0.0: setv(self, "cam_fov", fov)
 	look_node = null; follow_node = null; orbit_on = false
+	focus_node = null; setv(self, "focus_k", 1.0)
+	_prev_vp = Projection.IDENTITY   # no motion blur smear across a cut
 
 ## Eased dolly / crane / push-in from the current framing.
 func move(pos: Vector3, look: Vector3, dur: float, fov := -1.0, trans := Tween.TRANS_SINE, ease_ := Tween.EASE_IN_OUT) -> void:
@@ -224,6 +244,72 @@ func ots(who: Node3D, at: Vector3, side := 1.0, fov := 40.0, back := 1.5, up := 
 	var d := (at - p); d.y = 0; d = d.normalized()
 	var right := d.cross(Vector3.UP).normalized()
 	cut(p - d * back + right * side * 0.55 + Vector3(0, up, 0), at, fov)
+
+## Lens in millimetres (full-frame, vertical): 18 wide .. 35 normal .. 85 portrait .. 200 long.
+func lens(mm: float, dur := 0.0) -> void:
+	var f := rad_to_deg(2.0 * atan(12.0 / mm))
+	if dur <= 0.0: setv(self, "cam_fov", f)
+	else: tw(self, "cam_fov", f, dur)
+
+## Keep focus on a node (+ offset); with dur > 0 it racks over from whatever was in focus.
+func focus_on(n: Node3D, off := Vector3.ZERO, dur := 0.0, amount := -1.0) -> void:
+	var cur_d := -1.0
+	if cam and attrs and attrs.dof_blur_far_enabled: cur_d = attrs.dof_blur_far_distance - maxf(0.5, (attrs.dof_blur_far_distance) * 0.23)
+	if cam and is_instance_valid(focus_node): cur_d = cam.global_position.distance_to(focus_node.global_position + focus_off)
+	focus_node = n; focus_off = off; focus_prev_d = cur_d
+	if amount >= 0.0: setv(self, "dof", amount)
+	if dur > 0.0 and cur_d > 0.0:
+		setv(self, "focus_k", 0.0); tw(self, "focus_k", 1.0, dur, 0.0, Tween.TRANS_CUBIC, Tween.EASE_IN_OUT)
+	else:
+		setv(self, "focus_k", 1.0)
+
+## A head (or any point on an actor) as a focus / lighting target.
+func head_of(a: Node3D) -> Node3D:
+	if a and a.has_method("head_node"): return a.head_node()
+	return a
+
+## Scene score: cues from audio/music/intro/<cue>.ogg (crossfaded; "" fades the score out).
+var score_players: Array = []
+var score_cue := ""
+func score(cue: String, fade := 1.0) -> void:
+	if cue == score_cue: return
+	score_cue = cue
+	for p in score_players:
+		if is_instance_valid(p):
+			var tw_ := create_tween(); tw_.tween_property(p, "volume_db", -60.0, maxf(fade, 0.05)); tw_.tween_callback(p.queue_free)
+	score_players = []
+	if cue == "": return
+	var path := "res://audio/music/%s/%s.ogg" % [playing, cue]
+	if not ResourceLoader.exists(path): return
+	Snd.set_track("", maxf(fade, 0.3))
+	var p := AudioStreamPlayer.new(); p.bus = "Music"; p.stream = load(path); p.volume_db = -60.0 if fade > 0.0 else SCORE_DB
+	add_child(p); p.play()
+	if fade > 0.0: create_tween().tween_property(p, "volume_db", SCORE_DB, fade)
+	score_players.append(p)
+const SCORE_DB := -4.0
+
+## Foley: audio/sfx/foley_<name>.ogg at a point (skipped when missing or fast-forwarding).
+func foley(n: String, at: Vector3, db := 0.0) -> void:
+	if ffwd(): return
+	if ResourceLoader.exists("res://audio/sfx/foley_%s.ogg" % n): Snd.at("foley_" + n, at, db)
+
+## Room tone: a looping bed (audio/sfx/foley_<name>.ogg) under the scene; "" fades it out.
+var tone_player: AudioStreamPlayer
+func room_tone(n: String, db := -14.0, fade := 1.5) -> void:
+	if is_instance_valid(tone_player):
+		var old := tone_player; var tw_ := create_tween(); tw_.tween_property(old, "volume_db", -60.0, fade); tw_.tween_callback(old.queue_free)
+		tone_player = null
+	var path := "res://audio/sfx/foley_%s.ogg" % n
+	if n == "" or not ResourceLoader.exists(path): return
+	var st: AudioStream = (load(path) as AudioStream).duplicate()
+	if "loop" in st: st.loop = true
+	tone_player = AudioStreamPlayer.new(); tone_player.bus = "SFX" if AudioServer.get_bus_index("SFX") >= 0 else "Master"
+	tone_player.stream = st; tone_player.volume_db = -60.0; add_child(tone_player); tone_player.play()
+	create_tween().tween_property(tone_player, "volume_db", db, fade)
+
+## Mark a beat in the log (--cut-log): music and foley are timed from these.
+func mark(n: String) -> void:
+	if start_args.has("cut-log"): print("[mark] %s %.2f" % [n, ct])
 
 func _process(dt: float) -> void:
 	sub_t -= dt
@@ -278,9 +364,19 @@ func _apply(dt: float) -> void:
 			var up := Vector3.UP if absf((look - pos).normalized().y) < 0.98 else Vector3.FORWARD
 			cam.look_at(look + off * 0.5, up)
 			if absf(cam_roll) > 0.0001: cam.rotate_object_local(Vector3(0, 0, 1), cam_roll)
+			if hand > 0.001:   # handheld: slow drift plus a little operator jitter, in rotation
+				var ht := ct * 1.0
+				cam.rotate_object_local(Vector3.RIGHT, (_hn.get_noise_2d(ht * 40.0, 1.0) * 0.012 + _hn.get_noise_2d(ht * 160.0, 5.0) * 0.003) * hand)
+				cam.rotate_object_local(Vector3.UP, (_hn.get_noise_2d(ht * 40.0, 9.0) * 0.014 + _hn.get_noise_2d(ht * 160.0, 13.0) * 0.003) * hand)
+				cam.rotate_object_local(Vector3.BACK, _hn.get_noise_2d(ht * 30.0, 17.0) * 0.008 * hand)
 		cam.fov = cam_fov
+		_post_fx()
+		_rig_update()
 		if attrs:
 			var fd := focus_d if focus_d > 0.0 else pos.distance_to(look)
+			if is_instance_valid(focus_node):
+				var nd := cam.global_position.distance_to(focus_node.global_position + focus_off)
+				fd = lerpf(focus_prev_d, nd, focus_k) if focus_prev_d > 0.0 else nd
 			var on := dof > 0.01
 			attrs.dof_blur_far_enabled = on
 			attrs.dof_blur_near_enabled = on and fd < 8.0
@@ -344,6 +440,9 @@ func _run(id: String) -> void:
 	cam.attributes = attrs
 	Game.main.add_child(cam)
 	cam.current = true
+	_hn.seed = 7; _hn.frequency = 0.01; _hn.fractal_octaves = 2
+	hand = 0.0; mblur = 0.6; focus_node = null; focus_k = 1.0
+	_add_post()
 	cam_fov = 50.0; sway = 1.0; fade = 1.0; bars = 1.0; dof = 0.0; focus_d = -1.0; cam_roll = 0.0
 	orbit_on = false; look_node = null; follow_node = null; auto_look = true; cast.clear(); speaking = ""
 	_apply(0.0)
@@ -375,6 +474,9 @@ func _finish(id: String) -> void:
 	scene = null
 	for a in actors: if is_instance_valid(a): a.queue_free()
 	actors.clear(); vesk = null; dodger = null; grudd = null; cast.clear()
+	light_off(); grade(""); score("", 1.5); room_tone("")
+	if is_instance_valid(_post): _post.queue_free()
+	_post = null
 	clock_a = 0; live_a = 0; call_a = 0; card_a = 0; loc_a = 0; boss_a = 0; poster_a = 0; next_a = 0; white = 0
 	if sun and sun_energy >= 0.0: sun.light_energy = sun_energy
 	sun_energy = -1.0
@@ -388,6 +490,8 @@ func _finish(id: String) -> void:
 	Snd.loop("wind_loop", true, -16)
 	playing = ""
 	Game.cutscene_finished.emit(id)
+	if start_args.has("cut-quit") and start_args.get("cut", "") == id:   # preview renders (Movie Maker) stop here
+		get_tree().create_timer(2.0).timeout.connect(get_tree().quit)
 	# ease from the cutscene camera into the gameplay camera, open the letterbox, fade in
 	var game_cam: Camera3D = Game.cam.camera if Game.cam and "camera" in Game.cam else null
 	var oc := cam
@@ -505,6 +609,7 @@ func sun_dim(on: bool) -> void:
 func _on_line(id: String, sp: String, text: String) -> void:
 	if playing == "": return
 	speaking = sp
+	if cast.has(sp) and is_instance_valid(cast[sp]) and cast[sp].has_method("lip"): cast[sp].lip(id)
 	if auto_look and cast.has(sp): all_look(sp, cast[sp].look_target if "look_target" in cast[sp] else null)
 	var who: String = SPEAKER_NAMES.get(sp, sp.to_upper())
 	var col: Color = SPEAKER_COLORS.get(sp, Color.WHITE)
@@ -711,3 +816,90 @@ func _draw_call() -> void:
 		var h := 6.0 + i * 5.0
 		var on := (int(ct * 4.0) % 5) > i
 		b.draw_rect(Rect2(Vector2(300 + i * 9, 96 - h), Vector2(6, h)), Color(0.5, 1, 0.55, 0.9 if on else 0.25))
+
+# ---------------------------------------------------------------- lens post, lighting rig, grade
+func _add_post() -> void:
+	_post = MeshInstance3D.new(); _post.name = "CutscenePost"
+	var q := QuadMesh.new(); q.size = Vector2(1, 1); _post.mesh = q
+	_post_mat = ShaderMaterial.new(); _post_mat.shader = load("res://shaders/cutscene_post.gdshader")
+	_post.material_override = _post_mat
+	_post.extra_cull_margin = 16384.0; _post.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_post.position = Vector3(0, 0, -0.2)
+	cam.add_child(_post)
+	_prev_vp = Projection.IDENTITY
+
+func _post_fx() -> void:
+	if not is_instance_valid(_post) or _post_mat == null: return
+	var cur := Projection(cam.global_transform.affine_inverse())
+	var valid := _prev_vp != Projection.IDENTITY and not ffwd()
+	_post_mat.set_shader_parameter("prev_view", _prev_vp if valid else cur)
+	_post_mat.set_shader_parameter("blur", mblur if valid else 0.0)
+	_prev_vp = cur
+
+const RIGS := {
+	# key (warm sun side), rim (back light), fill (sky side); energies for SpotLight3D / OmniLight3D
+	"golden": {"key": Color(1.0, 0.8, 0.58), "key_e": 3.0, "rim": Color(1.0, 0.68, 0.38), "rim_e": 9.0, "fill": Color(0.55, 0.66, 0.9), "fill_e": 0.6, "elev": 0.45},
+	"soft": {"key": Color(1.0, 0.86, 0.7), "key_e": 2.0, "rim": Color(1.0, 0.75, 0.5), "rim_e": 5.0, "fill": Color(0.6, 0.7, 0.9), "fill_e": 0.8, "elev": 0.35},
+	"tension": {"key": Color(0.85, 0.85, 1.0), "key_e": 1.8, "rim": Color(1.0, 0.45, 0.12), "rim_e": 12.0, "fill": Color(0.4, 0.5, 0.8), "fill_e": 0.4, "elev": 0.6},
+	"angry": {"key": Color(1.0, 0.72, 0.5), "key_e": 2.6, "rim": Color(1.0, 0.35, 0.1), "rim_e": 16.0, "fill": Color(0.45, 0.5, 0.75), "fill_e": 0.3, "elev": -0.15},
+	"hero": {"key": Color(1.0, 0.82, 0.6), "key_e": 3.4, "rim": Color(1.0, 0.6, 0.25), "rim_e": 18.0, "fill": Color(0.5, 0.65, 1.0), "fill_e": 0.7, "elev": 0.2},
+}
+
+## Per-shot three-point light on a subject (placed from the camera each frame, like a set crew would):
+## key from the `side` (+1 camera right), rim from behind on the other side, cool fill from the front.
+func light(subject: Node3D, preset := "golden", side := 1.0, h := 1.45) -> void:
+	rig_subject = subject; rig_side = side; rig_h = h; rig_preset = preset
+	if rig_lights.is_empty():
+		var key := SpotLight3D.new(); key.name = "CsKey"; key.shadow_enabled = true; key.spot_range = 7.0; key.spot_angle = 32.0
+		key.spot_angle_attenuation = 0.8; key.shadow_blur = 2.0; key.light_size = 0.25
+		var rim := SpotLight3D.new(); rim.name = "CsRim"; rim.shadow_enabled = false; rim.spot_range = 6.0; rim.spot_angle = 28.0; rim.light_specular = 1.0
+		var fill := OmniLight3D.new(); fill.name = "CsFill"; fill.shadow_enabled = false; fill.omni_range = 5.0; fill.light_specular = 0.15
+		for l in [key, rim, fill]: l.light_volumetric_fog_energy = 0.0; Game.main.add_child(l)
+		rig_lights = [key, rim, fill]
+	var r: Dictionary = RIGS.get(preset, RIGS.golden)
+	var key: SpotLight3D = rig_lights[0]; var rim: SpotLight3D = rig_lights[1]; var fill: OmniLight3D = rig_lights[2]
+	key.light_color = r.key; rim.light_color = r.rim; fill.light_color = r.fill
+	tw(key, "light_energy", r.key_e, 0.4); tw(rim, "light_energy", r.rim_e, 0.4); tw(fill, "light_energy", r.fill_e, 0.4)
+	for l in rig_lights: l.visible = true
+	_rig_update()
+
+func light_off() -> void:
+	for l in rig_lights: if is_instance_valid(l): l.queue_free()
+	rig_lights = []; rig_subject = null
+
+func _rig_update() -> void:
+	if rig_lights.is_empty() or not is_instance_valid(rig_subject) or cam == null: return
+	var c: Vector3 = rig_subject.global_position + (Vector3.ZERO if rig_subject.name == "Eyes" else Vector3(0, rig_h, 0))
+	var to_cam := cam.global_position - c; to_cam.y = 0
+	if to_cam.length() < 0.01: to_cam = Vector3.BACK
+	to_cam = to_cam.normalized()
+	var r: Dictionary = RIGS.get(rig_preset, RIGS.golden)
+	var kd := to_cam.rotated(Vector3.UP, deg_to_rad(55.0) * rig_side) + Vector3(0, r.elev, 0)
+	var rd := (-to_cam).rotated(Vector3.UP, -deg_to_rad(40.0) * rig_side) + Vector3(0, 0.55, 0)
+	var fd := to_cam.rotated(Vector3.UP, -deg_to_rad(35.0) * rig_side) + Vector3(0, 0.1, 0)
+	var key: SpotLight3D = rig_lights[0]; var rim: SpotLight3D = rig_lights[1]; var fill: OmniLight3D = rig_lights[2]
+	key.global_position = c + kd.normalized() * 2.6; key.look_at(c, Vector3.UP)
+	rim.global_position = c + rd.normalized() * 2.2; rim.look_at(c, Vector3.UP)
+	fill.global_position = c + fd.normalized() * 1.8
+
+const GRADES := {
+	"golden": {"adjustment_saturation": 1.24, "adjustment_contrast": 1.12, "tonemap_exposure": 0.95, "volumetric_fog_density": 0.006, "glow_intensity": 0.95},
+	"porch": {"adjustment_saturation": 1.2, "adjustment_contrast": 1.1, "tonemap_exposure": 0.92, "volumetric_fog_density": 0.012, "glow_intensity": 1.0},
+	"tension": {"adjustment_saturation": 0.88, "adjustment_contrast": 1.22, "tonemap_exposure": 0.82, "volumetric_fog_density": 0.014, "glow_intensity": 1.1},
+	"chaos": {"adjustment_saturation": 1.32, "adjustment_contrast": 1.24, "tonemap_exposure": 0.92, "volumetric_fog_density": 0.01, "glow_intensity": 1.2},
+	"hero": {"adjustment_saturation": 1.28, "adjustment_contrast": 1.18, "tonemap_exposure": 0.98, "volumetric_fog_density": 0.009, "glow_intensity": 1.15},
+}
+
+## Scene colour grade and atmosphere (the world Environment, put back when the cutscene ends).
+func grade(n: String, dur := 1.2) -> void:
+	var env: Environment = Game.main.get("env") if Game.main else null
+	if env == null: return
+	if n == "":
+		for k in env_saved: env.set(k, env_saved[k])
+		env_saved = {}; grade_name = ""; return
+	var g: Dictionary = GRADES.get(n, {})
+	for k in g:
+		if not env_saved.has(k): env_saved[k] = env.get(k)
+		if dur <= 0.0 or ffwd(): setv(env, k, g[k])
+		else: tw(env, k, g[k], dur)
+	grade_name = n
