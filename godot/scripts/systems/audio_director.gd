@@ -61,6 +61,7 @@ var chat_t := 2.0
 var lowpass := 20500.0
 var fountain_done := false
 var boss_phase2 := false
+var cut_id := ""
 var flyby: AudioStreamPlayer3D
 var flyby_t := 25.0
 var flyby_a := Vector3.ZERO
@@ -77,6 +78,7 @@ func _ready() -> void:
 	Game.collectible_found.connect(func(_k, _id): Snd.sting("sting_secret", -3.0))
 	Game.bot_killed.connect(_on_bot_killed)
 	Game.zone_entered.connect(_on_zone_entered)
+	Game.cutscene_started.connect(func(id): cut_id = id)
 	Game.player_respawned.connect(func(_p): Snd.play("area_whoosh", -12.0, 0.05, 0.5))
 	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0; boss_phase2 = false)
 	Game.boss_health.connect(_on_boss_health)
@@ -154,16 +156,19 @@ static func _rect_dist(r: Rect2, p: Vector2) -> float:
 func _locate(pos: Vector3) -> String:
 	var isl: Dictionary = Game.level.islands
 	var p := Vector2(pos.x, pos.z)
-	var best := ""; var best_d := INF; var best_area := INF
+	var hs: Dictionary = Game.level.heights if "heights" in Game.level else {}
+	var best := ""; var best_d := INF; var best_k := INF
 	var dist := {}
 	for n in isl:
 		var r: Rect2 = isl[n]
 		var d := _rect_dist(r, p)
 		var a: String = island_area.get(n, "plaza")
 		dist[a] = minf(dist.get(a, INF), d)
-		var sz := r.get_area()
-		if d < best_d - 0.5 or (d <= 0.0 and best_d <= 0.0 and sz < best_area):
-			best_d = d; best = n; best_area = sz
+		# among islands under the point, the deck closest below the hero wins (stacked decks)
+		var h: float = hs.get(n, 0.0)
+		var k := absf(pos.y - h) + (6.0 if h > pos.y + 1.0 else 0.0)
+		if d < best_d - 0.5 or (d <= 0.0 and best_d <= 0.0 and k < best_k):
+			best_d = d; best = n; best_k = k
 	for a in AREAS:
 		var d: float = dist.get(a, INF)
 		weights[a] = pow(clampf(1.0 - d / 22.0, 0.0, 1.0), 1.5)
@@ -190,6 +195,10 @@ func landed(db: float) -> void:
 	if db > -2.0: Snd.play("debris", db - 12.0, 0.1, 0.3)
 
 # ------------------------------------------------------------------ music
+## the music cue for the cutscene that is starting (Snd.music("cutscene") asks)
+func cut_cue() -> String:
+	return "cut_" + cut_id if cut_id != "" else ""
+
 func _shop_open() -> bool:
 	var g: Node = Game.main.get_node_or_null("Gizmart") if Game.main else null
 	return g != null and g.get("open_i") != null and int(g.open_i) >= 0
@@ -508,6 +517,11 @@ func _self_test() -> void:
 	var b_ok := Snd.track == "boss_b"
 	print("[audio-test] %s boss phase two: track=%s" % ["PASS" if b_ok else "FAIL", Snd.track])
 	ok = ok and b_ok
+	Game.cutscene_started.emit("broadcast"); Snd.music("cutscene", 0.5)
+	var cue_ok := Snd.track == "cut_broadcast"
+	print("[audio-test] %s cutscene cue: track=%s" % ["PASS" if cue_ok else "FAIL", Snd.track])
+	ok = ok and cue_ok
+	Game.cutscene_finished.emit("broadcast")
 	Snd.music("skyharbor", 0.5)
 	var gz: Node = Game.main.get_node_or_null("Gizmart")
 	if gz and gz.get("kiosks") != null and gz.kiosks.size() > 0 and gz.has_method("_open"):

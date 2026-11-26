@@ -262,6 +262,11 @@ func has_music(t: String) -> bool:
 	return ResourceLoader.exists(MUSIC_DIR + t + ".ogg") or ResourceLoader.exists(MUSIC_DIR + t + ".mp3")
 
 func music(n: String, fade := 1.5) -> void:
+	if n == "cutscene":   # each cutscene gets its own cue (audio/music/cut_<id>) when there is one
+		var cue: String = director.cut_cue() if _dir() else ""
+		music_name = n; adaptive = false
+		set_track(cue if cue != "" and has_music(cue) else "cutscene", fade)
+		return
 	if n == music_name: return
 	music_name = n
 	adaptive = n == "skyharbor" and has_music("area_plaza")
