@@ -43,6 +43,10 @@ var prompt := Control.new()
 var banner := Control.new()
 var subs := Control.new()
 var toast_box := VBoxContainer.new()
+var wstrip := Control.new()
+var flyer_layer := Control.new()
+var flyers: Array = []                 # sprockets flying into the counter: { from, t, delay }
+var strip_t := 0.0
 
 # state
 var hull := 8
@@ -103,10 +107,13 @@ func _ready() -> void:
 	_place(collect, Vector2(1, 0), Rect2(-300, 92, 282, 46), _draw_collect)
 	_place(boss, Vector2(0.5, 0), Rect2(-340, 10, 680, 84), _draw_boss)
 	_place(weapon, Vector2(1, 1), Rect2(-470, -156, 452, 140), _draw_weapon)
+	_place(wstrip, Vector2(1, 1), Rect2(-470, -206, 452, 50), _draw_wstrip)
 	_place(cross, Vector2(0.5, 0.5), Rect2(-40, -40, 80, 80), _draw_cross)
 	_place(prompt, Vector2(0.5, 0.5), Rect2(-320, 70, 640, 60), _draw_prompt)
 	_place(banner, Vector2(0.5, 0), Rect2(-640, 150, 1280, 150), _draw_banner)
 	_place(subs, Vector2(0.5, 1), Rect2(-520, -190, 1040, 170), _draw_subs)
+	flyer_layer.set_anchors_preset(Control.PRESET_FULL_RECT); flyer_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flyer_layer.draw.connect(_draw_flyers); root.add_child(flyer_layer)
 	toast_box.anchor_left = 1; toast_box.anchor_right = 1
 	toast_box.offset_left = -440; toast_box.offset_right = -18; toast_box.offset_top = 146; toast_box.offset_bottom = 560
 	toast_box.add_theme_constant_override("separation", 10); toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -124,7 +131,7 @@ func _ready() -> void:
 	combat.nuts_changed.connect(_nuts)
 	combat.hull_changed.connect(_hull)
 	combat.hit_marker.connect(func(k): hit_t = 0.18; hit_kill = k)
-	combat.weapon_changed.connect(func(_id): wpn_pop = 1.0)
+	combat.weapon_changed.connect(func(_id): wpn_pop = 1.0; strip_t = 2.5)
 	combat.ammo_changed.connect(func(_id, _a, _m): ammo_pop = 1.0)
 	combat.weapon_level_up.connect(_level_up)
 	if "hull" in combat: hull = combat.hull
@@ -179,6 +186,7 @@ func _nuts(n: int) -> void:
 	nuts = n
 	if nut_last >= 0 and n > nut_last:
 		nut_gain_n += n - nut_last; nut_gain_t = 1.6; gear_spin = 1.0; wallet_pop = 1.0
+		_spawn_flyers(n - nut_last)
 	elif nut_last < 0:
 		nut_shown = n
 	nut_last = n
@@ -303,6 +311,11 @@ func _process(dt: float) -> void:
 	sub_a = move_toward(sub_a, 1.0 if sub_t > 0.0 and subtitles and sub_text != "" else 0.0, dt * (8.0 if sub_t > 0.0 else 3.0))
 	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs]: c.queue_redraw()
 	for c in toast_box.get_children(): c.queue_redraw()
+	strip_t = maxf(0.0, strip_t - dt)
+	wstrip.queue_redraw()
+	for f in flyers: f.t += dt
+	flyers = flyers.filter(func(f): return f.t < f.delay + 0.55)
+	flyer_layer.queue_redraw()
 
 func _pad() -> bool:
 	return player != null and player.get("using_pad") == true
@@ -351,6 +364,11 @@ func _draw_vitals() -> void:
 	# jetpack + dash strip, tucked under the hull panel
 	var jr := Rect2(78, 70, 246, 32)
 	HD.panel(ci, jr, JET_COL, 10, -0.2, 1.0)
+	if low:
+		var la := 0.55 + 0.45 * sin(t * 8.0)
+		var lr := Rect2(332, 70, 74, 26)
+		HD.panel(ci, lr, LOW_COL, 9, -0.2, la, Color(0.45, 0.06, 0.05, 0.95), Color(0.25, 0.02, 0.02, 0.95))
+		HD.text(ci, head, Vector2(lr.get_center().x, 89), "REPAIR!", 15, Color(1, 0.9, 0.85), 1, 4, la)
 	var jets := 0
 	var gliding := false
 	var dash_frac := 1.0
@@ -629,3 +647,49 @@ func _draw_toast(card: Control) -> void:
 	HD.text(card, head, Vector2(66 + ox, 32), d.title, 22, col.lightened(0.1), 0, 5)
 	if d.sub != "":
 		card.draw_multiline_string(body, Vector2(66 + ox, 42 + body.get_ascent(17)), d.sub, HORIZONTAL_ALIGNMENT_LEFT, card.size.x - 96, 17, -1, Color(0.9, 0.94, 1.0))
+
+# ---------------------------------------------------------------- draw: owned-weapon strip
+## Small emblems for every owned weapon above the weapon card, the current one raised and ringed.
+## Bright for a moment after a swap, then it settles back to a dim strip.
+func _draw_wstrip() -> void:
+	if combat == null or not ("WEAPONS" in combat): return
+	var owned: Array = []
+	for id in combat.WEAPONS:
+		if id == "arc_lancer" or Game.has(id): owned.append(id)
+	if owned.size() < 2: return
+	var ci := wstrip
+	var a := 0.85 + 0.15 * clampf(strip_t / 0.4, 0.0, 1.0)
+	var pad := _pad()
+	var x := 392.0 - (owned.size() - 1) * 52.0
+	for i in owned.size():
+		var id: String = owned[i]
+		var cur: bool = id == combat.current
+		var wc: Color = combat.weapon_color(id)
+		var c := Vector2(x + i * 52.0, 24.0 - (3.0 if cur else 0.0))
+		HD.badge(ci, c, 20.0 if cur else 16.0, wc if cur else wc.darkened(0.3), a)
+		HD.icon(ci, HD.weapon_icon(id), c, 12.0 if cur else 9.5, wc if cur else wc.darkened(0.1), a)
+		if not pad:
+			var k := c + Vector2(-16, 13)
+			ci.draw_circle(k, 9, Color(HD.INK, a), true, -1, true)
+			ci.draw_circle(k, 7, Color(0.9, 0.93, 1.0, a) if cur else Color(0.55, 0.6, 0.7, a), true, -1, true)
+			HD.text(ci, head, k + Vector2(0, 5), str(i + 1), 13, Color(0.08, 0.1, 0.18), 1, 0, a)
+	if pad:
+		HD.text(ci, head, Vector2(x - 40, 30), "LB", 16, Color(0.85, 0.9, 1), 1, 5, a)
+
+# ---------------------------------------------------------------- sprocket flyers
+func _spawn_flyers(gain: int) -> void:
+	var vp := root.size
+	var from := Vector2(vp.x * 0.5, vp.y * 0.62)
+	for i in mini(8, maxi(1, gain / 5)):
+		flyers.append({ from = from + Vector2(randf_range(-60, 60), randf_range(-40, 30)), t = 0.0, delay = i * 0.05, side = randf_range(-1, 1) })
+
+func _draw_flyers() -> void:
+	if flyers.is_empty(): return
+	var to := Vector2(root.size.x - 300 + 50, 52)
+	for f in flyers:
+		var k: float = clampf((f.t - f.delay) / 0.55, 0.0, 1.0)
+		if k <= 0.0: continue
+		var e := k * k * (3.0 - 2.0 * k)
+		var mid: Vector2 = (f.from + to) * 0.5 + Vector2(f.side * 160.0, -140.0)
+		var p: Vector2 = (f.from.lerp(mid, e)).lerp(mid.lerp(to, e), e)
+		HD.icon(flyer_layer, "sprocket", p, lerpf(13.0, 8.0, e), GOLD, 1.0 - maxf(0.0, (k - 0.85) / 0.15), t * 8.0 + f.side)
