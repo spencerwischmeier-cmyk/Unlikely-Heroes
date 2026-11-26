@@ -13,7 +13,7 @@ var layer: CanvasLayer
 var wheel: Control
 var center_label: Label
 var sub_label: Label
-var font: SystemFont
+var font: Font
 var open := false
 var sel := -1
 var point := Vector2.ZERO
@@ -173,8 +173,7 @@ func _label_sel() -> void:
 
 # ---------------------------------------------------------------- UI
 func _build_ui() -> void:
-	font = SystemFont.new(); font.font_names = PackedStringArray(["Inter", "Segoe UI", "Arial", "sans-serif"])
-	font.font_weight = 900; font.font_italic = true
+	font = preload("res://scripts/ui/hud_draw.gd").head_font()
 	layer = CanvasLayer.new(); layer.layer = 30; add_child(layer)
 	wheel = Control.new()
 	wheel.anchor_left = 0.5; wheel.anchor_right = 0.5; wheel.anchor_top = 0.5; wheel.anchor_bottom = 0.5
