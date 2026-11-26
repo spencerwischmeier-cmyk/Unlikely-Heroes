@@ -49,6 +49,12 @@ func _ready() -> void:
 		rail_chute = [Vector3(-21, 8.9, -4), 0.0, run, 0.0, Rect2(-22, 14, 44, 32)],
 		container_washer = [Vector3(50.6, 4.1, -4), -PI / 2, dj, 6.4, Rect2(44.5, -5.2, 5, 2.4)],
 	}
+	# extra cases from each area's own file: res://scripts/level/areas/<area>.gd may define
+	# `static func traversal_cases(moves: Dictionary) -> Dictionary` (same format as above)
+	var moves := { dj = dj, dj_short = dj_short, glide = glide, sj = sj, hooks2 = hooks2, run = run }
+	for f in preload("res://scripts/level/areas.gd").files():
+		var sc: Script = load(f)
+		if sc.has_method("traversal_cases"): cases.merge(sc.traversal_cases(moves), true)
 	var which := "all"
 	for a in OS.get_cmdline_user_args(): if a.begins_with("--traverse="): which = a.substr(11)
 	order = cases.keys() if which == "all" else which.split(",")

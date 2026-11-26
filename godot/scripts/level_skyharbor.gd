@@ -392,6 +392,7 @@ func _build() -> void:
 	_build_crane_yard()
 	_build_city()
 	_define_zones()
+	preload("res://scripts/level/areas.gd").build_all(self)
 	debug_spots = {
 		start = [start_pos, PI], plaza = [Vector3(0, 0.1, 40), PI], docks = [Vector3(39, 0.1, 24), PI],
 		pier_c = [Vector3(64, 6.1, -38), -PI / 2], terrace = [Vector3(-32, 0.1, 40), -PI / 2],
