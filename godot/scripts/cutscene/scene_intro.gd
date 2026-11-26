@@ -49,6 +49,7 @@ func run() -> void:
 
 	var seated: bool = vesk.has_method("hold") and vesk.has("cs_sit_drink")
 	if seated: vesk.hold("cs_sit_drink", 2.6, 0.0)
+	_vesk = vesk
 	var vh: Node3D = C.head_of(vesk)            # his eyes, for focus pulls and the light rig
 	var dh: Node3D = dodger
 	C.score("open", 0.0)
@@ -98,10 +99,10 @@ func run() -> void:
 	await C.say("intro_03", 0.9)
 	# 5. "Ahhh. Finally. Nothing left to fix." Eyes shut, the long happy sigh, then the sip
 	C.mark("sigh")
-	C.cut(seat + Vector3(0.62, 1.02, -1.5), seat + Vector3(0, 1.0, 0.1)); C.lens(65.0)
+	_cu(38.0, 1.25, 65.0, -0.02)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 0.8)
 	C.light(vh, "golden", -1.0)
-	C.move(seat + Vector3(0.48, 1.0, -1.22), seat + Vector3(0, 1.0, 0.1), 12.0)   # slow push-in
+	_push(38.0, 0.95, 12.0)   # slow push-in
 	vesk.mood("content", 0.6)
 	vesk.act("content_sigh")
 	C.fx(func(): C.foley("chair_creak", chair_pos, -10))
@@ -132,10 +133,10 @@ func run() -> void:
 	await C.say("intro_05", 0.4)
 	# 7. "Dodger. It's my day off." Close on Vesk, Dodger a soft blur at the frame edge
 	C.mark("day_off")
-	C.cut(seat + Vector3(1.05, 1.08, -1.3), seat + Vector3(0.05, 1.0, 0.05)); C.lens(85.0)
+	_cu(-28.0, 1.35, 85.0, 0.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", 1.0)
-	C.move(seat + Vector3(0.95, 1.06, -1.18), seat + Vector3(0.05, 1.0, 0.05), 10.0)
+	_push(-28.0, 1.15, 10.0)
 	C.auto_look = false
 	vesk.look_point = chair_pos + Vector3(2, 1.4, -8)
 	vesk.mood("annoyed", 0.4)
@@ -158,7 +159,7 @@ func run() -> void:
 	C.move(seat + Vector3(2.1, 1.4, -2.0), seat + Vector3(0.7, 1.2, 0), 6.0)
 	dodger.act("hop")
 	await C.say("cs_intro_gate_1", 0.25)
-	C.cut(seat + Vector3(0.7, 1.05, -1.45), seat + Vector3(0, 1.0, 0.1)); C.lens(75.0)
+	_cu(30.0, 1.2, 75.0, 0.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	vesk.mood("tired", 0.3)
@@ -168,7 +169,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	C.cut(seat + Vector3(0.7, 1.05, -1.45), seat + Vector3(0, 1.0, 0.1)); C.lens(75.0)
+	_cu(30.0, 1.2, 75.0, 0.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
@@ -249,12 +250,12 @@ func run() -> void:
 	vesk.mood("shocked", 0.15); vesk.act("flinch")
 	C.focus_on(vh, Vector3.ZERO, 0.6)                  # rack to Vesk's face over the hat
 	await C.say("sky_intro_coffee_1", 0.3)
-	C.cut(seat + Vector3(0.55, 1.05, -1.4), seat + Vector3(0, 1.0, 0.1)); C.lens(75.0)
+	_cu(22.0, 1.15, 75.0, 0.02)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "tension", -1.0)
 	vesk.mood("annoyed", 0.25); vesk.act("lean_in")
 	await C.say("sky_intro_coffee_2", 0.4)
-	C.cut(cpos + Vector3(-0.32, 0.36, -0.55), cpos + Vector3(0, 0.38, 0)); C.lens(85.0)
+	C.cut(cpos + Vector3(-0.6, 0.5, -1.05), cpos + Vector3(0, 0.36, 0)); C.lens(45.0)
 	C.focus_on(coffee, Vector3(0, 0.4, 0), 0.0, 1.0)
 	await C.say("sky_intro_coffee_3", 0.6)
 	# 11. the toaster growls (dutch angle)
@@ -345,7 +346,7 @@ func run() -> void:
 	C.mark("not_my_problem")
 	C.grade("porch", 1.5)
 	C.score("porch_b", 1.5)
-	C.cut(seat + Vector3(0.5, 1.04, -1.4), seat + Vector3(0, 1.0, 0.1)); C.lens(75.0)
+	_cu(34.0, 1.2, 75.0, 0.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", 1.0)
 	vesk.look_target = null; vesk.look_point = chair_pos + Vector3(2, 1.2, -8)
@@ -398,9 +399,9 @@ func run() -> void:
 	var vp: Vector3 = vesk.global_position
 	var fwd := Vector3(sin(vesk.rotation.y), 0, cos(vesk.rotation.y))
 	var side := fwd.cross(Vector3.UP)
-	C.cut(vp + fwd * 2.2 + side * 0.5 + Vector3(0, 1.32, 0), vp + Vector3(0, 1.38, 0)); C.lens(50.0)
-	C.move(vp + fwd * 1.15 + side * 0.25 + Vector3(0, 1.34, 0), vp + Vector3(0, 1.38, 0), 4.0, -1.0, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
-	C.lens(28.0, 4.0)
+	_cu(12.0, 2.4, 50.0, 0.0)
+	_push(12.0, 1.3, 4.0)
+	C.lens(35.0, 4.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "angry", 1.0)
 	vesk.look_target = null; vesk.look_point = chair_pos
@@ -419,8 +420,8 @@ func run() -> void:
 	C.setv(vesk, "rotation:y", C.face_to(vesk, vesk.global_position + Vector3(-1, 0, -2)))
 	vp = vesk.global_position
 	fwd = Vector3(sin(vesk.rotation.y), 0, cos(vesk.rotation.y)); side = fwd.cross(Vector3.UP)
-	C.cut(vp + fwd * 1.7 - side * 0.6 + Vector3(0, 0.55, 0), vp + Vector3(0, 1.45, 0)); C.lens(24.0)
-	C.move(vp + fwd * 1.45 - side * 0.5 + Vector3(0, 0.5, 0), vp + Vector3(0, 1.45, 0), 4.0)
+	C.cut(vp + fwd * 2.3 - side * 1.1 + Vector3(0, 0.8, 0), vp + Vector3(0, 1.5, 0)); C.lens(28.0)
+	C.move(vp + fwd * 2.0 - side * 0.95 + Vector3(0, 0.75, 0), vp + Vector3(0, 1.5, 0), 4.0)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 0.6)
 	C.light(vh, "hero", -1.0)
 	vesk.look_point = Vector3.INF
@@ -478,6 +479,19 @@ func run() -> void:
 	await C.wait(0.9)
 	if chair:  # the chewed chair stays knocked over
 		chair.rotation.z = 1.45; chair.scale = Vector3(1, 0.75, 1)
+
+var _vesk: Node3D
+## Close-up on Vesk's face: camera `dist` metres out at `az` degrees from where he faces (+ = his left).
+func _cu(az: float, dist: float, mm: float, dy := 0.0) -> void:
+	var e: Vector3 = C.head_of(_vesk).global_position
+	var f := Vector3(sin(_vesk.rotation.y), 0, cos(_vesk.rotation.y)).rotated(Vector3.UP, deg_to_rad(az))
+	C.cut(e + f * dist + Vector3(0, dy, 0), e + Vector3(0, -0.04, 0)); C.lens(mm)
+
+## Slow push-in to `dist` along the same angle.
+func _push(az: float, dist: float, dur: float) -> void:
+	var e: Vector3 = C.head_of(_vesk).global_position
+	var f := Vector3(sin(_vesk.rotation.y), 0, cos(_vesk.rotation.y)).rotated(Vector3.UP, deg_to_rad(az))
+	C.move(e + f * dist, e + Vector3(0, -0.04, 0), dur)
 
 ## The first Gizmart kiosk (position, front direction), from the Gizmart system or the level's shop spots.
 func _gizmart_spot() -> Array:

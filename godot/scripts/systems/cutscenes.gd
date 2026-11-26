@@ -136,6 +136,7 @@ var vesk: Node3D
 var dodger: Node3D
 var grudd: Node3D
 var start_args := {}
+var _still_n := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -214,6 +215,12 @@ func fx(f: Callable) -> void:
 # ---------------------------------------------------------------- camera language
 func cut(pos: Vector3, look: Vector3, fov := -1.0) -> void:
 	if start_args.has("cut-log"): print("[cut] %s t=%.1f" % [playing, ct])
+	if start_args.has("cut-stills") and not ffwd():   # a still 1 s into every shot (look-dev)
+		var n := _still_n; _still_n += 1
+		get_tree().create_timer(1.0).timeout.connect(func():
+			if playing == "": return
+			var img := get_viewport().get_texture().get_image()
+			img.save_jpg("%s/shot_%02d_%03ds.jpg" % [start_args["cut-stills"], n, int(ct)], 0.85))
 	for p in ["cam_pos", "cam_look", "cam_roll", "orbit_a"]: setv(self, p, get(p))
 	cam_pos = pos; cam_look = look; cam_roll = 0.0
 	if fov > 0.0: setv(self, "cam_fov", fov)
@@ -436,6 +443,7 @@ func _run(id: String) -> void:
 		Game.player.process_mode = Node.PROCESS_MODE_DISABLED
 		Game.player.visible = false
 	cam = Camera3D.new(); cam.name = "CutsceneCam"; cam.far = 2500; cam.near = 0.05
+	cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF   # driven every frame, not per physics tick
 	attrs = _make_attrs()
 	cam.attributes = attrs
 	Game.main.add_child(cam)
