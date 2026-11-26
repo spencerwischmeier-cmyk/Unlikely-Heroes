@@ -76,7 +76,7 @@ func _process(_dt: float) -> bool:
 	if which == "crane" and n == 3:
 		var c: Node3D = actors[0]
 		c.visible = true; c.magnet.visible = true
-		c.boom.rotation.x = -0.55; c.turn.rotation.y = 0.35; c.rail_path.visible = false
+		c.boom.rotation.x = -0.55; c.turn.rotation.y = 0.35; c.rail_path.visible = false; c.lamp_mat.emission_energy_multiplier = 9.0
 		c.magnet.global_position = c.tip.global_position + Vector3(0, -1.6, 0)
 	if which == "gizmart" and n == 5 and actors.size() > 0: actors[0].mood("hello", 99.0)
 	if n == frames:

@@ -99,6 +99,7 @@ var mag_model: Node3D
 var stacks: Array = []         # exhaust stack tops (smoke when damaged)
 var skin_mats: Array = []      # livery materials for the scrap when it breaks
 var cab_squash := 0.0
+var lamp_mat: StandardMaterial3D
 var smoke_t := 0.0
 
 func _m(c: Color, metal := 0.5, rough := 0.4) -> StandardMaterial3D:
@@ -212,6 +213,13 @@ func _skin() -> void:
 		e.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var port := _box(turn, Vector3(1.0, 0.22, 0.06), cab_glow, Vector3(0, 1.28, 1.44))
 	port.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# roof warning lamps: they flash on every attack wind-up and never stop in phase 2
+	lamp_mat = StandardMaterial3D.new(); lamp_mat.albedo_color = Color(1, 0.2, 0.1); lamp_mat.emission_enabled = true
+	lamp_mat.emission = Color(1, 0.15, 0.08); lamp_mat.emission_energy_multiplier = 0.5
+	for sx in [-1.0, 1.0]:
+		var lm := SphereMesh.new(); lm.radius = 0.1; lm.height = 0.2
+		var l := MeshInstance3D.new(); l.mesh = lm; l.material_override = lamp_mat; l.position = Vector3(0.66 * sx, 2.66, 0.81)
+		l.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; turn.add_child(l)
 	for sx in [-1.0, 1.0]:
 		var st := Node3D.new(); st.position = Vector3(0.41 * sx, 3.15, -1.1); turn.add_child(st); stacks.append(st)
 
@@ -239,6 +247,9 @@ func _damage_fx(dt: float) -> void:
 		cab_model.scale = Vector3.ONE * 1.25 * Vector3(1.0 + k * 0.05, 1.0 - k * 0.04, 1.0 + k * 0.05)
 		# engine idle: the cab chugs on its turret
 		cab_model.position.y = -0.02 + absf(sin(t * 9.0)) * 0.025
+	if lamp_mat:
+		var alarm := phase == 2 or state in ["slam", "spray", "sweep_wind", "sweep", "crew", "stunned", "dying", "rip"]
+		lamp_mat.emission_energy_multiplier = (9.0 if fmod(t, 0.36) < 0.18 else 1.0) if alarm else 0.6
 	if state in ["off", "intro"] or stacks.is_empty(): return
 	# slam tell: the magnet crackles and its coil arcs while it charges over Vesk
 	if state == "slam" and randf() < dt * (14.0 if st_t < 0.6 else 6.0):
