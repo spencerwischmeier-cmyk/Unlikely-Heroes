@@ -14,6 +14,7 @@ var bots: Array = []           # { n, a: Vector3, b: Vector3, u: float, dir: int
 var sprockets: Array = []      # { n, pos: Vector3, ph: float }
 var bobbers: Array = []        # { n, base: Vector3, amp: float, sp: float, ph: float }
 var spinners: Array = []       # { n, axis: Vector3, sp: float }
+var quips: Array = []          # { pos: Vector3, r: float, ids: Array, riding: bool } (each plays once)
 var amb_center := Vector3.ZERO
 var amb_radius := 40.0
 var amb: AudioStreamPlayer
@@ -168,6 +169,10 @@ func sprocket_line(a: Vector3, b: Vector3, count: int) -> void:
 func add_bobber(n: Node3D, amp := 0.15, sp := 1.0) -> void:
 	if n: bobbers.append({ n = n, base = n.position, amp = amp, sp = sp, ph = rng.randf() * TAU })
 
+## voice lines (ids in audio/voice/script.json) the first time Vesk comes within r of pos
+func add_quip(pos: Vector3, r: float, ids: Array, riding := false) -> void:
+	quips.append({ pos = pos, r = r, ids = ids, riding = riding })
+
 func add_spinner(n: Node3D, axis := Vector3.UP, sp := 1.0) -> void:
 	if n: spinners.append({ n = n, axis = axis, sp = sp })
 
@@ -256,6 +261,12 @@ func _process(dt: float) -> void:
 			if chime: _oneshot(chime, -10.0)
 			FX.sparks(s.n.position, Color(1.0, 0.8, 0.35), 6, 3.0)
 			s.n.queue_free(); sprockets.remove_at(i)
+	if pl and not Game.input_locked and Engine.get_physics_frames() % 10 == 0:
+		for i in range(quips.size() - 1, -1, -1):
+			var q: Dictionary = quips[i]
+			if pl.global_position.distance_to(q.pos) < q.r and (not q.riding or pl.get("riding")):
+				for id in q.ids: Snd.voice(id)
+				quips.remove_at(i)
 	# garden ambience fades with distance from the gardens
 	if amb:
 		var d := eye.distance_to(amb_center)

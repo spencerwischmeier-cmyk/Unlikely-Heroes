@@ -341,6 +341,26 @@ func waterfall(top: Vector3, out: Vector2, width := 2.0, drop := 26.0) -> void:
 	p.position = Vector3(0, -1.0, 0.5)
 	n.add_child(p)
 
+## petals drifting down over an area (box of half-extents ext centred at c)
+func petals(c: Vector3, ext: Vector3, amount := 24, col := Color(1.0, 0.7, 0.85)) -> void:
+	var p := CPUParticles3D.new()
+	var q := QuadMesh.new(); q.size = Vector2(0.09, 0.07); p.mesh = q
+	var m := StandardMaterial3D.new(); m.vertex_color_use_as_albedo = true; m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.emission_enabled = true; m.emission = Color(0.25, 0.15, 0.18); m.roughness = 0.7
+	p.material_override = m
+	p.amount = amount; p.lifetime = 7.0; p.preprocess = 7.0
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX; p.emission_box_extents = ext
+	p.direction = Vector3(1, -0.3, 0.4); p.spread = 40; p.initial_velocity_min = 0.3; p.initial_velocity_max = 0.8
+	p.gravity = Vector3(0.15, -0.35, 0.05)
+	p.angular_velocity_min = -180; p.angular_velocity_max = 180
+	p.particle_flag_rotate_y = true
+	var g := Gradient.new(); g.set_color(0, col); g.set_color(1, Color(1.0, 0.95, 0.75))
+	p.color_initial_ramp = g
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.position = c
+	p.visibility_aabb = AABB(-ext - Vector3(2, 8, 2), ext * 2 + Vector3(4, 10, 4))
+	root.add_child(p)
+
 # ------------------------------------------------------------------ structures
 ## a glass dome (radius r) with brass ribs at centre c (floor y). Solid wall ring with door gaps at the
 ## given yaw angles (radians, 0 = +z). Returns the holder.
