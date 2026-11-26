@@ -15,19 +15,19 @@ extends Node
 
 const AREAS := {
 	"junkyard": {"combat": "combat_b", "surface": "gravel", "amb_db": -7.0, "verb": 0.14,
-		"shots": [["os_chime", -4.0], ["os_clank", -8.0], ["gull_call", -12.0], ["os_creak", -10.0]]},
+		"shots": [["os_chime", -4.0], ["os_clank", -8.0], ["gull_call", -12.0], ["os_creak", -10.0], ["os_scrap_fall", -6.0]]},
 	"plaza": {"combat": "combat_a", "surface": "stone", "amb_db": -8.0, "verb": 0.09,
-		"shots": [["os_pigeons", -6.0], ["os_horn", -8.0], ["gull_call", -8.0], ["os_bell", -12.0], ["os_flock", -6.0]]},
+		"shots": [["os_pigeons", -6.0], ["os_horn", -8.0], ["gull_call", -8.0], ["os_bell", -12.0], ["os_flock", -6.0], ["os_tram", -8.0], ["os_leaves", -10.0]]},
 	"terrace": {"combat": "combat_b", "surface": "stone", "amb_db": -8.0, "verb": 0.1,
-		"shots": [["os_bell", -6.0], ["os_pigeons", -8.0], ["os_chime", -10.0]]},
+		"shots": [["os_bell", -6.0], ["os_pigeons", -8.0], ["os_chime", -10.0], ["os_cart", -5.0], ["os_kettle", -7.0]]},
 	"gardens": {"combat": "combat_a", "surface": "grass", "amb_db": -6.0, "verb": 0.05,
-		"shots": [["os_bird1", -3.0], ["os_bird2", -3.0], ["os_bird1", -6.0], ["os_pigeons", -10.0], ["os_flock", -4.0]]},
+		"shots": [["os_bird1", -3.0], ["os_bird2", -3.0], ["os_bird1", -6.0], ["os_pigeons", -10.0], ["os_flock", -4.0], ["os_leaves", -4.0], ["os_bees", -6.0]]},
 	"docks": {"combat": "combat_b", "surface": "wood", "amb_db": -7.0, "verb": 0.07,
-		"shots": [["gull_call", -4.0], ["os_creak", -4.0], ["os_horn", -6.0], ["os_gust", -8.0]]},
+		"shots": [["gull_call", -4.0], ["os_creak", -4.0], ["os_horn", -6.0], ["os_gust", -8.0], ["os_winch", -5.0]]},
 	"mast": {"combat": "combat_a", "surface": "metal", "amb_db": -6.0, "verb": 0.04,
-		"shots": [["os_gust", -2.0], ["gull_call", -8.0], ["os_horn", -10.0]]},
+		"shots": [["os_gust", -2.0], ["gull_call", -8.0], ["os_horn", -10.0], ["os_antenna", -6.0], ["os_flagsnap", -5.0]]},
 	"yard": {"combat": "combat_c", "surface": "metal", "amb_db": -6.0, "verb": 0.18,
-		"shots": [["os_clank", -2.0], ["os_hiss", -3.0], ["os_clank", -6.0], ["os_horn", -12.0]]},
+		"shots": [["os_clank", -2.0], ["os_hiss", -3.0], ["os_clank", -6.0], ["os_horn", -12.0], ["os_hammer", -3.0]]},
 }
 ## island name (exact, then prefix, in this order) -> area
 const ISLAND_AREA := [["junkyard", "junkyard"], ["junk", "junkyard"], ["causeway_2", "yard"], ["causeway", "plaza"],
@@ -609,6 +609,10 @@ func _self_test() -> void:
 		var h := Snd.has_music(t)
 		ok = ok and h
 		if not h: print("[audio-test] FAIL missing music ", t)
+	for a in AREAS:
+		for sh in AREAS[a].shots:
+			if not Snd.has_sound(sh[0]): ok = false; print("[audio-test] FAIL missing one-shot ", sh[0])
+		if not Snd.streams.has("amb_" + a): ok = false; print("[audio-test] FAIL missing bed amb_", a)
 	for b in ["Music", "SFX", "Voice", "Amb", "World"]:
 		if AudioServer.get_bus_index(b) < 0: ok = false; print("[audio-test] FAIL missing bus ", b)
 	print("[audio-test] ", "ALL PASS" if ok else "SOME FAILED")
