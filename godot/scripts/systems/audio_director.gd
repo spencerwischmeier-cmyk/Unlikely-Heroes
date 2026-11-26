@@ -17,11 +17,11 @@ const AREAS := {
 	"junkyard": {"combat": "combat_b", "surface": "gravel", "amb_db": -7.0, "verb": 0.14,
 		"shots": [["os_chime", -4.0], ["os_clank", -8.0], ["gull_call", -12.0], ["os_creak", -10.0]]},
 	"plaza": {"combat": "combat_a", "surface": "stone", "amb_db": -8.0, "verb": 0.09,
-		"shots": [["os_pigeons", -6.0], ["os_horn", -8.0], ["gull_call", -8.0], ["os_bell", -12.0]]},
+		"shots": [["os_pigeons", -6.0], ["os_horn", -8.0], ["gull_call", -8.0], ["os_bell", -12.0], ["os_flock", -6.0]]},
 	"terrace": {"combat": "combat_b", "surface": "stone", "amb_db": -8.0, "verb": 0.1,
 		"shots": [["os_bell", -6.0], ["os_pigeons", -8.0], ["os_chime", -10.0]]},
 	"gardens": {"combat": "combat_a", "surface": "grass", "amb_db": -6.0, "verb": 0.05,
-		"shots": [["os_bird1", -3.0], ["os_bird2", -3.0], ["os_bird1", -6.0], ["os_pigeons", -10.0]]},
+		"shots": [["os_bird1", -3.0], ["os_bird2", -3.0], ["os_bird1", -6.0], ["os_pigeons", -10.0], ["os_flock", -4.0]]},
 	"docks": {"combat": "combat_b", "surface": "wood", "amb_db": -7.0, "verb": 0.07,
 		"shots": [["gull_call", -4.0], ["os_creak", -4.0], ["os_horn", -6.0], ["os_gust", -8.0]]},
 	"mast": {"combat": "combat_a", "surface": "metal", "amb_db": -6.0, "verb": 0.04,
@@ -59,6 +59,12 @@ var emit_t := 1.0
 var turbines_done := false
 var chat_t := 2.0
 var lowpass := 20500.0
+var fountain_done := false
+var flyby: AudioStreamPlayer3D
+var flyby_t := 25.0
+var flyby_a := Vector3.ZERO
+var flyby_b := Vector3.ZERO
+var flyby_k := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -206,6 +212,7 @@ func _on_zone_entered(id: String) -> void:
 
 func _on_bot_killed(_bot: Node, pos: Vector3, _kind: String) -> void:
 	Snd.at("bot_die", pos, -3.0, 0.1, 0.05)
+	Snd.play("kill_tick", -13.0, 0.04, 0.04)
 
 # ------------------------------------------------------------------ ambience
 func _ensure_beds() -> void:
@@ -269,6 +276,33 @@ func _update_chatter(dt: float) -> void:
 	var b: Node3D = near.pick_random()
 	Snd.at("bot_chat", b.global_position + Vector3(0, 0.6, 0), -9.0, 0.15, 0.4)
 
+## a distant airship drones across the sky now and then
+func _update_flyby(dt: float) -> void:
+	if not Snd.streams.has("airship_engine"): return
+	if flyby == null:
+		flyby = AudioStreamPlayer3D.new(); flyby.name = "Flyby"
+		var s: AudioStream = Snd.streams["airship_engine"].duplicate()
+		if "loop" in s: s.loop = true
+		flyby.stream = s; flyby.bus = "World"; flyby.unit_size = 18.0; flyby.max_distance = 160.0
+		flyby.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+		add_child(flyby)
+	if flyby.playing:
+		flyby_k += dt / 26.0
+		flyby.global_position = flyby_a.lerp(flyby_b, flyby_k)
+		flyby.volume_db = -10.0 + linear_to_db(maxf(sin(clampf(flyby_k, 0.0, 1.0) * PI), 0.001))
+		if flyby_k >= 1.0: flyby.stop()
+		return
+	flyby_t -= dt
+	if flyby_t > 0.0 or combat: return
+	flyby_t = randf_range(50.0, 110.0)
+	var c: Vector3 = Game.player.global_position
+	var ang := randf() * TAU
+	var side := Vector3(cos(ang), 0, sin(ang))
+	var fwd := Vector3(-side.z, 0, side.x)
+	var off := side * randf_range(45.0, 70.0) + Vector3(0, randf_range(22.0, 38.0), 0)
+	flyby_a = c + off - fwd * 90.0; flyby_b = c + off + fwd * 90.0; flyby_k = 0.0
+	flyby.global_position = flyby_a; flyby.pitch_scale = randf_range(0.85, 1.1); flyby.play(randf() * 3.0)
+
 ## looping 3D sounds stuck to things in the level (lifts, turbines, Dodger, Gizmart, the relay)
 func _attach(n: Node, sound: String, db: float, unit := 3.0, maxd := 28.0, offset := Vector3.ZERO) -> void:
 	if n == null or not is_instance_valid(n) or not (n is Node3D) or n.has_node("SndLoop"): return
@@ -290,6 +324,10 @@ func _update_emitters() -> void:
 		for t in Game.level.find_children("*wind_turbine*", "", true, false):
 			if found >= 8: break
 			_attach(t, "turbine_loop", -12.0, 4.0, 34.0, Vector3(0, 6.0, 0)); found += 1
+	if not fountain_done and Game.level.islands.has("plaza") and (Game.level.islands.plaza as Rect2).has_point(Vector2(0, 28)):
+		fountain_done = true
+		var f := Node3D.new(); f.name = "FountainSnd"; Game.level.add_child(f); f.global_position = Vector3(0, 1.2, 28)
+		_attach(f, "fountain", -6.0, 3.0, 26.0)
 	if Game.main:
 		var dg: Node = Game.main.get_node_or_null("Dodger")
 		if dg and dg.get("drone") != null: _attach(dg.drone, "drone_hum", -18.0, 2.0, 16.0)
@@ -356,6 +394,7 @@ func _process(dt: float) -> void:
 	_update_beds(dt)
 	_update_oneshots(dt)
 	_update_chatter(dt)
+	_update_flyby(dt)
 	emit_t -= dt
 	if emit_t <= 0.0: emit_t = 2.0; _update_emitters()
 	_update_world(dt)

@@ -33,6 +33,9 @@ const LAYERS := {
 	"sprocket_burst": [["coin_burst", -3.0, 0.05]],
 	"hook_fire": [["rope_swing", -7.0, 0.06]],
 	"crate_break": [["debris", -12.0, 0.06]],
+	"scatter_fire": [["scatter_punch", -5.0, 0.0]],
+	"lobber_fire": [["thump_launch", -4.0, 0.0]],
+	"seeker_fire": [["seeker_whir", -6.0, 0.02]],
 }
 ## how many copies of one sound may ring at once (the oldest is cut)
 const MAX_INST := {"step": 2, "blaster": 3, "bolt_hit": 3, "nut_pickup": 3, "melee_hit": 3, "debris": 2,
