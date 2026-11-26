@@ -429,8 +429,8 @@ static func _warehouse(L: Node3D, A: Node3D) -> void:
 
 	# ---- LINE 1: the raised belt running west with crates riding it; the red button at its far end
 	var y1 := 3.0
-	var l1 := belt(L, A, "line1", Vector3(106, y1, 30.5), Vector3(88, y1, 30.5), 3.0, 4.5)
-	belt_crates(L, A, l1, 3, 1.2)
+	var l1 := belt(L, A, "line1", Vector3(106, y1, 30.5), Vector3(88, y1, 30.5), 3.0, 4.0)
+	belt_crates(L, A, l1, 2, 1.2)
 	for x in range(89, 106, 3):
 		for s in [-1, 1]: L.box(Vector3(x, (y1 - 0.4) / 2, 30.5 + s * 1.2), Vector3(0.3, y1 - 0.4, 0.3), L.mat_dark, false)
 	# steps up to its west end
