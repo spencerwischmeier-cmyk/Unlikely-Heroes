@@ -199,3 +199,21 @@ static func kit(mat_name: String) -> Material:
 			"sign": m = null
 	_cache[key] = m
 	return m
+
+## A weathered, world-triplanar version of a texture set (grime, rust, moss, wet patches).
+static func worn(set: String, tint := Color(1, 1, 1), scale := 0.14, metal := 0.4, rough := 0.6, moss := 0.5) -> ShaderMaterial:
+	var key := "worn_%s_%s_%s_%s" % [set, tint.to_html(), scale, moss]
+	if _cache.has(key): return _cache[key]
+	var m := ShaderMaterial.new()
+	m.shader = load("res://shaders/worn_surface.gdshader")
+	var a := _tex(set + "_albedo")
+	m.set_shader_parameter("albedo_tex", a if a else panel_tex())
+	var n := _tex(set + "_normal"); if n: m.set_shader_parameter("normal_tex", n)
+	var r := _tex(set + "_rough"); if r: m.set_shader_parameter("rough_tex", r)
+	m.set_shader_parameter("tint", tint)
+	m.set_shader_parameter("tex_scale", scale)
+	m.set_shader_parameter("metallic_v", metal)
+	m.set_shader_parameter("rough_v", rough)
+	m.set_shader_parameter("moss", moss)
+	_cache[key] = m
+	return m
