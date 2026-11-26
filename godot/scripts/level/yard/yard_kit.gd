@@ -126,12 +126,30 @@ static func model(parent: Node3D, name_: String, pos: Vector3, yaw := 0.0, heigh
 	return holder
 
 # ---------------------------------------------------------------- set pieces
-## A lattice tower (square, 4 legs with X bracing) from y0 up to y0 + h.
+## Many boxes with one material as a single MultiMesh (girders and towers are built from hundreds of beams).
+static func _mm(parent: Node, m: String, tfs: Array) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.mesh = box_mesh(Vector3.ONE)
+	mm.instance_count = tfs.size()
+	for i in tfs.size(): mm.set_instance_transform(i, tfs[i])
+	var mi := MultiMeshInstance3D.new(); mi.multimesh = mm; mi.material_override = mat(m)
+	parent.add_child(mi)
+	return mi
+
+static func _beam_tf(a: Vector3, b: Vector3, w: float) -> Transform3D:
+	var d := b - a
+	var up := Vector3.UP if absf(d.normalized().y) < 0.99 else Vector3.RIGHT
+	return Transform3D(Basis.looking_at(d, up) * Basis.from_scale(Vector3(w, w, d.length())), (a + b) * 0.5)
+
+static func _box_tf(pos: Vector3, size: Vector3) -> Transform3D:
+	return Transform3D(Basis.from_scale(size), pos)
+
+## A lattice tower (square, 4 legs with X bracing) from pos up to pos.y + h.
 static func lattice(parent: Node, pos: Vector3, w: float, h: float, m := "yellow", collide := true) -> Node3D:
 	var n := node(parent, pos)
 	var hw := w * 0.5
+	var main := []; var web := []
 	for c in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-		bx(n, Vector3(c.x * hw, h * 0.5, c.y * hw), Vector3(0.28, h, 0.28), m)
+		main.append(_box_tf(Vector3(c.x * hw, h * 0.5, c.y * hw), Vector3(0.28, h, 0.28)))
 	var steps := maxi(1, roundi(h / (w * 1.2)))
 	var sh := h / steps
 	for i in steps:
@@ -139,8 +157,9 @@ static func lattice(parent: Node, pos: Vector3, w: float, h: float, m := "yellow
 		for side in 4:
 			var a := Vector2(-1, -1).rotated(side * PI / 2) * hw
 			var b := Vector2(1, -1).rotated(side * PI / 2) * hw
-			beam(n, Vector3(a.x, y0, a.y), Vector3(b.x, y0 + sh, b.y), 0.12, "steel")
-			bx(n, Vector3((a.x + b.x) * 0.5, y0 + sh, (a.y + b.y) * 0.5), Vector3(absf(b.x - a.x) + 0.2, 0.2, absf(b.y - a.y) + 0.2), m)
+			web.append(_beam_tf(Vector3(a.x, y0, a.y), Vector3(b.x, y0 + sh, b.y), 0.12))
+			main.append(_box_tf(Vector3((a.x + b.x) * 0.5, y0 + sh, (a.y + b.y) * 0.5), Vector3(absf(b.x - a.x) + 0.2, 0.2, absf(b.y - a.y) + 0.2)))
+	_mm(n, m, main); _mm(n, "steel", web)
 	if collide: add_collider(n, Vector3(w + 0.2, h, w + 0.2), Vector3(0, h * 0.5, 0))
 	return n
 
@@ -149,15 +168,18 @@ static func girder(parent: Node, a: Vector3, b: Vector3, gh := 1.0, m := "yellow
 	var n := node(parent, Vector3.ZERO)
 	var d := b - a; var L := d.length(); var dir := d / L
 	var side := dir.cross(Vector3.UP).normalized() * 0.45
+	var main := []; var web := []
 	for s in [-1.0, 1.0]:
-		beam(n, a + side * s, b + side * s, 0.24, m)
-		beam(n, a + side * s + Vector3(0, gh, 0), b + side * s + Vector3(0, gh, 0), 0.24, m)
+		main.append(_beam_tf(a + side * s, b + side * s, 0.24))
+		main.append(_beam_tf(a + side * s + Vector3(0, gh, 0), b + side * s + Vector3(0, gh, 0), 0.24))
 		var k := maxi(2, roundi(L / gh))
 		for i in k:
 			var p0: Vector3 = a + dir * (L * i / k) + side * s
 			var p1: Vector3 = a + dir * (L * (i + 1) / k) + side * s
-			if i % 2 == 0: beam(n, p0, p1 + Vector3(0, gh, 0), 0.1, "steel")
-			else: beam(n, p0 + Vector3(0, gh, 0), p1, 0.1, "steel")
+			if i % 2 == 0: web.append(_beam_tf(p0, p1 + Vector3(0, gh, 0), 0.1))
+			else: web.append(_beam_tf(p0 + Vector3(0, gh, 0), p1, 0.1))
+			if i % 3 == 0: web.append(_beam_tf(p0 + Vector3(0, gh, 0), p0 + Vector3(0, gh, 0) - side * s * 2.0, 0.1))
+	_mm(n, m, main); _mm(n, "steel", web)
 	return n
 
 ## Hazard stripe band on the floor (thin, no collision).
