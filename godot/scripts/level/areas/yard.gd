@@ -46,7 +46,7 @@ static func build(L) -> void:
 
 static func traversal_cases(moves: Dictionary) -> Dictionary:
 	return {
-		yard_belt = [Vector3(-22.5, 0.1, -64), -PI / 2, moves.run, 0.0, Rect2(-58, -100, 28, 38)],
+		yard_belt = [Vector3(-19.5, 0.1, -64), -PI / 2, [[0.0, "move_forward", true], [1.4, "move_forward", false]], 0.0, Rect2(-58, -100, 28, 38)],
 		yard_stack1 = [Vector3(-56.6, 0.1, -62.6), PI, moves.sj, 1.2, Rect2(-57.5, -66.8, 1.8, 2.7)],
 		yard_stack2 = [Vector3(-56.6, 1.3, -64.9), PI, moves.sj, 2.4, Rect2(-57.8, -72, 2.4, 5)],
 		yard_stack3 = [Vector3(-56.6, 2.5, -71.4), PI, moves.dj_short, 4.8, Rect2(-57.8, -79, 2.4, 5)],
