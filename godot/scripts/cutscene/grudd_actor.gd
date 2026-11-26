@@ -148,6 +148,22 @@ func _build() -> void:
 	var badge := Label3D.new(); badge.text = "FOREMAN"; badge.font_size = 64; badge.pixel_size = 0.004
 	badge.position = Vector3(0, 2.1, 0.64); badge.modulate = Color(0.1, 0.1, 0.1); badge.outline_size = 0; body.add_child(badge)
 	_sp(body, 0.32, rust, Vector3(-1.0, 2.05, 0)); _sp(body, 0.32, rust, Vector3(1.0, 2.05, 0))
+	# middle-manager details: a big red necktie, a collar, chunky striped pauldrons, rivets, a gauge
+	var tie := M.std(Color(0.75, 0.1, 0.1), 0.1, 0.5)
+	_bx(body, Vector3(1.0, 0.12, 0.2), M.std(Color(0.95, 0.93, 0.88), 0.0, 0.6), Vector3(0, 2.2, 0.58))
+	_bx(body, Vector3(0.22, 0.18, 0.08), tie, Vector3(0, 2.1, 0.68))
+	_bx(body, Vector3(0.26, 0.7, 0.06), tie, Vector3(0, 1.7, 0.7), Vector3(0, 0, 0.05))
+	_bx(body, Vector3(0.18, 0.18, 0.06), tie, Vector3(0.015, 1.33, 0.7), Vector3(0, 0, PI / 4))
+	for sx in [-1, 1]:
+		var pd := Node3D.new(); pd.position = Vector3(1.05 * sx, 2.25, 0); pd.rotation.z = -0.25 * sx; body.add_child(pd)
+		_bx(pd, Vector3(0.75, 0.22, 0.85), yel, Vector3.ZERO)
+		for i in 3: _bx(pd, Vector3(0.12, 0.23, 0.86), dark, Vector3(-0.24 + i * 0.24, 0.005, 0), Vector3(0, 0, 0.4))
+		for z in [-0.3, 0.3]: _sp(body, 0.05, steel, Vector3(0.85 * sx, 1.15, 0.63 + z * 0.0))
+	for i in 6: _sp(body, 0.045, steel, Vector3(-0.75 + i * 0.3, 2.15, 0.63))
+	_cy(body, 0.16, 0.05, steel, Vector3(0.6, 1.25, 0.64), Vector3(PI / 2, 0, 0))
+	_bx(body, Vector3(0.02, 0.12, 0.02), M.std(Color(0.8, 0.1, 0.1)), Vector3(0.62, 1.28, 0.67), Vector3(0, 0, -0.6))
+	var pin := Label3D.new(); pin.text = "EMPLOYEE\nOF THE MONTH"; pin.font_size = 32; pin.pixel_size = 0.004
+	pin.position = Vector3(-0.6, 1.3, 0.66); pin.modulate = Color(0.95, 0.8, 0.2); pin.outline_size = 4; body.add_child(pin)
 	# head: a boxy monitor face, angry brow, loudspeaker mouth
 	head = Node3D.new(); head.position = Vector3(0, 2.3, 0.05); body.add_child(head)
 	_cy(head, 0.22, 0.25, dark, Vector3(0, 0.08, 0))
