@@ -184,7 +184,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cub(-50.0, 1.8, 55.0, 0.05)    # front three-quarter, camera tucked under Dodger so his face reads
+	_cub(-50.0, 2.7, 40.0, 0.12)    # front three-quarter medium, wide enough that the slurp stays in frame
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
