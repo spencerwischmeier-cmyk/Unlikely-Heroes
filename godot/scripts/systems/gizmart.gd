@@ -23,6 +23,7 @@ var hello_cd := 0.0
 
 var layer: CanvasLayer
 var prompt: Label
+var hud_prompt := false
 var panel: PanelContainer
 var title: Label
 var tagline: Label
@@ -81,7 +82,12 @@ func _process(dt: float) -> void:
 			if Vector2(p.x - f.x, p.z - f.z).length() < RANGE and absf(p.y - f.y) < 2.0: near = i
 	var pad: bool = Game.player != null and Game.player.get("using_pad") == true
 	prompt.text = ("Y" if pad else "E") + "   SHOP AT GIZMART"
-	prompt.visible = near >= 0
+	# the HUD draws the prompt (key cap or pad button in a panel); fall back to our own label without it
+	var hud_ok: bool = Game.hud != null and Game.hud.has_method("show_prompt")
+	prompt.visible = near >= 0 and not hud_ok
+	if hud_ok:
+		if near >= 0: Game.hud.show_prompt(prompt.text); hud_prompt = true
+		elif hud_prompt: Game.hud.hide_prompt(); hud_prompt = false
 	if near >= 0:
 		var g := sin(Time.get_ticks_msec() / 1000.0 * 4.0) * 0.5 + 0.5
 		prompt.modulate.a = 0.75 + 0.25 * g
@@ -91,6 +97,7 @@ func _process(dt: float) -> void:
 func _open(i: int, pause := true) -> void:
 	open_i = i
 	prompt.visible = false
+	if hud_prompt: Game.hud.hide_prompt(); hud_prompt = false
 	Game.input_locked = true
 	get_tree().paused = pause
 	prev_mouse = Input.mouse_mode

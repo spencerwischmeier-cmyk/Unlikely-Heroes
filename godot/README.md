@@ -26,5 +26,7 @@ Open this `godot/` folder in **Godot 4.7** (Project Manager > Import > pick `pro
 - `scripts/camera_rig.gd` the third-person camera.
 - `scripts/level_skyharbor.gd` Skyharbor, built from code (islands, sky steps, moving platforms, rails, hooks).
 - `scripts/mats.gd` shared materials and procedural textures.
+- `scripts/hud.gd` the HUD; `scripts/ui/hud_draw.gd` draws its panels and icons. Fonts in `fonts/` (Lilita One, Nunito; SIL OFL).
+- `tools/hud_preview.tscn` checks the HUD in seconds over a still image: `godot --path . res://tools/hud_preview.tscn -- --bg=shot.png --state=explore|boss|lowhull`.
 - `scripts/shot.gd` test helper: `godot --path . -- --shot=out.png --frames=60 --no-capture` saves a screenshot.
 - `models/` the Blender models from `../art/`.

@@ -41,7 +41,7 @@ var pop_sub: Label
 var pop_t := 0.0
 var bonus_label: Label
 var bonus_t := 0.0
-var font: SystemFont
+var font: Font
 
 func _ready() -> void:
 	var v = Game.level.get("dodger_crash_pos") if Game.level else null
@@ -260,8 +260,7 @@ func _rate(kills: Array) -> void:
 
 # ---------------------------------------------------------------- UI
 func _build_ui() -> void:
-	font = SystemFont.new(); font.font_names = PackedStringArray(["Inter", "Segoe UI", "Arial", "sans-serif"])
-	font.font_weight = 900; font.font_italic = true
+	font = preload("res://scripts/ui/hud_draw.gd").head_font()
 	layer = CanvasLayer.new(); layer.layer = 5; add_child(layer)
 	meter = Control.new(); meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meter.draw.connect(_draw_meter); meter.set_meta("pop", 0.0)
