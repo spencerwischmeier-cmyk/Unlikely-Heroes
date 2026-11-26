@@ -262,6 +262,11 @@ func _update_world(dt: float) -> void:
 	Snd.loop_extra["wind_loop"] = clampf((y - 5.0) / 14.0, 0.0, 1.0) * 9.0
 	Snd.loop_extra["city_loop"] = -clampf((y - 8.0) / 12.0, 0.0, 1.0) * 6.0
 
+func _in_pause_menu() -> bool:
+	var m: Node = Game.main.get_node_or_null("Menus") if Game.main else null
+	if m == null or not ("state" in m): return false
+	return m.state == "pause" or (m.state == "settings" and m.get("settings_from") != "title")
+
 ## bots mutter to each other during a fight
 func _update_chatter(dt: float) -> void:
 	chat_t -= dt
@@ -367,7 +372,10 @@ func _update_hero() -> void:
 	var hull: int = Game.combat.get("hull") if Game.combat and Game.combat.get("hull") != null else 8
 	var low := hull > 0 and hull <= 2 and not paused
 	Snd.loop("lowhp_beat", low, -12.0)
-	lowpass = move_toward(lowpass, 1400.0 if low else 20500.0, get_process_delta_time() * (40000.0 if low else 9000.0))
+	var menu := _in_pause_menu()
+	var want_lp := 700.0 if menu else (1400.0 if low else 20500.0)
+	lowpass = move_toward(lowpass, want_lp, get_process_delta_time() * (40000.0 if want_lp < lowpass else 9000.0))
+	Snd.menu_duck = menu
 	var lp := Snd.bus_fx("Music", "AudioEffectLowPassFilter")
 	if lp: lp.cutoff_hz = lowpass
 	var swinging: bool = pl.get("swing_hook") != null
@@ -403,7 +411,7 @@ func _process(dt: float) -> void:
 func _print_state() -> void:
 	var w := {}
 	for a in bed_w: if bed_w[a] > 0.01: w[a] = snappedf(bed_w[a], 0.01)
-	print("[audio] area=%s island=%s combat=%s track=%s music=%s beds=%s verb=%.2f" % [area, cur_island, combat, Snd.track, Snd.music_name, w, verb])
+	print("[audio] area=%s island=%s combat=%s track=%s music=%s beds=%s verb=%.2f lp=%d" % [area, cur_island, combat, Snd.track, Snd.music_name, w, verb, lowpass])
 
 # ------------------------------------------------------------------ self test
 func _self_test() -> void:

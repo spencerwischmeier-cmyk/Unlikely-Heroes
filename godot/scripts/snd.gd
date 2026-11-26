@@ -222,11 +222,14 @@ func bus_fx(bus: String, cls: String) -> AudioEffect:
 
 ## ducking: music and ambience dip under dialogue
 var duck := 0.0
+var menu_duck := false     # set by the director while the pause menu is up (ambience dips, music muffles)
+var menu_amt := 0.0
 func _duck_process(dt: float) -> void:
 	var talking := voice_player != null and voice_player.playing
 	duck = move_toward(duck, 1.0 if talking else 0.0, dt * (4.0 if talking else 1.2))
 	var m := bus_fx("Music", "AudioEffectAmplify"); if m: m.volume_db = -6.5 * duck
-	var a := bus_fx("Amb", "AudioEffectAmplify"); if a: a.volume_db = -6.0 * duck
+	menu_amt = move_toward(menu_amt, 1.0 if menu_duck else 0.0, dt * 3.0)
+	var a := bus_fx("Amb", "AudioEffectAmplify"); if a: a.volume_db = -6.0 * duck - 12.0 * menu_amt
 	var w := bus_fx("World", "AudioEffectAmplify"); if w: w.volume_db = -2.5 * duck
 
 # ---------- music (crossfades between tracks in audio/music) ----------
