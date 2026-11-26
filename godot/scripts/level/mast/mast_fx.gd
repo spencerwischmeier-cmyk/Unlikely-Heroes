@@ -301,6 +301,19 @@ func _physics_process(dt: float) -> void:
 	_wind(dt)
 	_sprockets(dt)
 
+## the pylon lift clanks off each time it leaves the top or the bottom
+var lift_phase := 0.0
+func _lift() -> void:
+	if level == null: return
+	for m in level.movers:
+		if m.id != "mast_lift" or not m.powered: continue
+		var ph := fmod(m.t / m.period, 1.0)
+		if (ph < lift_phase and lift_phase > 0.9) or (ph >= 0.5 and lift_phase < 0.5):
+			Snd.at("lift_move", m.body.global_position, -6.0)
+			play_at("mast_crank", m.body.global_position, -8.0, 0.1)
+		lift_phase = ph
+
 func _process(dt: float) -> void:
+	_lift()
 	_dish(dt)
 	_ambient(dt)
