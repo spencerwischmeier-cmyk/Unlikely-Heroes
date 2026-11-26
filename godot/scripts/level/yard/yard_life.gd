@@ -45,6 +45,8 @@ var drop_t := 9.0
 var drops: Array = []        # { node, vel, target, ring, landed, life }
 var incidents := 0
 var said := {}
+var pen_rect := Rect2(28, -85, 24, 22)
+var pen_guarded := false
 
 func _ready() -> void:
 	pa_player = AudioStreamPlayer3D.new(); pa_player.unit_size = 22.0; pa_player.max_distance = 140.0; pa_player.volume_db = 4.0
@@ -392,6 +394,14 @@ func _process(dt: float) -> void:
 			else:
 				pa_t = 6.0
 	if boss_on: _step_drops(dt, pl)
+	# the pen's guards jump out the first time Vesk lands in it
+	if pl and not pen_guarded and pen_rect.has_point(Vector2(pl.global_position.x, pl.global_position.z)) and absf(pl.global_position.y) < 3.0:
+		pen_guarded = true
+		var g := get_node_or_null("/root/Game")
+		if g and g.main and g.main.has_method("spawn_bot") and not OS.get_cmdline_user_args().has("--no-bots"):
+			for k in [["roller", Vector3(38, 0, -70)], ["roller", Vector3(44, 0, -76)], ["crew", Vector3(41, 0, -80)]]:
+				g.main.spawn_bot(k[0], k[1], pen_rect)
+			_sfx("yard_siren", Vector3(30.6, 6, -75), -2.0)
 	_update_drops(dt, pl)
 
 ## During the boss fight a crate slips off the overhead crane now and then: a red ring marks where it lands.
