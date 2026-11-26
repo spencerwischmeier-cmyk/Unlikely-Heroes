@@ -379,6 +379,7 @@ static func _deck_crown(L: Node3D, fx: Node3D) -> void:
 		beacon(fx, root, p + Vector3(0, 1.05, 0), 0.16, false, 0.75, 0.25)
 	windsock(root, fx, Vector3(C.x - 3.6, 20.0, C.z - 1.5), 2.6, Vector3(0.3, 0, 1).normalized())
 	flag_pole(root, fx, Vector3(C.x + 3.65, 20.0, C.z + 1.6), 3.2, Vector3(0, 0, 1), Color(0.25, 0.7, 0.75), fm)
+	fx.loop_at("mast_flag_loop", Vector3(C.x, 22.0, C.z), -12.0, 5.0, 30.0)
 	# junction boxes and cable runs over the deck edge
 	boxm(root, Vector3(C.x - 3.5, 20.4, C.z + 1.2), Vector3(0.5, 0.8, 0.9), mats.teal)
 	sphere(root, Vector3(C.x - 3.22, 20.6, C.z + 1.2), 0.06, mats.cyan)
@@ -471,6 +472,7 @@ static func _east_route(L: Node3D, fx: Node3D) -> void:
 	var gr := Rect2(C1.position.x, C1.position.y - 0.5, C1.size.x, C1.size.y + 4.0)
 	_gust(root, fx, gr, C1_Y - 1.0, C1_Y + 5.0, Vector3(0, 0, 1), 5.0, 7.0, 0.0, shelters, Vector3(c.x, C1_Y + 1.5, c.y - 2.5))
 	windsock(root, fx, Vector3(30.3, C1_Y, C1.position.y + 0.15), 2.4, Vector3(0, 0, 1), 0)
+	fx.loop_at("mast_flag_loop", Vector3(c.x, C1_Y + 1.5, c.y), -14.0, 4.0, 25.0)
 	var wl := Label3D.new(); wl.font_size = 44; wl.pixel_size = 0.005; wl.outline_size = 8; wl.set_meta("kind", "wind")
 	wl.position = Vector3(22.6, C1_Y + 2.3, C1.position.y + 0.02); wl.text = "WIND"; wl.modulate = Color(0.6, 0.95, 1)
 	boxm(root, Vector3(22.6, C1_Y + 2.3, C1.position.y - 0.06), Vector3(1.1, 0.6, 0.1), mats.steel)
@@ -716,6 +718,7 @@ static func _story(L: Node3D) -> void:
 	L.zones[at]["skip_to"] = true
 	L.zones.insert(at, { id = "mast_pylon", name = "RELAY PYLON", rect = P1, y = P1_Y, y_range = 3.0, skippable = true,
 		objective = "Take the catwalk and the cable east to the relay pylon",
+		enter_lines = ["sky_mast_pylon_1", "sky_mast_pylon_2"], clear_lines = ["sky_mast_pylon_clear_1"],
 		waves = [{ roller = 2 }, { hornet = 2 }] })
 	L.zones[at + 1]["guards"] = [{ rect = L.islands.dish_deck, y = 20.0, hornet = 2 }, { rect = P2, y = P2_Y, hornet = 1 }]
 

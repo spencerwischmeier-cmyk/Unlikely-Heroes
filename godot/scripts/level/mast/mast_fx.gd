@@ -15,6 +15,7 @@ var gusts: Array = []
 var socks: Array = []          # { pivot: Node3D, sock: Node3D, dir: Vector3, gust: int (index or -1) }
 var flag_mats: Array = []      # ShaderMaterial (uniform "gust")
 var flag_gust := 0.0
+var gust_said := false
 # ---- sprockets: { node: Node3D, id: String, pos: Vector3 }
 var sprockets: Array = []
 # ---- sparks along the lattice
@@ -44,6 +45,16 @@ func _ready() -> void:
 		var p := AudioStreamPlayer3D.new(); p.unit_size = 10.0; p.max_distance = 110.0; p.bus = "SFX"
 		add_child(p); players.append(p)
 	if level: last_target = level.dish_target
+	# the broadcast hum: low and sour until the dish is aligned, then it swells (see _dish)
+	if level and level.dish_pivot:
+		hum = loop_at("mast_dish_hum", Vector3.ZERO, -13.0, 7.0, 70.0)
+		if hum:
+			remove_child(hum); level.dish_pivot.add_child(hum); hum.position = Vector3.ZERO; hum.pitch_scale = 0.72
+	# debug: --mast-on starts with the dish aligned and powering up (for screenshots)
+	if OS.get_cmdline_user_args().has("--mast-on") and level and level.has_method("on_zone_cleared"):
+		level.on_zone_cleared("mast")
+		level.dish_pivot.rotation = Vector3(level.dish_target.y, level.dish_target.x, 0)
+		last_target = level.dish_target
 
 func stream(n: String, loop := false) -> AudioStream:
 	var key := n + ("_loop" if loop else "")
@@ -103,6 +114,8 @@ func _wind(dt: float) -> void:
 			if s.has_point(Vector2(pp.x, pp.z)): sheltered = true; break
 		if sheltered: continue
 		p.move_and_collide(g.dir * g.power * a * dt)
+		if not gust_said and a > 0.9:
+			gust_said = true; Game.say("sky_mast_gust_1"); Game.say("sky_mast_gust_2")
 	for m: ShaderMaterial in flag_mats: m.set_shader_parameter("gust", flag_gust)
 	for s in socks:
 		var a: float = 0.35
@@ -153,24 +166,22 @@ func _dish(dt: float) -> void:
 		# the power climbs the lattice ring by ring, then the dish fires its beam into the sky
 		for i in power_rings.size():
 			var m: StandardMaterial3D = power_rings[i]
-			var on := power_t > 0.25 + i * 0.3
+			var at := 0.1 if i >= 4 else 0.35 + i * 0.35
+			var on := power_t > at
 			m.emission = Color(0.3, 0.95, 1.0) if on else Color(1.0, 0.63, 0.19)
-			var flash := clampf(1.0 - (power_t - (0.25 + i * 0.3)) * 2.0, 0.0, 1.0) if on else 0.0
-			m.emission_energy_multiplier = 3.0 + 9.0 * flash + (1.0 + sin(t * 3.0 - i * 0.8)) * (1.0 if on else 0.0)
-			if on and flash > 0.95 and i < spark_spots.size(): pass
-		if power_t > 0.25 and power_t - dt <= 0.25 + power_rings.size() * 0.3 and fmod(power_t, 0.3) < dt:
-			var sp: Vector3 = spark_spots.pick_random() if spark_spots.size() > 0 else dp.global_position
-			FX.sparks(sp, Color(0.4, 0.95, 1.0), 16, 6.0)
+			var flash := clampf(1.0 - (power_t - at) * 2.0, 0.0, 1.0) if on else 0.0
+			m.emission_energy_multiplier = 3.0 + 9.0 * flash + (1.0 + sin(t * 3.0 - i * 0.8) if on else 0.0)
+		if power_t > 0.2 and power_t < 1.9 and fmod(power_t, 0.3) < dt and spark_spots.size() > 0:
+			FX.sparks(spark_spots.pick_random(), Color(0.4, 0.95, 1.0), 16, 6.0)
 		var fire := clampf((power_t - 1.9) / 0.5, 0.0, 1.0)
 		if power_t >= 1.9 and power_t - dt < 1.9:
 			FX.shake(0.8)
 			for k in 3:
 				get_tree().create_timer(0.18 * k).timeout.connect(func(): FX.ring(dp.global_position, Color(0.3, 0.95, 1.0), 2.5 + k * 1.5))
 			FX.sparks(dp.global_position, Color(0.5, 1.0, 1.0), 30, 9.0)
-			if hum == null:
-				hum = loop_at("mast_dish_hum", Vector3.ZERO, -4.0, 9.0, 90.0)
-				if hum:
-					remove_child(hum); dp.add_child(hum); hum.position = Vector3.ZERO
+			if hum:
+				var tw := create_tween().set_parallel()
+				tw.tween_property(hum, "pitch_scale", 1.0, 1.2); tw.tween_property(hum, "volume_db", -1.0, 0.8)
 		if beam:
 			beam.visible = fire > 0.0
 			beam.scale = Vector3(lerpf(0.2, 1.0, fire), lerpf(0.2, 1.0, fire), fire)
