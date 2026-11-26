@@ -43,12 +43,14 @@ func setup(level: Node3D) -> void:
 	var args := OS.get_cmdline_user_args()
 	dress = not args.has("--no-ground-dress")
 	stats = args.has("--ground-stats")
-	_make_arrays()
-	_make_mats()
-	_reskin(L)
+	var off := args.has("--no-ground")   # keep the old floors (the tour still runs, for comparisons)
+	if not off:
+		_make_arrays()
+		_make_mats()
+		_reskin(L)
 	if stats:
 		print("[ground] floors=%d by style %s" % [floors.size(), counts])
-	set_physics_process(dress)
+	set_physics_process(dress and not off)
 	for a in args:
 		if a.begins_with("--ground-tour="): tour_prefix = a.substr(14)
 	set_process(tour_prefix != "")

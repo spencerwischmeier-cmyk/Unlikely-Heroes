@@ -5,7 +5,6 @@ extends RefCounted
 const Ground := preload("res://scripts/level/ground/ground.gd")
 
 static func build(L) -> void:
-	if OS.get_cmdline_user_args().has("--no-ground"): return
 	var g: Node3D = Ground.new()
 	g.name = "Ground"
 	L.add_child(g)
