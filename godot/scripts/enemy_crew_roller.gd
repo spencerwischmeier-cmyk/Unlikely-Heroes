@@ -41,6 +41,11 @@ func _ready() -> void:
 
 ## The riveter arm (pivot at the shoulder; the crew swings it to hammer and cocks it back to fire).
 func _build_arm(head: Node3D) -> Node3D:
+	if ResourceLoader.exists("res://models/chars/crew_riveter.glb"):
+		var r: Node3D = load("res://models/chars/crew_riveter.glb").instantiate()
+		r.name = "arm"; r.position = Vector3(-0.5, 0.32, 0.02); head.add_child(r)
+		_collect(r)
+		return r
 	var yellow := StandardMaterial3D.new(); yellow.albedo_color = Color(0.86, 0.6, 0.14); yellow.metallic = 0.4; yellow.roughness = 0.5
 	var dark := StandardMaterial3D.new(); dark.albedo_color = Color(0.17, 0.19, 0.22); dark.metallic = 0.7; dark.roughness = 0.45
 	var brass := StandardMaterial3D.new(); brass.albedo_color = Color(0.85, 0.62, 0.25); brass.metallic = 0.9; brass.roughness = 0.3

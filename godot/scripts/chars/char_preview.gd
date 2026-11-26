@@ -30,7 +30,7 @@ func _initialize() -> void:
 	match which:
 		"bots":
 			_add_script("res://scripts/enemy_roller.gd", Vector3(-2.4, 0, 0), 0.3)
-			_add_script("res://scripts/enemy_crew_roller.gd", Vector3(-0.8, 0, 0), 0.3)
+			_add_script("res://scripts/enemy_crew_roller.gd", Vector3(-0.8, 0, 0), -0.6)
 			_add_script("res://scripts/enemy_hornet.gd", Vector3(0.9, 1.3, 0), 0.0)
 			var b := _add_script("res://scripts/crew_barricade.gd", Vector3(2.9, 0, -0.4), 0.0)
 			b.set("rise", 1.0)
