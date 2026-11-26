@@ -631,3 +631,20 @@ static func vines(a: Vector3, b: Vector3, side: Vector3, density := 1.2) -> void
 		var g := Color(0.3, 0.58, 0.24).lerp(Color(0.5, 0.75, 0.3), _hash3(Vector3(i, 7, a.x)))
 		add(cloth_mesh(), mat("flutter_soft"), tf(p, Vector3(0.35 + _hash3(Vector3(i, 1, 1)) * 0.3, h, 1), Vector3(0, yaw, 0)), false, g)
 		if i % 3 == 0: add(sphere_mesh(), mat("moss"), tf(p + Vector3(0, -0.05, 0), Vector3(0.7, 0.35, 0.6)), false)
+
+## a patterned rug on the floor (decor only, flush with the floor)
+static func rug(pos: Vector3, w: float, d: float, c1: String, c2: String, yaw := 0.0) -> void:
+	var T := Transform3D(Basis(Vector3.UP, yaw), pos)
+	add(box_mesh(), mat("cloth_" + c1), T * tf(Vector3(0, 0.012, 0), Vector3(w, 0.024, d)), false)
+	add(box_mesh(), mat("cloth_" + c2), T * tf(Vector3(0, 0.016, 0), Vector3(w * 0.78, 0.024, d * 0.72)), false)
+	add(box_mesh(), mat("cloth_" + c1), T * tf(Vector3(0, 0.02, 0), Vector3(w * 0.5, 0.024, d * 0.35)), false)
+	for i in 3:
+		add(box_mesh(), mat("cloth_cream"), T * tf(Vector3(-w * 0.3 + i * w * 0.3, 0.022, 0), Vector3(0.16, 0.024, 0.16), Vector3(0, PI / 4, 0)), false)
+
+## a hanging flower basket (on a mast or post), with trailing leaves
+static func flower_basket(pos: Vector3) -> void:
+	add(cyl_mesh(10), mat("wood"), tf(pos, Vector3(0.6, 0.35, 0.6)), false)
+	for i in 5:
+		var a := i * TAU / 5 + pos.x
+		add(sphere_mesh(), mat("blossom" if i % 2 == 0 else "leaf"), tf(pos + Vector3(cos(a) * 0.22, 0.2, sin(a) * 0.22), Vector3.ONE * 0.32), false)
+		add(cloth_mesh(), mat("flutter_soft"), tf(pos + Vector3(cos(a) * 0.3, 0.0, sin(a) * 0.3), Vector3(0.2, 0.6 + (i % 2) * 0.3, 1), Vector3(0, a, 0)), false, Color(0.35, 0.62, 0.28))

@@ -9,6 +9,7 @@ const TK := preload("res://scripts/level/terrace/tkit.gd")
 var fans: Array = []
 var sprockets: Array = []      # { node: Node3D, pos: Vector3, phase: float }
 var swingers: Array = []       # { node: Node3D, amp: float, speed: float, phase: float }
+var gulls: Array = []          # { node: Node3D, c: Vector3, r: float, speed: float, phase: float, wings: Array }
 var floaters: Array = []       # { node: Node3D, base: Vector3, phase: float, rise: float }
 var kettle_pos := Vector3.ZERO
 ## voice lines the first time Vesk steps into a spot: { rect: Rect2, y: float, ids: Array }
@@ -31,6 +32,18 @@ func add_sprocket(pos: Vector3) -> void:
 	n.scale = Vector3.ONE * 1.25
 	add_child(n); n.global_position = pos
 	sprockets.append({ node = n, pos = pos, phase = randf() * TAU })
+
+func add_gull(c: Vector3, r: float, speed: float, mat_body: Material, mat_wing: Material) -> void:
+	var n := Node3D.new(); add_child(n)
+	var body := MeshInstance3D.new(); body.mesh = TK.sphere_mesh(); body.material_override = mat_body
+	body.scale = Vector3(0.22, 0.2, 0.6); n.add_child(body)
+	var wings := []
+	for s in [-1, 1]:
+		var piv := Node3D.new(); n.add_child(piv)
+		var w := MeshInstance3D.new(); w.mesh = TK.box_mesh(); w.material_override = mat_wing
+		w.scale = Vector3(0.75, 0.03, 0.3); w.position = Vector3(0.4 * s, 0, 0); piv.add_child(w)
+		wings.append(piv)
+	gulls.append({ node = n, c = c, r = r, speed = speed, phase = randf() * TAU, wings = wings })
 
 func add_swinger(n: Node3D, amp := 0.12, speed := 1.3) -> void:
 	swingers.append({ node = n, amp = amp, speed = speed, phase = randf() * TAU })
@@ -72,6 +85,14 @@ func _process(dt: float) -> void:
 		var n: Node3D = s.node
 		n.rotation.z = sin(_t * s.speed + s.phase) * s.amp
 		n.rotation.x = sin(_t * s.speed * 0.7 + s.phase * 1.3) * s.amp * 0.6
+	for g in gulls:
+		var a: float = _t * g.speed + g.phase
+		var n: Node3D = g.node
+		n.position = g.c + Vector3(cos(a) * g.r, sin(a * 2.3) * 0.8, sin(a) * g.r)
+		n.rotation.y = -a + (PI if g.speed > 0 else 0.0)
+		var flap := sin(_t * 7.0 + g.phase * 4.0) * 0.6
+		(g.wings[0] as Node3D).rotation.z = flap
+		(g.wings[1] as Node3D).rotation.z = -flap
 	for f in floaters:
 		var n: Node3D = f.node
 		var u := fposmod(_t * f.rise + f.phase, 1.0)

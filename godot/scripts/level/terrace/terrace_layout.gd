@@ -17,6 +17,9 @@ const MODELS := "res://models/terrace/"
 
 static var life: Node3D
 
+static func M_GULL_WING() -> Material:
+	return TK.M.std(Color(0.72, 0.76, 0.8), 0.0, 0.7)
+
 static func build(L: Node3D) -> void:
 	TK.begin(L)
 	life = Life.new(); life.name = "TerraceLife"; L.add_child(life)
@@ -204,6 +207,12 @@ static func _bazaar(L: Node3D) -> void:
 	TK.bunting(d + Vector3(0, -0.4, 0), Vector3(-79.6, 3.0, 53.6), 0.6)
 	TK.bunting(a + Vector3(0, -0.6, 0), d + Vector3(0, -0.6, 0), 1.0)
 	TK.bunting(b + Vector3(0, -0.6, 0), c + Vector3(0, -0.6, 0), 1.0)
+	# rugs laid out in front of the stalls, flower baskets on the masts
+	TK.rug(Vector3(-71, 0, 35.4), 3.0, 2.0, "crimson", "saffron")
+	TK.rug(Vector3(-58.5, 0, 35.4), 3.0, 2.0, "teal", "cream")
+	TK.rug(Vector3(-71, 0, 49.2), 3.2, 2.0, "plum", "saffron")
+	TK.rug(Vector3(-65, 0, 47.8), 2.6, 1.6, "sky", "cream", 0.2)
+	for mp in [a, b, c, d]: TK.flower_basket(Vector3(mp.x + 0.4, 3.6, mp.z))
 	# the centrepiece: a spice pyramid round the big centre pole
 	TK.add(TK.cyl_mesh(16), TK.mat("terracotta"), TK.tf(Vector3(-65, 0.3, 42.8), Vector3(4.2, 0.6, 4.2)))
 	TK.add(TK.cyl_mesh(16), TK.mat("brass"), TK.tf(Vector3(-65, 0.62, 42.8), Vector3(4.3, 0.06, 4.3)), false)
@@ -242,6 +251,9 @@ static func _tea_terrace(L: Node3D) -> void:
 		var an := i * TAU / 6 + 0.3
 		var ch := TK.chimes(Vector3(-71.5 + cos(an) * 3.6, y + 3.5, 19.0 + sin(an) * 3.6), 0.8)
 		life.add_swinger(ch, 0.14, 1.1 + i * 0.13)
+	TK.rug(Vector3(-66.0, y, 25.8), 3.4, 2.4, "teal", "cream", 0.3)
+	TK.rug(Vector3(-74.8, y, 26.0), 3.4, 2.4, "crimson", "saffron", -0.5)
+	TK.rug(Vector3(-65.6, y, 16.0), 3.4, 2.4, "plum", "cream", 1.0)
 	TK.tea_table(Vector3(-66.0, y, 25.8), 0.3)
 	TK.tea_table(Vector3(-74.8, y, 26.0), -0.5)
 	TK.tea_table(Vector3(-65.6, y, 16.0), 1.0)
@@ -394,6 +406,7 @@ static func _fan(pos: Vector3, r: float, top: float, vmax: float, accel: float, 
 static func _tiers(L: Node3D) -> void:
 	# tier 2 (2.4): crates, a lantern line across to the tea terrace, laundry high over the chasm
 	TK.goods_heap(Vector3(-52.6, 2.4, 15.6), 0.3, 0.9)
+	TK.rug(Vector3(-56, 2.4, 20.5), 4.0, 2.6, "saffron", "teal", 0.1)
 	TK.post(Vector3(-50.6, 2.4, 14.6), 4.0, 0.08, "brass")
 	TK.post(Vector3(-50.6, 4.8, 8.4), 5.0, 0.08, "brass")
 	TK.laundry(Vector3(-50.6, 9.6, 8.4), Vector3(-50.6, 6.2, 14.6), 0.5)
@@ -447,6 +460,10 @@ static func _wash_nook(L: Node3D) -> void:
 
 # ------------------------------------------------------------------ sky lanterns drifting up
 static func _sky_lanterns() -> void:
+	# gulls circling the market
+	var white := TK.mat("plaster"); var grey := M_GULL_WING()
+	for g in [[Vector3(-65, 13, 42), 14.0, 0.25], [Vector3(-65, 15, 40), 10.0, -0.3], [Vector3(-90, 17, 14), 9.0, 0.35], [Vector3(-52, 12, 2), 8.0, -0.28], [Vector3(-40, 11, 37), 12.0, 0.22]]:
+		life.add_gull(g[0], g[1], g[2], white, grey)
 	# kites tethered to the market, bobbing in the wind
 	for k in [[Vector3(-79.6, 1.0, 52.6), Vector3(-90, 17, 64), "crimson", "saffron"], [Vector3(-50.6, 2.4, 14.8), Vector3(-44, 16, 4), "teal", "cream"],
 			[Vector3(-96.8, 7.8, 19.6), Vector3(-108, 21, 28), "plum", "saffron"]]:
