@@ -392,7 +392,6 @@ func _build() -> void:
 	_build_crane_yard()
 	_build_city()
 	_define_zones()
-	preload("res://scripts/level/areas.gd").build_all(self)
 	debug_spots = {
 		start = [start_pos, PI], plaza = [Vector3(0, 0.1, 40), PI], docks = [Vector3(39, 0.1, 24), PI],
 		pier_c = [Vector3(64, 6.1, -38), -PI / 2], terrace = [Vector3(-32, 0.1, 40), -PI / 2],
@@ -400,13 +399,16 @@ func _build() -> void:
 		dish = [Vector3(17, 20.1, -31), -PI * 0.75], yard = [Vector3(0, 0.1, -62), PI], arena = [Vector3(0, 0.1, -84), PI],
 		vault = [Vector3(2, 0.1, 41), PI / 2],
 	}
+	preload("res://scripts/level/areas.gd").build_all(self)   # after debug_spots, so areas can add spots
 
 func _build_junkyard() -> void:
 	# Vesk's junkyard: a walled pocket south of the plaza. Tutorial: run, hop the junk walls, climb the
 	# scrap pile to Dodger, wrench the bots, then crank Dodger's launcher to open the gate.
-	var r := rect(0, 82, 36, 28)
+	# The island runs on south past the porch to Vesk's shack and home yard (z 96..112); the side walls have
+	# gaps to the scrap heap (west) and the hull dock (east). Everything past the walls is in areas/junkyard.gd.
+	var r := rect(0, 90, 36, 44)
 	island("junkyard", r, 0.0, Color(0.92, 0.86, 0.76))
-	for w in [[0, 96.4, 36.8, 0.8], [-18.4, 82, 0.8, 28.8], [18.4, 82, 0.8, 28.8]]:
+	for w in [[-18.4, 72.3, 0.8, 8.6], [-18.4, 96.7, 0.8, 31.4], [18.4, 71.8, 0.8, 7.6], [18.4, 96.2, 0.8, 32.4]]:
 		box(Vector3(w[0], 1.25, w[1]), Vector3(w[2], 2.5, w[3]), mat_rust)
 	railing(-18, 68, -3.5, 68); railing(3.5, 68, 18, 68)
 	gate("junk_gate", Vector3(0, 0, 68), 7.0, 3.5)
@@ -430,7 +432,7 @@ func _build_junkyard() -> void:
 	# tutorial run: low junk walls to hop
 	block(0, 86, 9, 0.8, 0.8, 0, mat_rust)
 	block(-3, 80.5, 0.8, 7, 1.0, 0, mat_rust)
-	hint_sign("HOP OVER", Vector3(4.8, 0, 87), PI)
+	hint_sign("SPACE: JUMP. HOLD IT TO GO HIGHER", Vector3(4.8, 0, 87), PI)
 	# the scrap pile where Dodger crashed (two jumps up), and a hidden shelf above it
 	block(-9, 78.5, 4, 4, 1.2, 0, mat_rust)
 	block(-12.5, 74.5, 4, 3.4, 2.4, 0, mat_rust)
@@ -688,10 +690,10 @@ func _define_zones() -> void:
 		{ id = "junk_crash", kind = "reach", rect = rect(-12.5, 74.5, 4, 3.4), y = 2.4, y_range = 1.2,
 			objective = "Find Dodger on top of the scrap pile (WASD to run, Space to jump)",
 			enter_lines = ["sky_junk_found_1", "sky_junk_found_2", "sky_junk_found_3"] },
-		{ id = "junkyard", name = "THE JUNKYARD", rect = islands.junkyard, objective = "Wrench the bots out of the junkyard (F to swing)",
+		{ id = "junkyard", name = "THE JUNKYARD", rect = rect(0, 82, 36, 28), objective = "Wrench the bots out of the junkyard (F to swing)",
 			enter_lines = ["sky_junk_bots_1", "sky_junk_bots_2"], clear_lines = ["sky_junk_clear_1"],
 			waves = [{ roller = 2 }, { roller = 3 }, { roller = 2, hornet = 1 }] },
-		{ id = "dodger_launch", kind = "activate", rect = islands.junkyard, banner = "DODGER AIRBORNE",
+		{ id = "dodger_launch", kind = "activate", rect = rect(0, 82, 36, 28), banner = "DODGER AIRBORNE",
 			objective = "Whack the launch crank to get Dodger airborne",
 			switches = [{ pos = Vector3(7.5, 0, 86.5), yaw = PI * 0.75, label = "LAUNCH CRANK" }],
 			clear_lines = ["sky_dodger_up_1", "sky_dodger_up_2", "sky_dodger_up_3"], open_gates = ["junk_gate"] },
