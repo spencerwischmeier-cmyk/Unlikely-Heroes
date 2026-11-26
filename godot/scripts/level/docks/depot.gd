@@ -214,6 +214,11 @@ static func build(L: Node3D, A: Node3D) -> void:
 	_warehouse(L, A)
 	_berth(L, A)
 	_piers_abc(L, A)
+	# steel trusses under the new decks, down into the clouds
+	for t in [[Vector3(58, -1.2, 12), 32.0], [Vector3(82, -1.2, 12), 36.0], [Vector3(58, -1.2, 48), 34.0], [Vector3(82, -1.2, 48), 30.0],
+			[Vector3(70, -1.2, 30), 40.0], [Vector3(86, -1.2, 16), 34.0], [Vector3(110, -1.2, 16), 38.0], [Vector3(86, -1.2, 44), 32.0],
+			[Vector3(110, -1.2, 44), 36.0], [Vector3(136, -1.2, 20), 30.0], [Vector3(136, -1.2, 40), 34.0], [Vector3(124, -1.2, 30), 38.0]]:
+		DocksDressing.place(L, "truss", t[0] - Vector3(0, t[1], 0), randf() * 0.3, t[1], false)
 
 # ------------------------------------------------------------------ Pier D: the container canyon
 static func _canyon(L: Node3D, A: Node3D) -> void:
