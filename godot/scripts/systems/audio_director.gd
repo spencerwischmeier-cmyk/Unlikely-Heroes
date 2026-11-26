@@ -62,6 +62,10 @@ var lowpass := 20500.0
 var fountain_done := false
 var boss_phase2 := false
 var cut_id := ""
+var listen_pos := Vector3.ZERO
+var listen_area := ""
+var last_kill_t := -99.0
+var last_clear_t := -99.0
 var flyby: AudioStreamPlayer3D
 var flyby_t := 25.0
 var flyby_a := Vector3.ZERO
@@ -245,7 +249,11 @@ func _update_combat(dt: float) -> void:
 				Snd.play("zone_alarm", -14.0, 0.0, 1.0)
 	else:
 		combat_t = combat_t + dt if near == 0 else 0.0
-		if combat_t > 5.0: combat = false; combat_t = 0.0
+		if combat_t > 5.0:
+			combat = false; combat_t = 0.0
+			var now := Time.get_ticks_msec() / 1000.0
+			# the fight ended because the bots got scrapped (not a zone clear, not running away): a little "phew"
+			if Snd.adaptive and now - last_kill_t < 7.0 and now - last_clear_t > 10.0: Snd.sting("sting_calm", -5.0, 5.0)
 
 func _on_zone_cleared(id: String) -> void:
 	var kind := ""
@@ -254,6 +262,7 @@ func _on_zone_cleared(id: String) -> void:
 			if z.get("id", "") == id: kind = z.get("kind", "")
 	if kind == "boss" or kind == "reach": return
 	Snd.sting("sting_clear", 0.0)
+	last_clear_t = Time.get_ticks_msec() / 1000.0
 	combat_t = maxf(combat_t, 3.5)   # let the combat music go soon after
 
 ## the boss fight's music turns furious at half health
@@ -270,6 +279,7 @@ func _on_zone_entered(id: String) -> void:
 
 func _on_bot_killed(_bot: Node, pos: Vector3, _kind: String) -> void:
 	Snd.at("bot_die", pos, -3.0, 0.1, 0.05)
+	last_kill_t = Time.get_ticks_msec() / 1000.0
 	Snd.play("kill_tick", -13.0, 0.04, 0.04)
 
 # ------------------------------------------------------------------ ambience
@@ -312,12 +322,12 @@ func _update_oneshots(dt: float) -> void:
 	shot_t -= dt
 	if shot_t > 0.0: return
 	shot_t = randf_range(3.5, 8.0) * (2.0 if combat else 1.0)
-	var a := area if AREAS.has(area) else ""
+	var a := listen_area if AREAS.has(listen_area) else (area if AREAS.has(area) else "")
 	if a == "": return
 	var s: Array = AREAS[a].shots.pick_random()
 	var ang := randf() * TAU
 	var r := randf_range(10.0, 26.0)
-	var pos: Vector3 = Game.player.global_position + Vector3(cos(ang) * r, randf_range(1.0, 9.0), sin(ang) * r)
+	var pos: Vector3 = listen_pos + Vector3(cos(ang) * r, randf_range(1.0, 9.0), sin(ang) * r)
 	Snd.at(s[0], pos, s[1], 0.12, 0.0)
 
 func _update_world(dt: float) -> void:
@@ -458,7 +468,17 @@ func _process(dt: float) -> void:
 	if tick <= 0.0:
 		tick = 0.2
 		if island_count != Game.level.islands.size(): _map_islands()
+		# in cutscenes the camera is the ear for the ambience (the music follows the hero's area)
+		listen_area = ""
+		var lw := {}
+		var cam := get_viewport().get_camera_3d()
+		if Game.input_locked and cam and cam.global_position.distance_to(Game.player.global_position) > 15.0:
+			listen_pos = cam.global_position
+			listen_area = _locate(listen_pos); lw = weights.duplicate()
+		else:
+			listen_pos = Game.player.global_position
 		var a := _locate(Game.player.global_position)
+		if not lw.is_empty(): weights = lw
 		if a != "" and a != area:
 			if a == cand: cand_t += 0.2
 			else: cand = a; cand_t = 0.0
