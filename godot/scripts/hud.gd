@@ -98,10 +98,10 @@ func _ready() -> void:
 	add_child(root)
 	_build_vignette()
 	_place(vitals, Vector2(0, 0), Rect2(18, 14, 420, 104), _draw_vitals)
-	_place(objective, Vector2(0, 0), Rect2(18, 122, 640, 76), _draw_objective)
+	_place(objective, Vector2(0, 0), Rect2(18, 122, 640, 104), _draw_objective)
 	_place(wallet, Vector2(1, 0), Rect2(-300, 14, 282, 76), _draw_wallet)
 	_place(collect, Vector2(1, 0), Rect2(-300, 92, 282, 46), _draw_collect)
-	_place(boss, Vector2(0.5, 0), Rect2(-420, 10, 840, 84), _draw_boss)
+	_place(boss, Vector2(0.5, 0), Rect2(-340, 10, 680, 84), _draw_boss)
 	_place(weapon, Vector2(1, 1), Rect2(-470, -156, 452, 140), _draw_weapon)
 	_place(cross, Vector2(0.5, 0.5), Rect2(-40, -40, 80, 80), _draw_cross)
 	_place(prompt, Vector2(0.5, 0.5), Rect2(-320, 70, 640, 60), _draw_prompt)
@@ -302,6 +302,7 @@ func _process(dt: float) -> void:
 	sub_t -= dt
 	sub_a = move_toward(sub_a, 1.0 if sub_t > 0.0 and subtitles and sub_text != "" else 0.0, dt * (8.0 if sub_t > 0.0 else 3.0))
 	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs]: c.queue_redraw()
+	for c in toast_box.get_children(): c.queue_redraw()
 
 func _pad() -> bool:
 	return player != null and player.get("using_pad") == true
@@ -381,19 +382,24 @@ func _draw_objective() -> void:
 	var fresh := clampf(1.0 - (obj_t - 0.35) / 2.5, 0.0, 1.0)     # glow while the objective is new
 	var fs := 21
 	var tw := body.get_string_size(obj_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var w := clampf(tw + 92.0, 260.0, 620.0)
-	var r := Rect2(30 + slide, 14, w, 54)
+	var two := tw > 540.0          # long objectives wrap onto a second line instead of being cut off
+	if two: fs = 19
+	var wrap := 540.0
+	var w := clampf((wrap if two else tw) + 92.0, 260.0, 640.0)
+	var h := 76.0 if two else 54.0
+	var r := Rect2(30 + slide, 14, w, h)
 	HD.panel(ci, r, OBJ_COL.lerp(Color.WHITE, fresh * 0.5 * (0.5 + 0.5 * sin(t * 10.0))), 12, -0.12, a)
-	HD.badge(ci, Vector2(32 + slide, 41), 24, OBJ_COL, a)
-	HD.icon(ci, "flag", Vector2(34 + slide, 41), 13, OBJ_COL, a)
+	HD.badge(ci, Vector2(32 + slide, 14 + h * 0.5), 24, OBJ_COL, a)
+	HD.icon(ci, "flag", Vector2(34 + slide, 14 + h * 0.5), 13, OBJ_COL, a)
 	HD.text(ci, head, Vector2(66 + slide, 34), "OBJECTIVE", 15, OBJ_COL, 0, 4, a)
 	if fresh > 0.0:
 		HD.text(ci, head, Vector2(150 + slide, 34), "NEW", 15, Color(1, 1, 1, fresh), 0, 4, a)
-	var shown := obj_text
-	if tw > 520.0:
-		while shown.length() > 4 and body.get_string_size(shown + "...", HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > 520.0: shown = shown.substr(0, shown.length() - 1)
-		shown += "..."
-	HD.text(ci, body, Vector2(66 + slide, 58), shown, fs, Color(1, 1, 1), 0, 5, a)
+	if two:
+		var pos := Vector2(66 + slide, 57)
+		ci.draw_multiline_string_outline(body, pos, obj_text, HORIZONTAL_ALIGNMENT_LEFT, wrap, fs, 2, 5, Color(HD.INK, a))
+		ci.draw_multiline_string(body, pos, obj_text, HORIZONTAL_ALIGNMENT_LEFT, wrap, fs, 2, Color(1, 1, 1, a))
+	else:
+		HD.text(ci, body, Vector2(66 + slide, 58), obj_text, fs, Color(1, 1, 1), 0, 5, a)
 
 # ---------------------------------------------------------------- draw: sprockets + collectibles
 func _draw_wallet() -> void:
@@ -504,11 +510,11 @@ func _draw_boss() -> void:
 	var drop := (1.0 - a) * -40.0
 	var shake := Vector2(sin(t * 70.0), cos(t * 53.0)) * 4.0 * boss_hit
 	ci.draw_set_transform(Vector2(0, drop) + shake)
-	var r := Rect2(70, 12, 750, 62)
+	var r := Rect2(50, 12, 620, 62)
 	HD.panel(ci, r, BOSS_COL, 14, 0.0, a, Color(0.3, 0.09, 0.1, 0.92), Color(0.1, 0.03, 0.05, 0.92))
-	HD.text(ci, head, Vector2(118, 37), boss_name if boss_name != "" else "", 21, Color(1, 0.85, 0.8), 0, 5, a)
-	HD.text(ci, body, Vector2(800, 37), "%d%%" % int(ceil(boss_frac * 100.0)), 15, Color(1, 0.75, 0.7), 2, 4, a)
-	var br := Rect2(118, 45, 682, 18)
+	HD.text(ci, head, Vector2(98, 37), boss_name if boss_name != "" else "", 21, Color(1, 0.85, 0.8), 0, 5, a)
+	HD.text(ci, body, Vector2(650, 37), "%d%%" % int(ceil(boss_frac * 100.0)), 15, Color(1, 0.75, 0.7), 2, 4, a)
+	var br := Rect2(98, 45, 552, 18)
 	ci.draw_colored_polygon(HD.rrect(br.grow(2.5), 9), Color(HD.INK, a))
 	ci.draw_colored_polygon(HD.rrect(br, 8), Color(0.12, 0.04, 0.06, a))
 	if boss_trail > boss_frac:
@@ -524,8 +530,8 @@ func _draw_boss() -> void:
 	for i in range(1, 10):
 		var x := br.position.x + br.size.x * i / 10.0
 		ci.draw_line(Vector2(x, br.position.y + 2), Vector2(x, br.end.y - 2), Color(0, 0, 0, 0.35 * a), 2.0)
-	HD.badge(ci, Vector2(76, 42), 36, BOSS_COL, a)
-	HD.icon(ci, "boss", Vector2(76, 44), 21, BOSS_COL, a)
+	HD.badge(ci, Vector2(56, 42), 36, BOSS_COL, a)
+	HD.icon(ci, "boss", Vector2(56, 44), 21, BOSS_COL, a)
 	ci.draw_set_transform(Vector2.ZERO)
 
 # ---------------------------------------------------------------- draw: crosshair + prompt

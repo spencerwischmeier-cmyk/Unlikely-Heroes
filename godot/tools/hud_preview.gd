@@ -101,7 +101,7 @@ func _ready() -> void:
 			hud.show_prompt("Y   SHOP AT GIZMART")
 		_:
 			combat.heat = 0.55
-			Game.objective_set.emit("docks", "Reach the Dock Plaza and find Dodger's signal")
+			Game.objective_set.emit("docks", "Find Dodger on top of the scrap pile (WASD to run, Space to jump, hold it to go higher)")
 			combat.nuts_changed.emit(1265)
 			hud.toast("LUCKY WASHER  1/3", "Lucky! Trade washers for cosmetics and cheats.", Color(1, 0.82, 0.3))
 			hud.toast_small("+12 SEEKER HIVE AMMO", Color(1.0, 0.8, 0.25))
