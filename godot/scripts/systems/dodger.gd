@@ -57,9 +57,12 @@ func _ready() -> void:
 	Game.zone_cleared.connect(_on_zone_cleared)
 	Game.zone_entered.connect(_on_zone_entered)
 	Game.bot_killed.connect(_on_kill)
-	Game.player_fell.connect(func(): if state == "follow": _bark("dodger", "fall", 0.8))
-	Game.player_hurt.connect(func(h): if state == "follow" and h > 2: _bark.call_deferred("dodger", "hurt", 0.2))
-	Game.item_unlocked.connect(func(id): if id == "shard_1": orange_t = 7.0)
+	Game.player_fell.connect(func(): if state == "follow": _bark("dodger", "fall", 0.8); _emote("surprised", 1.4))
+	Game.player_hurt.connect(func(h):
+		if state != "follow": return
+		_emote("surprised" if h > 2 else "sad", 1.2)
+		if h > 2: _bark.call_deferred("dodger", "hurt", 0.2))
+	Game.item_unlocked.connect(func(id): if id == "shard_1": orange_t = 7.0; _emote("angry", 6.0))
 	Game.cutscene_started.connect(func(_id): if drone: drone.visible = false)
 	Game.cutscene_finished.connect(func(_id): if drone: drone.visible = true)
 	_build_ui()
@@ -164,12 +167,16 @@ func _poll_barks(dt: float) -> void:
 		grind_cd = 25.0; _bark("dodger", "grind", 0.5)
 	was_riding = riding
 	var hot: bool = Game.combat != null and Game.combat.get("overheated") == true
-	if hot and not was_hot: _bark("vesk", "overheat", 0.6)
+	if hot and not was_hot: _bark("vesk", "overheat", 0.6); _emote("smug", 1.5)
 	was_hot = hot
 	taunt_t -= dt
 	if taunt_t <= 0.0:
 		taunt_t = randf_range(20.0, 35.0)
-		if _nearest_bot(25.0): _bark("dodger", "taunt", 0.6)
+		if _nearest_bot(25.0): _bark("dodger", "taunt", 0.6); _emote("smug", 2.0)
+
+## Dodger's eye pulls a face (scripts/cutscene/drone_actor.gd emote()).
+func _emote(m: String, secs: float) -> void:
+	if drone and drone.has_method("emote"): drone.emote(m, secs)
 
 func _bark(who: String, kind: String, chance: float) -> void:
 	if bark_cd > 0.0 and who == "dodger": return
@@ -185,6 +192,7 @@ func _on_kill(_bot: Node, pos: Vector3, _kind: String) -> void:
 	combo_t = COMBO_TIME
 	combo_peak = maxi(combo_peak, combo)
 	if combo >= 2: Snd.play("combo_up", -8, 0.0)
+	_emote("happy", 0.9 + minf(combo, 6) * 0.2)
 	meter.set_meta("pop", 1.0)
 	if combo in [3, 6, 10]: _bark("dodger", "combo", 0.8)
 	var pl := Game.player

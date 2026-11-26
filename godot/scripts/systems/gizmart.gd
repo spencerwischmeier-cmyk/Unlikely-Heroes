@@ -14,6 +14,7 @@ const ITEMS := {
 		desc = "Releases a swarm of homing micro-drones. They find the bots so you don't have to." },
 }
 const RANGE := 2.8
+const GizmartActor := preload("res://scripts/chars/gizmart_actor.gd")
 
 var kiosks: Array = []        # { node: Node3D, spot: Dictionary, front: Vector3 }
 var near := -1
@@ -52,6 +53,12 @@ func _place_kiosks() -> void:
 		var yaw: float = s.get("yaw", 0.0)
 		var k := Kit.place(Game.level, "gizmart_kiosk", s.pos, yaw, 1.0, true)
 		k.name = "Gizmart%d" % kiosks.size()
+		# the kiosk keeps its collision; its body is the animated Gizmart (live screen face, bob and lean)
+		var actor: Node3D = null
+		if ResourceLoader.exists("res://models/chars/gizmart.glb"):
+			for c in k.get_children():
+				if not (c is StaticBody3D): c.queue_free(); k.remove_child(c)
+			actor = GizmartActor.new(); actor.name = "GizmartActor"; k.add_child(actor)
 		var fwd := Vector3(sin(yaw), 0, cos(yaw))
 		Kit.set_glow(k, "grin", Color(0.55, 1, 0.45), 3.0)
 		Kit.set_glow(k, "eyes", Color(0.55, 1, 0.45), 3.0)
@@ -59,7 +66,7 @@ func _place_kiosks() -> void:
 		tag.modulate = Color(0.6, 1, 0.5); tag.outline_size = 12; tag.position = Vector3(0, 3.5, 0.2)
 		tag.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 		k.add_child(tag)
-		kiosks.append({ node = k, spot = s, front = (s.pos as Vector3) + fwd * 1.5 })
+		kiosks.append({ node = k, spot = s, front = (s.pos as Vector3) + fwd * 1.5, actor = actor })
 
 func _process(dt: float) -> void:
 	hello_cd -= dt
@@ -97,12 +104,20 @@ func _open(i: int, pause := true) -> void:
 	tw.tween_property(panel, "modulate:a", 1.0, 0.15); tw.tween_property(panel, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK)
 	Snd.play("ui_select", -4)
 	Kit.flash(kiosks[i].node, "grin", Color(0.55, 1, 0.45), 9.0, 3.0, 0.5)
+	_mood(i, "hello", 1.6)
 	Snd.play("gizmart_chime", -6, 0.0, 0.0)
 	if hello_cd <= 0.0: Snd.bark("gizmart", "hello"); hello_cd = 20.0
 	if rows.size() > 0: rows[0].button.grab_focus()
 
+## Gizmart pulls a face on his screen (see scripts/chars/gizmart_actor.gd).
+func _mood(i: int, m: String, secs: float) -> void:
+	if i < 0 or i >= kiosks.size(): return
+	var a = kiosks[i].get("actor")
+	if a and is_instance_valid(a): a.mood(m, secs)
+
 func _close() -> void:
 	if open_i < 0: return
+	_mood(open_i, "happy", 1.5)
 	open_i = -1
 	panel.visible = false
 	get_tree().paused = false
@@ -122,10 +137,12 @@ func _buy(id: String) -> void:
 		Snd.bark("gizmart", "buy")
 		_vesk_buy_line()
 		Kit.flash(kiosks[open_i].node, "grin", Color(1, 0.9, 0.3), 12.0, 3.0, 0.8)
+		_mood(open_i, "excited", 2.0)
 		info.text = "%s added to your arsenal." % it.name
 	else:
 		Snd.play("shop_deny", -2)
 		if not (Snd.voice_player and Snd.voice_player.playing): Snd.bark("gizmart", "poor")
+		_mood(open_i, "sad", 1.6)
 		info.text = "You need %d more sprockets." % (int(it.price) - Game.nuts())
 	_refresh()
 
