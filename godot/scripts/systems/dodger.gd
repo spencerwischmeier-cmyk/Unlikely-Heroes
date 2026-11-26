@@ -311,11 +311,13 @@ func _draw_meter() -> void:
 	var r := 58.0 + pop * 8.0
 	var frac := clampf(combo_t / COMBO_TIME, 0.0, 1.0)
 	var hot := Color(1, 0.55, 0.2).lerp(Color(1, 0.25, 0.3), clampf((combo - 2) / 8.0, 0, 1))
-	meter.draw_circle(c, r + 6, Color(0, 0.05, 0.1, 0.55))
-	meter.draw_arc(c, r, 0, TAU, 48, Color(1, 1, 1, 0.15), 8)
-	meter.draw_arc(c, r, -PI / 2, -PI / 2 + TAU * frac, 48, hot, 8, true)
+	var HD = preload("res://scripts/ui/hud_draw.gd")
+	HD.badge(meter, c, r + 4, hot)
+	meter.draw_arc(c, r - 8, 0, TAU, 48, Color(0, 0, 0, 0.45), 9, true)
+	meter.draw_arc(c, r - 8, -PI / 2, -PI / 2 + TAU * frac, 48, hot.lightened(0.2), 7, true)
 	# little Dodger eye in the middle top
-	meter.draw_circle(c + Vector2(0, -r + 0.5), 7, Color(0.35, 0.95, 1))
+	meter.draw_circle(c + Vector2(0, -r - 4), 9, Color(0.02, 0.04, 0.08), true, -1, true)
+	meter.draw_circle(c + Vector2(0, -r - 4), 6.5, Color(0.35, 0.95, 1), true, -1, true)
 	var txt := "x%d" % combo
 	var fs := 46 + int(pop * 10)
 	var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
