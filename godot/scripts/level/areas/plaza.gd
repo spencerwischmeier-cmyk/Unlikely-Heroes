@@ -302,6 +302,19 @@ static func _floor_art() -> void:
 			[Vector3(13.5, 0.015, 28.5), Vector3(15.0, 0.02, 0.5)], [Vector3(13.5, 0.015, 31.5), Vector3(15.0, 0.02, 0.5)],
 			[Vector3(-4.4, 0.015, 18.0), Vector3(0.5, 0.02, 7.0)], [Vector3(-7.6, 0.015, 18.0), Vector3(0.5, 0.02, 7.0)]]:
 		bx(s[0], s[1], "e8b84a")
+	# brass manhole covers and drain grates
+	for p in [Vector3(-9.5, 0, 30.5), Vector3(9.0, 0, 26.0), Vector3(-3.0, 0, 39.0), Vector3(12.5, 0, 40.5), Vector3(-12.0, 0, 37.5)]:
+		cy(p + Vector3(0, 0.012, 0), 0.62, 0.62, 0.025, "brass", 18)
+		cy(p + Vector3(0, 0.02, 0), 0.45, 0.45, 0.02, "dark", 18)
+		for i in 3: bx(p + Vector3(-0.24 + i * 0.24, 0.032, 0), Vector3(0.06, 0.012, 0.7), "brass")
+	for p in [Vector3(6.5, 0, 34.5), Vector3(-6.5, 0, 22.0), Vector3(15.0, 0, 30.0)]:
+		bx(p + Vector3(0, 0.012, 0), Vector3(1.4, 0.02, 0.7), "dark")
+		for i in 6: bx(p + Vector3(-0.55 + i * 0.22, 0.025, 0), Vector3(0.08, 0.012, 0.6), "6b7480")
+	# sacks of produce by the north stalls
+	for p in [Vector3(1.9, 0, 16.6), Vector3(7.1, 0, 16.2), Vector3(12.6, 0, 17.4)]:
+		for j in 2:
+			var sk := sphere(p + Vector3(j * 0.5, 0.32, j * 0.2), 0.36, "c9a46a"); sk.scale = Vector3(1, 0.9, 0.85)
+			sphere(p + Vector3(j * 0.5, 0.62, j * 0.2), 0.2, ["e8543c", "f2a33a", "a5d04a"][j], null, true)
 	# a compass rose of tiles under the arch
 	for i in 8:
 		var a := i * TAU / 8.0
