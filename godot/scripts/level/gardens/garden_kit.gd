@@ -650,6 +650,7 @@ var coping_mat: StandardMaterial3D
 func reskin_island(r: Rect2, y: float) -> void:
 	if flag_mat == null:
 		flag_mat = ShaderMaterial.new(); flag_mat.shader = _flag_shader()
+		flag_mat.set_meta("ground", true)   # the ground pass (scripts/level/ground) swaps in its flagstone
 		rock_mat = M.std(Color(0.47, 0.38, 0.32), 0.0, 0.95)
 		coping_mat = M.std(Color(0.86, 0.78, 0.64), 0.0, 0.8)
 	var g := r.grow(0.6)
