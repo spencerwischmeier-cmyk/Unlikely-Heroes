@@ -361,6 +361,57 @@ func petals(c: Vector3, ext: Vector3, amount := 24, col := Color(1.0, 0.7, 0.85)
 	p.visibility_aabb = AABB(-ext - Vector3(2, 8, 2), ext * 2 + Vector3(4, 10, 4))
 	root.add_child(p)
 
+## terracotta pots with plants (batched)
+func pots(c: Vector3, n := 3, spread := 0.6) -> void:
+	var terracotta := Color(0.85, 0.45, 0.28)
+	for i in n:
+		var p := c + Vector3(rng.randf_range(-spread, spread), 0, rng.randf_range(-spread, spread))
+		var r := rng.randf_range(0.18, 0.3)
+		add_inst("pot", _pot_mesh(), pot_mat, Transform3D(Basis().scaled_local(Vector3(r, r * 1.3, r)), p + Vector3(0, r * 0.65, 0)), _vary(terracotta, 0.05))
+		if rng.randf() < 0.5:
+			add_inst("leaf", blob_mesh, foliage_mat, xf_at(p + Vector3(0, r * 1.5, 0), Vector3(r, r * 0.9, r)), _vary(Color(0.3, 0.62, 0.3)))
+			flower(p + Vector3(0, r * 2.0, 0), FLOWER_COLS[rng.randi() % FLOWER_COLS.size()], 0.18)
+		else:
+			add_inst("leafy", leaf_mesh, flower_mat, xf_at(p + Vector3(0, r * 1.2, 0), Vector3.ONE * r * 3.0, rng.randf() * TAU), _vary(Color(0.32, 0.66, 0.3)), false)
+
+var pot_mat: StandardMaterial3D
+var _pot: CylinderMesh
+func _pot_mesh() -> CylinderMesh:
+	if _pot == null:
+		_pot = CylinderMesh.new(); _pot.top_radius = 1.0; _pot.bottom_radius = 0.7; _pot.height = 1.0; _pot.radial_segments = 10; _pot.rings = 1
+		pot_mat = M.std(Color(1, 1, 1), 0.0, 0.85); pot_mat.vertex_color_use_as_albedo = true
+	return _pot
+
+## gardening gear the bots left lying around: watering can, rake, seed sacks, a wheelbarrow of soil
+func garden_tools(base: Vector3, yaw := 0.0) -> void:
+	var n := Node3D.new(); n.position = base; n.rotation.y = yaw; root.add_child(n)
+	var green := M.paint(Color(0.25, 0.6, 0.45))
+	# watering can
+	cylm(Vector3(0, 0.2, 0), 0.18, 0.2, 0.4, green, 12, n)
+	var spout := cylm(Vector3(0.28, 0.32, 0), 0.025, 0.04, 0.4, green, 6, n); spout.rotation.z = -0.9
+	var rose := cylm(Vector3(0.44, 0.45, 0), 0.06, 0.03, 0.05, brass_mat, 8, n); rose.rotation.z = -0.9
+	var tm := TorusMesh.new(); tm.inner_radius = 0.1; tm.outer_radius = 0.13; tm.rings = 10; tm.ring_segments = 5
+	var handle := mesh(tm, green, Vector3(-0.05, 0.42, 0), n); handle.rotation.x = PI / 2
+	# rake leaning on a bag of seed
+	var rake := Node3D.new(); rake.position = Vector3(-0.6, 0, 0.1); rake.rotation.z = 0.35; n.add_child(rake)
+	cylm(Vector3(0, 0.75, 0), 0.025, 0.025, 1.5, plank_mat, 6, rake)
+	var head := mesh(box_mesh, frame_mat, Vector3(0, 1.5, 0), rake); head.scale = Vector3(0.05, 0.06, 0.4)
+	for k in 5:
+		var tine := mesh(box_mesh, frame_mat, Vector3(0, 1.58, -0.16 + k * 0.08), rake); tine.scale = Vector3(0.02, 0.12, 0.02)
+	var sack_mat := M.cloth(Color(0.85, 0.75, 0.55))
+	for k in 2:
+		var sack := mesh(blob_mesh, sack_mat, Vector3(-0.95 + k * 0.05, 0.25, -0.3 + k * 0.5), n)
+		sack.scale = Vector3(0.28, 0.3, 0.22); sack.rotation.y = k * 0.6
+	# wheelbarrow with soil and a sapling
+	var wb := Node3D.new(); wb.position = Vector3(0.6, 0, -0.9); wb.rotation.y = 0.5; n.add_child(wb)
+	var tub := mesh(box_mesh, M.paint(Color(0.9, 0.45, 0.2)), Vector3(0, 0.5, 0), wb); tub.scale = Vector3(0.7, 0.35, 1.0)
+	var dirt := mesh(box_mesh, soil_mat, Vector3(0, 0.66, 0), wb); dirt.scale = Vector3(0.6, 0.05, 0.9)
+	var wheel := cylm(Vector3(0, 0.2, 0.6), 0.2, 0.2, 0.08, M.rubber(), 12, wb); wheel.rotation.z = PI / 2
+	for sx in [-1, 1]:
+		var leg := mesh(box_mesh, frame_mat, Vector3(sx * 0.28, 0.2, -0.35), wb); leg.scale = Vector3(0.05, 0.4, 0.05)
+		var arm := mesh(box_mesh, frame_mat, Vector3(sx * 0.3, 0.55, -0.75), wb); arm.scale = Vector3(0.05, 0.05, 0.7)
+	bush(base + Basis(Vector3.UP, yaw) * (Vector3(0.6, 0.85, -0.9)), 0.22, Color(0.35, 0.7, 0.32), 2)
+
 # ------------------------------------------------------------------ structures
 ## a glass dome (radius r) with brass ribs at centre c (floor y). Solid wall ring with door gaps at the
 ## given yaw angles (radians, 0 = +z). Returns the holder.

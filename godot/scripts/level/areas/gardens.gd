@@ -53,6 +53,13 @@ static func build(L: Node3D) -> void:
 	K.petals(Vector3(-40.5, Y + 4.0, -43), Vector3(9, 1.5, 7), 24)
 	K.petals(Vector3(TREE.x, CROWN_Y + 4.0, TREE.y), Vector3(6, 2, 6), 30, Color(0.7, 0.95, 0.5))
 	K.petals(Vector3(-41.5, GROVE_Y + 3.0, -63), Vector3(8, 1.5, 7), 24, Color(1.0, 0.8, 0.3))
+	# garden bots' tools and pots near the sheds and hives
+	K.garden_tools(Vector3(-34.6, Y, 2.4), 0.0)
+	K.garden_tools(Vector3(-36.4, Y, -47.6), 0.4)
+	K.garden_tools(Vector3(-44.5, GROVE_Y, -68.6), PI * 0.1)
+	for p in [Vector3(-28.8, Y, 3.5), Vector3(-29.2, Y, -1.6), Vector3(-32.4, Y, -49.4), Vector3(-49.2, Y, -36.6),
+			Vector3(-46.5, Y, -40.5), Vector3(-35.2, GROVE_Y, -69.0), Vector3(-49.0, GROVE_Y, -56.8), Vector3(TREE.x - 1.2, CROWN_Y, TREE.y - 1.8)]:
+		K.pots(p, 3, 0.45)
 	# Vesk and Dodger have opinions (once each)
 	life.add_quip(DOME, 2.6, ["gardens_dome_1", "gardens_dome_2"])
 	life.add_quip(Vector3(-48.5, Y, -43), 2.5, ["gardens_tree_1"])
