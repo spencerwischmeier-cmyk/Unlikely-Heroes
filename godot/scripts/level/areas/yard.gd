@@ -318,6 +318,14 @@ static func _arena(L, life) -> void:
 	ring.mesh = tm; ring.material_override = K.mat("hazard"); ring.scale = Vector3(1, 0.03, 1); ring.position = Vector3(0, 0.01, -102)
 	L.add_child(ring)
 	for z in [-81.2, -112.8]: K.stripe(L, Vector3(0, 0, z), Vector2(42, 0.8))
+	# floor grates with a hot glow under them, and oil stains: the stage is a working deck
+	for g in [Vector3(-14, 0, -84.5), Vector3(14, 0, -84.5), Vector3(-17, 0, -97), Vector3(17, 0, -97), Vector3(-14, 0, -109.5), Vector3(14, 0, -109.5)]:
+		K.bx(L, g + Vector3(0, 0.015, 0), Vector3(3.0, 0.03, 2.0), "dark")
+		for i in 6: K.bx(L, g + Vector3(-1.25 + i * 0.5, 0.035, 0), Vector3(0.12, 0.03, 1.8), "steel")
+		K.bx(L, g + Vector3(0, 0.02, 0), Vector3(2.8, 0.02, 1.8), "glow_molten")
+	for o in [Vector3(-6, 0, -90), Vector3(7, 0, -108), Vector3(4, 0, -88), Vector3(-9, 0, -104)]:
+		var st := K.cy(L, o + Vector3(0, 0.012, 0), randf_range(0.8, 1.5), 0.01, "cable", Vector3.ZERO, 16)
+		st.scale = Vector3(1.0, 1.0, randf_range(0.6, 1.0))
 	for x in [-20.8, 20.8]: K.stripe(L, Vector3(x, 0, -97), Vector2(0.8, 30))
 	# overhead crane: runway girders on lattice towers, a travelling bridge with a trolley and a hanging load
 	for x in [-24.5, 24.5]:
