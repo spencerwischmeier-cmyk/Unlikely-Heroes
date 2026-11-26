@@ -461,6 +461,12 @@ static func _spots(L: Node3D) -> void:
 	for z in [14.8, 16.2]: sp.append(Vector3(-79.0, 4.5, z))                                              # under the loft stairs
 	sp.append(Vector3(-79.2, 0.9, 32.6))                                                                  # behind the bazaar stairs
 	for p in sp: life.add_sprocket(p)
+	life.triggers = [
+		{ rect = Rect2(-80, 12, 18, 18), y = 3.6, ids = ["terrace_tea_1", "terrace_tea_2"] },
+		{ rect = Rect2(-97, 14, 8, 6), y = 7.8, ids = ["terrace_fan_1"] },
+		{ rect = Rect2(-95.5, 21.5, 5, 4), y = 12.6, ids = ["terrace_perch_1"] },
+		{ rect = Rect2(-61, 55, 10, 5), y = -3.2, ids = ["terrace_nook_1"] },
+	]
 	var spots := {
 		bazaar = [Vector3(-65, 0.1, 47), PI], tea = [Vector3(-66, 3.7, 28), -2.6], loft = [Vector3(-84.5, 7.9, 12), -PI / 2],
 		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-51, 4.9, 1.5), PI], perch = [Vector3(-93, 12.7, 23.5), PI],

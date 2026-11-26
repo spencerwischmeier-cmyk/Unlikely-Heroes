@@ -88,6 +88,13 @@
  ["sky_yard_gate_clear_1","dodger","And look, another Gizmart. He gets everywhere."],
  ["sky_yard_gate_clear_2","vesk","Stock up. Something big is moving in there."]
 ],
+"terrace": [
+ ["terrace_tea_1","dodger","[excited] A tea house! Vesk, look, there's a sign about me. I'm famous! Banned, but famous."],
+ ["terrace_tea_2","vesk","[gruff] Finally. Somebody in this city with standards."],
+ ["terrace_fan_1","dodger","Jump over the fan and hold it. Let the wind do all the work. You know, like you do with everything."],
+ ["terrace_perch_1","vesk","[grumbling] Wind chimes. Great. A headache, now in brass."],
+ ["terrace_nook_1","dodger","[curious] Somebody's laundry. Somebody with very, very small socks."]
+],
 "cutscene": [
  ["sky_intro_coffee_1","dodger","[confused] Uh, Vesk? Did your coffee maker just punch a time card?"],
  ["sky_intro_coffee_2","vesk","[flatly] No. I'm retired. The coffee maker is retired."],

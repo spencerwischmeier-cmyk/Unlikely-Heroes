@@ -11,6 +11,8 @@ var sprockets: Array = []      # { node: Node3D, pos: Vector3, phase: float }
 var swingers: Array = []       # { node: Node3D, amp: float, speed: float, phase: float }
 var floaters: Array = []       # { node: Node3D, base: Vector3, phase: float, rise: float }
 var kettle_pos := Vector3.ZERO
+## voice lines the first time Vesk steps into a spot: { rect: Rect2, y: float, ids: Array }
+var triggers: Array = []
 var kettle_t := 8.0
 var _t := 0.0
 var _lift_snd := 0.0
@@ -87,6 +89,14 @@ func _process(dt: float) -> void:
 			Snd.play("nut_pickup", -6, 0.18, 0.02)
 			FX.sparks(n.global_position, Color(1.0, 0.8, 0.3), 6, 3.0)
 			n.queue_free(); sprockets.remove_at(i)
+	if p:
+		for i in range(triggers.size() - 1, -1, -1):
+			var tr: Dictionary = triggers[i]
+			var pp := p.global_position
+			if (tr.rect as Rect2).has_point(Vector2(pp.x, pp.z)) and absf(pp.y - tr.y) < 1.5:
+				triggers.remove_at(i)
+				if Game.input_locked: continue
+				for id in tr.ids: Snd.voice(id)
 	# the tea kettle whistles now and then when Vesk is near
 	kettle_t -= dt
 	if kettle_t <= 0.0:
