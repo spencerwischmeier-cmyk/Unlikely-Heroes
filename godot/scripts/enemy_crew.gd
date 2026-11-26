@@ -108,6 +108,7 @@ func _physics_process(dt: float) -> void:
 			var behind := (p - line_c).dot(line_n) < -0.6
 			if barricades.is_empty() or behind:
 				state = "charge"; st_t = 3.5
+				Snd.at("chars_crew_grumble", lead.global_position, -3, 0.15)
 				Snd.at("crane_warn", lead.global_position, -10, 0.1)
 			elif st_t <= 0.0:
 				state = "march"; st_t = 3.0
@@ -146,6 +147,7 @@ func _start_build(lead: Node3D, n: Vector3) -> void:
 	builds += 1
 	state = "build"; st_t = BUILD_T; hammer_t = 0.0
 	Snd.at("crew_hammer", lead.global_position, -4, 0.1)
+	Snd.at("chars_crew_grumble", lead.global_position + Vector3(0, 0.8, 0), -6, 0.1)
 	line_n = n
 	var side := Vector3(n.z, 0, -n.x)
 	line_c = lead.global_position + n * 1.7

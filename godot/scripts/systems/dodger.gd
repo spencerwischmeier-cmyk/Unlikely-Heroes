@@ -61,6 +61,7 @@ func _ready() -> void:
 	Game.player_hurt.connect(func(h):
 		if state != "follow": return
 		_emote("surprised" if h > 2 else "sad", 1.2)
+		if h <= 2: Snd.at("chars_dodger_worried", drone.global_position, -8, 0.05, 4.0)
 		if h > 2: _bark.call_deferred("dodger", "hurt", 0.2))
 	Game.item_unlocked.connect(func(id): if id == "shard_1": orange_t = 7.0; _emote("angry", 6.0))
 	Game.cutscene_started.connect(func(_id): if drone: drone.visible = false)
@@ -193,6 +194,7 @@ func _on_kill(_bot: Node, pos: Vector3, _kind: String) -> void:
 	combo_peak = maxi(combo_peak, combo)
 	if combo >= 2: Snd.play("combo_up", -8, 0.0)
 	_emote("happy", 0.9 + minf(combo, 6) * 0.2)
+	if combo in [3, 6, 10]: Snd.at("chars_dodger_happy", drone.global_position, -8, 0.05, 1.0)
 	meter.set_meta("pop", 1.0)
 	if combo in [3, 6, 10]: _bark("dodger", "combo", 0.8)
 	var pl := Game.player

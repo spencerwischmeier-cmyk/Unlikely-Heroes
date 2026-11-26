@@ -336,6 +336,7 @@ func damage(amount: float, _point: Vector3, _dir: Vector3) -> bool:
 
 func _hurt(amount: float) -> bool:
 	hp -= amount; flash = 1.0
+	if amount >= 3.0: Snd.at("chars_crane_hurt", center(), 0, 0.1, 0.8)
 	if phase == 1 and hp <= BOSS_HP * 0.5:
 		hp = BOSS_HP * 0.5; pending_rip = true     # phase 2 always plays
 	Game.boss_health.emit(NAME, maxf(0.0, hp / BOSS_HP))
@@ -397,7 +398,7 @@ func _intro(dt: float, to_hero: Vector3) -> void:
 		var k := clampf((3.0 - st_t) / 3.0, 0, 1)
 		pitch = 0.2 + sin(k * PI) * 0.9
 		turn_yaw += angle_difference(turn_yaw, atan2(to_hero.x, to_hero.z)) * (1.0 - exp(-2.0 * dt))
-		if st_t < 2.2 and st_t + dt >= 2.2: Snd.at("crane_warn", center(), 4, 0.0); FX.shake(0.5)
+		if st_t < 2.2 and st_t + dt >= 2.2: Snd.at("crane_warn", center(), 4, 0.0); FX.shake(0.5); Snd.at("chars_crane_roar", center(), 4, 0.0)
 		if st_t < 1.6 and st_t + dt >= 1.6: Snd.at("crane_move", position, 0)
 		eye_mat.emission_energy_multiplier = 6.0 + sin(k * PI) * 14.0
 	if st_t <= 0.0:

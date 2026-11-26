@@ -126,6 +126,7 @@ func _burst() -> void:
 	var parts := break_parts.filter(func(n): return is_instance_valid(n))
 	for e in eyes: if is_instance_valid(e.node): (e.mat as StandardMaterial3D).emission_energy_multiplier = 0.4
 	ScrapBurst.burst(get_parent(), c, burst_scale, chunk_mats, scrap_count, parts)
+	Snd.at("chars_bot_break", c, -3, 0.12, 0.05)
 	FX.shake(0.6 * burst_scale)
 	Snd.at("explode_small", c, 0.0)
 	FX.stop(0.045)

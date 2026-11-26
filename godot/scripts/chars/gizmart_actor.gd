@@ -60,6 +60,7 @@ func _glow(c: Color, e: float) -> StandardMaterial3D:
 func mood(m: String, secs := 1.5) -> void:
 	face = m; face_t = secs
 	if m in ["excited", "hello"]: hop = 1.0
+	if m == "excited" and is_inside_tree(): Snd.at("chars_gizmart_hop", global_position + Vector3(0, 1.5, 0), -4, 0.05)
 
 func _process(dt: float) -> void:
 	t += dt

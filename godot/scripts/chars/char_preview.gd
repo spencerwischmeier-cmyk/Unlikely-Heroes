@@ -33,29 +33,30 @@ func _initialize() -> void:
 			_add_model("res://models/crew_roller.glb", Vector3(-0.8, 0, 0))
 			_add_model("res://models/hornet.glb", Vector3(0.9, 1.3, 0))
 			_add_model("res://models/crew_barricade.glb", Vector3(2.9, 0, -0.4))
-			cam.position = Vector3(0.2, 1.7, 7.2); cam.look_at(Vector3(0.2, 0.8, 0))
+			_aim(cam, Vector3(0.2, 1.7, 7.2), Vector3(0.2, 0.8, 0))
 		"gizmart":
 			var g: Node3D = load("res://scripts/chars/gizmart_actor.gd").new(); root3.add_child(g)
 			g.rotation.y = 0.35
 			actors.append(g)
-			cam.position = Vector3(0.3, 2.2, 4.6); cam.look_at(Vector3(0.1, 1.7, 0))
+			_aim(cam, Vector3(0.3, 2.2, 4.6), Vector3(0.1, 1.7, 0))
 		"dodger":
 			for i in 3:
 				var d: Node3D = load("res://scripts/cutscene/drone_actor.gd").new(); root3.add_child(d)
 				d.position = Vector3((i - 1) * 0.9, 1.0, 0); d.rotation.y = 0.25
 				actors.append(d)
-			cam.position = Vector3(0, 1.15, 2.0); cam.look_at(Vector3(0, 1.0, 0))
+			_aim(cam, Vector3(0, 1.15, 2.0), Vector3(0, 1.0, 0))
 		"grudd":
 			var m := _add_model("res://models/chars/grudd.glb", Vector3.ZERO)
 			var ap := m.find_child("AnimationPlayer", true, false) as AnimationPlayer
 			if ap and ap.has_animation("talk"): ap.play("talk")
-			cam.position = Vector3(1.5, 2.6, 7.5); cam.look_at(Vector3(0, 2.0, 0))
+			_aim(cam, Vector3(1.5, 2.6, 7.5), Vector3(0, 2.0, 0))
 		"crane":
 			var c: Node3D = load("res://scripts/cranebot.gd").new(); root3.add_child(c)
-			c.visible = true; c.magnet.visible = true; c.cable.visible = false
-			c.boom.rotation.x = -0.5
-			c.magnet.global_position = c.tip.global_position + Vector3(0, -1.6, 0)
-			cam.position = Vector3(7, 5, 11); cam.look_at(Vector3(0, 2.5, 0))
+			actors.append(c)
+			_aim(cam, Vector3(7, 5, 11), Vector3(0, 2.5, 0))
+
+func _aim(cam: Camera3D, pos: Vector3, at: Vector3) -> void:
+	cam.transform = Transform3D(Basis.looking_at(at - pos), pos)
 
 func _add_model(path: String, pos: Vector3) -> Node3D:
 	var m: Node3D = load(path).instantiate(); root3.add_child(m); m.position = pos
@@ -66,6 +67,11 @@ func _process(_dt: float) -> bool:
 	if which == "dodger" and n == 5:
 		var moods := ["happy", "angry", "sad"]
 		for i in actors.size(): if actors[i].has_method("emote"): actors[i].emote(moods[i], 99.0)
+	if which == "crane" and n == 3:
+		var c: Node3D = actors[0]
+		c.visible = true; c.magnet.visible = true
+		c.boom.rotation.x = -0.5; c.turn.rotation.y = 0.5
+		c.magnet.global_position = c.tip.global_position + Vector3(0, -1.6, 0)
 	if which == "gizmart" and n == 5 and actors.size() > 0: actors[0].mood("hello", 99.0)
 	if n == frames:
 		var img := root.get_viewport().get_texture().get_image()

@@ -62,6 +62,7 @@ func _physics_process(dt: float) -> void:
 		return
 	tick_common(dt)
 	if paused(): aim_line.visible = false; return
+	if spawn_t > 0.0 and spawn_t + 0.02 >= 1.0: Snd.at("chars_hornet_dive", global_position, -6, 0.12, 0.2)
 	var hp_ := player.global_position
 	var hero_c := hp_ + Vector3(0, 0.9, 0)
 	orbit_a += dt * 0.35
@@ -124,6 +125,7 @@ func _death_fx(self_destruct: bool) -> void:
 	velocity = velocity * 0.4 + Vector3(0, 2.0, 0)
 	FX.sparks(center(), Color(1, 0.6, 0.3), 14, 6)
 	Snd.at("explode_small", center(), -6, 0.2)
+	Snd.at("chars_hornet_dive", center(), -4, 0.0, 0.1)
 
 func _fall(dt: float) -> void:
 	fall_t -= dt; t += dt

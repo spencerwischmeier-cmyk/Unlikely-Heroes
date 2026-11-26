@@ -78,6 +78,7 @@ func _physics_process(dt: float) -> void:
 				state = "wake"; st_t = 0.45
 				FX.puff(global_position + Vector3(0, 0.1, 0), Color(1, 0.75, 0.7)); FX.ring(global_position + Vector3(0, 0.05, 0), Color(1, 0.6, 0.4), 0.5)
 				Snd.at("land", global_position, -6)
+				Snd.at("chars_roller_wake", global_position, -6, 0.12, 0.1)
 				pop = 1.0
 		"wake":
 			# a little shake and hop before it starts rolling
@@ -86,6 +87,7 @@ func _physics_process(dt: float) -> void:
 			if model: model.rotation.y = sin(t * 40.0) * 0.15
 			if st_t <= 0.0:
 				state = "chase"; velocity.y = 3.0; eye_open = 1.0; pop = 0.8
+				Snd.at("chars_roller_hop", global_position, -9, 0.15, 0.1)
 				if model: model.rotation.y = 0
 		"chase":
 			if is_on_floor() and stun <= 0.0:
