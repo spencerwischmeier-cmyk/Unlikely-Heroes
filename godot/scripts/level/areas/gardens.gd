@@ -434,6 +434,19 @@ static func _hive_grove(L: Node3D, K, life) -> void:
 	for x in [-48.0, -45.0, -37.0, -34.5]: K.vines(Vector3(x, GROVE_Y - 0.1, -70.15), randf_range(2.0, 3.5))
 	for z in [-68.0, -64.0, -60.0]: K.vines(Vector3(-50.15, GROVE_Y - 0.1, z), randf_range(2.0, 3.5))
 	K.garden_lamp(Vector3(-34.6, GROVE_Y, -56.6), -PI / 2, Color(1.0, 0.8, 0.5), false)
+	# the east orchard, where the Lookout hook swing lands: fruit trees, beds along the edge, a bench
+	for tp in [Vector3(-27.6, GROVE_Y, -57.8), Vector3(-30.5, GROVE_Y, -68.2), Vector3(-27.4, GROVE_Y, -68.6)]:
+		K.tree(tp, randf_range(3.6, 4.6), randf_range(1.3, 1.6), Color(0.42, 0.72, 0.3), true)
+	K.flower_bed(-26.75, -63.3, 0.9, 6.5, GROVE_Y, 0.45, true, 8.0)
+	K.flower_bed(-30.0, -56.75, 4.5, 0.9, GROVE_Y, 0.45, true, 8.0)
+	K.model("garden_tree", Vector3(-32.6, GROVE_Y, -57.2), 0.0, 2.2, true, 0.4)
+	L.prop("bench", Vector3(-31.6, GROVE_Y, -69.1), PI)
+	K.garden_lamp(Vector3(-26.6, GROVE_Y, -59.4), PI, Color(1.0, 0.8, 0.5), true)
+	K.garden_lamp(Vector3(-26.6, GROVE_Y, -67.2), PI, Color(1.0, 0.8, 0.5), false)
+	L.crate_spots.append(Vector3(-28.2, GROVE_Y, -66.0))
+	life.sprocket_line(Vector3(-33.5, GROVE_Y + 1.0, -63.3), Vector3(-28.0, GROVE_Y + 1.0, -63.3), 3)
+	for z in [-58.0, -62.0, -66.0]: K.vines(Vector3(-25.85, GROVE_Y - 0.1, z), randf_range(2.0, 3.5))
+	for i in 3: life.add_butterfly(Vector3(-29.5, GROVE_Y + 0.6, -63), 2.5)
 	for i in 6: life.add_butterfly(Vector3(randf_range(-46, -36), GROVE_Y + 0.5, randf_range(-67, -57)), randf_range(1.2, 2.5))
 
 # ------------------------------------------------------------------ sky dressing: gulls and far islands
@@ -456,7 +469,7 @@ static func _debug_spots(L: Node3D) -> void:
 		gd_tree = [Vector3(-47.5, Y + 0.1, -41.0), -PI * 0.6],
 		gd_crown = [Vector3(TREE.x + 1.8, CROWN_Y + 0.1, TREE.y + 1.4), PI * 0.75],
 		gd_grove = [Vector3(-40, GROVE_Y + 0.1, -57.0), PI + 0.3],
-		gd_lookout = [LOOK + Vector3(0, 0.1, 1.5), PI],
+		gd_lookout = [LOOK + Vector3(-1.5, 0.1, -1.0), PI / 2],
 		gd_vista = [Vector3(-26.5, Y + 0.1, -24), -PI * 0.6],
 	}
 	for k in spots: L.debug_spots[k] = spots[k]
