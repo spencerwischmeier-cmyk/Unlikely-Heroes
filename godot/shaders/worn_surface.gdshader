@@ -46,9 +46,12 @@ void fragment() {
 	float up = clamp(wnrm.y, 0.0, 1.0);
 	float side = 1.0 - up;
 	// big soft grime patches + streaks running down vertical faces
-	float g = smoothstep(0.38, 0.68, fbm(wpos * 0.22 + 3.1)) * grime;
+	float g = smoothstep(0.32, 0.62, fbm(wpos * 0.22 + 3.1)) * grime;
+	// dirt collects in the plate seams (dark texels) everywhere
+	float seam = smoothstep(0.6, 0.3, dot(tri(albedo_tex, p, w).rgb, vec3(0.333)));
 	float streak = smoothstep(0.55, 0.85, fbm(vec3(wpos.x * 1.6, wpos.y * 0.18, wpos.z * 1.6))) * side * grime;
-	base = mix(base, base * grime_col * 1.5, clamp(g * 0.85 + streak * 0.6, 0.0, 1.0));
+	base = mix(base, base * grime_col * 1.05, clamp(g * 0.8 + streak * 0.6 + seam * 0.5, 0.0, 1.0));
+	base *= 0.82; // the clean deck read too bright under the golden-hour sun
 	base *= 0.9 + 0.2 * noise(wpos * 1.3);
 	// rust blooms
 	float rr = smoothstep(0.56, 0.76, fbm(wpos * 0.6 + 11.0)) * rust;

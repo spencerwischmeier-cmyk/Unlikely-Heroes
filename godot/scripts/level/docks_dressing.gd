@@ -120,6 +120,11 @@ static func dress(L: Node3D) -> void:
 	place(L, "dock_bot", Vector3(37, 0, 40.2), PI, 1.3, true)
 	place(L, "cable_spool", Vector3(29.8, 0, 18.4), 0.0, 1.4, true)
 	place(L, "hazard_barrier", Vector3(46.8, 0, 17.0), 0.3, 1.1, false)
+	# more clutter along the edges so the open deck reads as a working dock
+	place(L, "crates", Vector3(29.4, 0, 29.5), 1.9, 1.5, true)
+	place(L, "barrels", Vector3(48.9, 0, 37.5), 0.7, 1.2, true)
+	place(L, "crates", Vector3(34.5, 0, 17.0), -0.3, 1.2, true)
+	place(L, "cable_spool", Vector3(48.6, 0, 27.2), 1.1, 1.1, true)
 	for b in [Vector3(28.6, 0, 40.5), Vector3(28.6, 0, 22.5), Vector3(49.4, 0, 36.5), Vector3(49.4, 0, 26.5)]:
 		place(L, "bollard", b, randf() * TAU, 0.7, true)
 	place(L, "floodlight", Vector3(49.2, 0, 43.2), PI * 1.25, 7.0, true, 0.3)
@@ -135,6 +140,8 @@ static func dress(L: Node3D) -> void:
 	place(L, "crates", Vector3(74.6, 6, -40), 0.2, 2.0, true)
 	place(L, "dock_bot", Vector3(70.5, 6, -36.5), -0.8, 1.3, true)
 	place(L, "cable_spool", Vector3(66, 6, -45), 0.5, 1.4, true)
+	place(L, "barrels", Vector3(61.2, 6, -44.6), 0.4, 1.2, true)
+	place(L, "crates", Vector3(75.2, 6, -31.2), 2.6, 1.4, true)
 	place(L, "hazard_barrier", Vector3(60.8, 6, -33.2), PI * 0.5, 1.1, false)
 	place(L, "floodlight", Vector3(75.4, 6, -45.4), PI * 1.75, 6.5, true, 0.3)
 	# ---- supports: steel trusses under the piers, down into the clouds
