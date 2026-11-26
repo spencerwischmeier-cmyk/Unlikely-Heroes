@@ -20,6 +20,8 @@ var st_t := 0.0
 var roll_snd := 0.0
 var warn: Node3D
 var launch_dir := Vector3.ZERO
+var eye_mat: StandardMaterial3D
+var tilt := 0.0           # head leans into the roll
 
 func _ready() -> void:
 	hp = 2.0; max_hp = 2.0; nuts = 4
@@ -30,6 +32,11 @@ func _ready() -> void:
 	ball = model.find_child("ball", true, false)
 	cap = model.find_child("cap", true, false)
 	floor_snap_length = 0.3
+	# one big red eye under the horned helmet; starts shut (it wakes up when it lands)
+	eye_mat = add_eye(cap if cap else model, Vector3(0, 0.83, 0.42), 0.1, Color(1, 0.16, 0.08), 5.0)
+	eye_open = 0.1
+	if cap: break_parts = [cap]
+	scrap_count = 10
 	roll_snd = randf_range(0.5, 2.0)
 
 func center() -> Vector3:
@@ -75,9 +82,10 @@ func _physics_process(dt: float) -> void:
 		"wake":
 			# a little shake and hop before it starts rolling
 			st_t -= dt
+			eye_open = lerpf(eye_open, 1.0, 1.0 - exp(-10.0 * dt))
 			if model: model.rotation.y = sin(t * 40.0) * 0.15
 			if st_t <= 0.0:
-				state = "chase"; velocity.y = 3.0
+				state = "chase"; velocity.y = 3.0; eye_open = 1.0; pop = 0.8
 				if model: model.rotation.y = 0
 		"chase":
 			if is_on_floor() and stun <= 0.0:
@@ -95,6 +103,8 @@ func _physics_process(dt: float) -> void:
 			fuse -= dt
 			var blink := sin(t * lerpf(25.0, 60.0, 1.0 - fuse / FUSE)) > 0.0
 			for m in flash_mats: m.emission = Color(1, 0.2, 0.1); m.emission_energy_multiplier = 3.0 if blink else 0.3
+			if eye_mat: eye_mat.emission_energy_multiplier = 14.0 if blink else 4.0
+			if cap: cap.position.y = 0.55 + absf(sin(t * 30.0)) * 0.05
 			if model: model.scale = Vector3.ONE * (1.0 + (FUSE - fuse) * 0.45)
 			if warn: warn.global_position = global_position + Vector3(0, 0.06, 0)
 			if fuse <= 0.0:
@@ -116,7 +126,12 @@ func _spin(dt: float) -> void:
 	if sp > 0.05 and ball:
 		var axis := Vector3(velocity.z, 0, -velocity.x).normalized()
 		ball.rotate(axis, sp * dt / 0.55)
-		if cap: cap.rotation.y = atan2(velocity.x, velocity.z)
+		if cap: cap.rotation.y = lerp_angle(cap.rotation.y, atan2(velocity.x, velocity.z), 1.0 - exp(-12.0 * dt))
+	# the head leans into the roll and bobs a little while rolling
+	tilt = lerpf(tilt, clampf(sp * 0.05, 0.0, 0.25), 1.0 - exp(-6.0 * dt))
+	if cap and state != "fuse":
+		cap.rotation.x = tilt
+		cap.position.y = 0.55 + absf(sin(t * sp * 2.2)) * 0.035 * minf(1.0, sp / 3.0)
 
 ## Return to Sender: fly until hitting a bot, the boss or a wall, then blow up on them.
 func _fly(dt: float) -> void:

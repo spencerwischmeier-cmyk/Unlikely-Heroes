@@ -91,6 +91,15 @@ var rail: Dictionary = {}
 var rail_path: Path3D
 var rail_glow: StandardMaterial3D
 var crates: Array = []
+# Meshy skin (models/chars/crane_*.glb) over the old primitive build, which stays for hitboxes and pivots
+const ScrapBurst := preload("res://scripts/chars/scrap_burst.gd")
+var base_model: Node3D
+var cab_model: Node3D
+var mag_model: Node3D
+var stacks: Array = []         # exhaust stack tops (smoke when damaged)
+var skin_mats: Array = []      # livery materials for the scrap when it breaks
+var cab_squash := 0.0
+var smoke_t := 0.0
 
 func _m(c: Color, metal := 0.5, rough := 0.4) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new(); m.albedo_color = c; m.metallic = metal; m.roughness = rough
@@ -175,7 +184,64 @@ func _ready() -> void:
 	hitbox.add_to_group("targets_proxy")
 	hitbox.set_meta("owner", self)
 	_build_rail(steel)
+	_skin()
 	_hide()
+
+## Swap the primitive body, cab and magnet for the Meshy models. The old meshes stay as hidden pivots
+## (the cab box still carries the hitbox and center()); the eye and the rivet port keep their materials.
+func _skin() -> void:
+	if not ResourceLoader.exists("res://models/chars/crane_cab.glb"): return
+	for n in get_children():
+		if n is MeshInstance3D and n != cable and n != warn: (n as MeshInstance3D).visible = false
+	for n in turn.get_children():
+		if n is MeshInstance3D: (n as MeshInstance3D).visible = false
+	for n in magnet.get_children():
+		if n is MeshInstance3D and (n as MeshInstance3D).material_override != mag_mat: (n as MeshInstance3D).visible = false
+	base_model = _skin_model("res://models/chars/crane_base.glb", self, Vector3.ZERO, Vector3(1.15, 0.7, 0.9))
+	cab_model = _skin_model("res://models/chars/crane_cab.glb", turn, Vector3(0, -0.02, -0.25), Vector3.ONE * 1.25)
+	mag_model = _skin_model("res://models/chars/crane_magnet.glb", magnet, Vector3(0, 0.72, 0), Vector3.ONE * 1.0)
+	# the angry visor (eye_mat) and the rivet port (cab_glow) as overlays on the new cab
+	for sx in [-1.0, 1.0]:
+		var e := _box(turn, Vector3(0.62, 0.2, 0.08), eye_mat, Vector3(0.31 * sx, 1.93, 1.4), Vector3(0, 0, 0.2 * sx))
+		e.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var port := _box(turn, Vector3(1.0, 0.22, 0.06), cab_glow, Vector3(0, 1.28, 1.44))
+	port.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for sx in [-1.0, 1.0]:
+		var st := Node3D.new(); st.position = Vector3(0.41 * sx, 3.15, -1.1); turn.add_child(st); stacks.append(st)
+
+func _skin_model(path: String, parent: Node3D, pos: Vector3, scl: Vector3) -> Node3D:
+	var m: Node3D = load(path).instantiate()
+	parent.add_child(m); m.position = pos; m.scale = scl
+	for mi in m.find_children("*", "MeshInstance3D", true, false):
+		var g := mi as MeshInstance3D
+		g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		for i in g.mesh.get_surface_count():
+			var src := g.get_active_material(i)
+			if src is StandardMaterial3D:
+				if skin_mats.size() < 4: skin_mats.append(src)
+				var c := (src as StandardMaterial3D).duplicate() as StandardMaterial3D
+				c.emission_enabled = true; c.emission = Color(1, 0.9, 0.8); c.emission_energy_multiplier = 0.0
+				g.set_surface_override_material(i, c); flash_mats.append(c)
+	return m
+
+## Damage states: the stacks smoke below 2/3 health, the cab sparks and both stacks belch below 1/3,
+## and it catches fire when nearly done. Also the cab "inhales" before a rivet fan.
+func _damage_fx(dt: float) -> void:
+	if cab_model:
+		cab_squash = lerpf(cab_squash, 1.0 if (state == "spray" and st_t > 0.0 and st_t < 0.8) else 0.0, 1.0 - exp(-10.0 * dt))
+		var k := cab_squash * (0.5 + 0.5 * sin(t * 30.0))
+		cab_model.scale = Vector3.ONE * 1.25 * Vector3(1.0 + k * 0.05, 1.0 - k * 0.04, 1.0 + k * 0.05)
+	if state in ["off", "intro"] or stacks.is_empty(): return
+	var f := hp / BOSS_HP
+	smoke_t -= dt
+	if f < 0.66 and smoke_t <= 0.0:
+		smoke_t = 0.35 if f > 0.33 else 0.16
+		var st: Node3D = stacks[0] if f > 0.33 else stacks.pick_random()
+		FX.smoke_trail(st.global_position, 1.0 if f > 0.33 else 1.5)
+		if f < 0.33 and randf() < 0.4:
+			FX.sparks(center() + Vector3(randf_range(-1, 1), randf_range(-0.3, 0.8), randf_range(-1, 1)), Color(1, 0.75, 0.35), 6, 4.0)
+		if f < 0.15 and randf() < 0.5:
+			FX.explosion(center() + Vector3(randf_range(-1, 1), 0.6, randf_range(-1, 1)), 0.25)
 
 ## The track rail: from the ground behind the crane, along the right-hand track and up to the cab roof.
 func _build_rail(steel: Material) -> void:
@@ -310,6 +376,7 @@ func _physics_process(dt: float) -> void:
 		_:
 			if Game.input_locked: return
 			_fight(dt, hero, hero_flat, to_hero, hd, speed, angry)
+	_damage_fx(dt)
 	_pose(dt, hero)
 
 # ---------- intro: drop out of the sky, roar ----------
@@ -632,6 +699,7 @@ func _dying(dt: float) -> bool:
 		var at := center()
 		FX.death_burst(at, 2.6, flash_mats.slice(0, 2), Color(1, 0.75, 0.3)); FX.explosion(position + Vector3(0, 1, 0), 2.0)
 		FX.shake(2.2); Snd.at("explode_big", at, 6, 0.0)
+		ScrapBurst.burst(get_parent(), at, 2.4, skin_mats, 26)
 		for c in crates: if is_instance_valid(c): c.smash(true)
 		crates.clear()
 		rotation.z = 0.0
@@ -666,7 +734,7 @@ func _pose(dt: float, _hero: Vector3) -> void:
 	magnet.rotation.y = turn_yaw
 	mag_mat.emission_energy_multiplier = 8.0 if (state in ["slam", "drop", "sweep_wind", "sweep"]) else 3.0
 	var top := tip_w
-	var bot := mag + Vector3(0, 0.6, 0)
+	var bot := mag + Vector3(0, 1.5 if mag_model else 0.6, 0)
 	cable.global_position = (top + bot) * 0.5
 	cable.scale = Vector3(1, maxf(0.05, top.distance_to(bot)), 1)
 	if state != "dying":

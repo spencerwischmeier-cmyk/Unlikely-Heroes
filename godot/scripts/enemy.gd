@@ -9,6 +9,8 @@ extends CharacterBody3D
 
 signal died(bot)
 
+const ScrapBurst := preload("res://scripts/chars/scrap_burst.gd")
+
 var combat: Node3D
 var player: CharacterBody3D
 var hp := 2.0
@@ -27,6 +29,11 @@ var lean := Vector3.ZERO          # hit lean (model rotation, eases back to zero
 var stagger_time := 0.22          # how long a hit stops the bot's steering
 var burst_color := Color(1, 0.55, 0.2)
 var burst_scale := 1.0
+var eyes: Array = []              # glowing eye overlays: { node, mat, color, energy } (blink, flare, flash)
+var eye_open := 1.0               # 0..1, squashes the eyes shut (blinks, waking up)
+var blink_t := 2.0
+var break_parts: Array = []       # model nodes ripped off and thrown when the bot breaks apart
+var scrap_count := 9
 
 func _init() -> void:
 	collision_layer = 4
@@ -52,6 +59,20 @@ func _collect(n: Node) -> void:
 				flash_mats.append(c)
 				if chunk_mats.size() < 3: chunk_mats.append(m)
 	for c in n.get_children(): _collect(c)
+
+## A glowing eye overlay (a flattened emissive sphere facing +Z) on `parent` at `pos`. Blinks and flashes
+## with the bot; returns its material so subclasses can flare it as a telegraph.
+func add_eye(parent: Node3D, pos: Vector3, r: float, color: Color, energy := 4.0, flat := 0.45) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color * 0.3; m.emission_enabled = true; m.emission = color; m.emission_energy_multiplier = energy
+	m.roughness = 0.2
+	var sm := SphereMesh.new(); sm.radius = r; sm.height = r * 2.0; sm.radial_segments = 16; sm.rings = 8
+	var mi := MeshInstance3D.new(); mi.mesh = sm; mi.material_override = m; mi.position = pos
+	mi.scale = Vector3(1, 1, flat); mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	eyes.append({ node = mi, mat = m, color = color, energy = energy })
+	blink_t = randf_range(1.0, 4.0)
+	return m
 
 func center() -> Vector3:
 	return global_position + Vector3(0, 0.55, 0)
@@ -101,6 +122,10 @@ func _death_fx(_self_destruct: bool) -> void:
 func _burst() -> void:
 	var c := center()
 	FX.death_burst(c, burst_scale, chunk_mats, burst_color)
+	# break apart: the head pops off, bolts, sprockets and panels fly
+	var parts := break_parts.filter(func(n): return is_instance_valid(n))
+	for e in eyes: if is_instance_valid(e.node): (e.mat as StandardMaterial3D).emission_energy_multiplier = 0.4
+	ScrapBurst.burst(get_parent(), c, burst_scale, chunk_mats, scrap_count, parts)
 	FX.shake(0.6 * burst_scale)
 	Snd.at("explode_small", c, 0.0)
 	FX.stop(0.045)
@@ -115,6 +140,22 @@ func tick_common(dt: float) -> void:
 	if model:
 		model.scale = Vector3(1.0 + pop * 0.28, 1.0 - pop * 0.18, 1.0 + pop * 0.28)
 		model.rotation = lean
+	_tick_eyes(dt)
+
+## Eyes: blink now and then, squint shut while staggered, flash white when hit.
+func _tick_eyes(dt: float) -> void:
+	if eyes.is_empty(): return
+	blink_t -= dt
+	var open := eye_open
+	if blink_t < 0.12: open *= absf(blink_t - 0.06) / 0.06
+	if blink_t <= 0.0: blink_t = randf_range(1.8, 4.5)
+	if stun > 0.0: open *= 0.25
+	for e in eyes:
+		var n: MeshInstance3D = e.node
+		if not is_instance_valid(n): continue
+		n.scale.y = maxf(0.08, open)
+		var m: StandardMaterial3D = e.mat
+		m.emission = (e.color as Color).lerp(Color.WHITE, flash)
 
 ## Keep a ground bot inside its zone rect.
 func clamp_to_zone() -> void:

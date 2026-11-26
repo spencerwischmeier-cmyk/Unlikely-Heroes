@@ -33,6 +33,8 @@ func _ready() -> void:
 	collision_mask = 0
 	setup_model("res://models/hornet.glb")
 	inner = model.find_child("inner", true, false)
+	for x in [-0.14, 0.14]: add_eye(inner if inner else model, Vector3(x, 0.2, 0.56), 0.065, Color(1, 0.15, 0.08), 5.0)
+	scrap_count = 11
 	fire_t = randf_range(1.8, 3.0); orbit_a = randf() * TAU; orbit_r = randf_range(8, 12); height = randf_range(3, 5.5)
 	eye_light = OmniLight3D.new(); eye_light.light_color = Color(1, 0.2, 0.1); eye_light.light_energy = 0.5; eye_light.omni_range = 4
 	add_child(eye_light)
@@ -75,7 +77,8 @@ func _physics_process(dt: float) -> void:
 	wobble = maxf(0.0, wobble - dt * 2.0)
 	if inner:
 		inner.rotation.z = clampf(-velocity.x * 0.05, -0.5, 0.5) + sin(t * 2.0) * 0.08 + sin(t * 30.0) * wobble * 0.5
-		inner.rotation.x = sin(t * 23.0) * wobble * 0.3
+		inner.rotation.x = sin(t * 23.0) * wobble * 0.3 + sin(t * 3.1) * 0.06
+		inner.position = Vector3(sin(t * 61.0) * 0.012, sin(t * 2.4) * 0.08 + sin(t * 53.0) * 0.012, 0)
 	buzz_t -= dt
 	if buzz_t <= 0.0: buzz_t = randf_range(2.5, 4.5); Snd.at("hornet_buzz", global_position, -10, 0.12, 0.3)
 	# attack: charge with an aim line, freeze the aim, fire
@@ -86,10 +89,14 @@ func _physics_process(dt: float) -> void:
 		if fire_t > LOCK_T: aim_at = hero_c + player.velocity * 0.15
 		var charge := 1.0 - fire_t / AIM_T
 		eye_light.light_energy = 0.5 + charge * 7.0
+		for e in eyes: (e.mat as StandardMaterial3D).emission_energy_multiplier = 5.0 + charge * 16.0
+		eye_open = 1.0 - charge * 0.45     # it squints down the sights
 		_aim_line(charge, fire_t <= LOCK_T)
 	else:
 		eye_light.light_energy = 0.5
 		aim_line.visible = false
+		eye_open = 1.0
+		for e in eyes: (e.mat as StandardMaterial3D).emission_energy_multiplier = 5.0
 	if fire_t <= 0.0:
 		aiming = false; aim_line.visible = false
 		fire_t = randf_range(2.4, 3.6)

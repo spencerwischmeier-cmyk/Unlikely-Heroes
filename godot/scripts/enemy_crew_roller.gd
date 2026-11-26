@@ -31,13 +31,44 @@ func _ready() -> void:
 	cap = model.find_child("cap", true, false)
 	arm = model.find_child("arm", true, false)
 	floor_snap_length = 0.3
-	# the visor + hat lamp share the glowing material: collect it to flare it as a telegraph
-	for mi in model.find_children("*", "MeshInstance3D", true, false):
-		for s in (mi as MeshInstance3D).mesh.get_surface_count():
-			var m := (mi as MeshInstance3D).get_active_material(s)
-			if m is StandardMaterial3D and (m as StandardMaterial3D).emission_enabled and not flash_mats.has(m):
-				var c := (m as StandardMaterial3D).duplicate() as StandardMaterial3D
-				(mi as MeshInstance3D).set_surface_override_material(s, c); lamp_mats.append(c)
+	# amber eye under the hard hat, a hat lamp, and a riveter arm on the right: flared as a telegraph
+	var head: Node3D = cap if cap else model
+	lamp_mats.append(add_eye(head, Vector3(0, 0.675, 0.33), 0.07, Color(1, 0.62, 0.12), 5.0))
+	lamp_mats.append(add_eye(head, Vector3(0, 0.975, 0.36), 0.05, Color(1, 0.85, 0.45), 5.0, 0.3))
+	arm = _build_arm(head)
+	if cap: break_parts = [cap]
+	scrap_count = 9
+
+## The riveter arm (pivot at the shoulder; the crew swings it to hammer and cocks it back to fire).
+func _build_arm(head: Node3D) -> Node3D:
+	var yellow := StandardMaterial3D.new(); yellow.albedo_color = Color(0.86, 0.6, 0.14); yellow.metallic = 0.4; yellow.roughness = 0.5
+	var dark := StandardMaterial3D.new(); dark.albedo_color = Color(0.17, 0.19, 0.22); dark.metallic = 0.7; dark.roughness = 0.45
+	var brass := StandardMaterial3D.new(); brass.albedo_color = Color(0.85, 0.62, 0.25); brass.metallic = 0.9; brass.roughness = 0.3
+	var red := StandardMaterial3D.new(); red.albedo_color = Color(0.62, 0.2, 0.14); red.metallic = 0.4; red.roughness = 0.5
+	for m in [yellow, dark, brass, red]:
+		m.emission_enabled = true; m.emission = Color.WHITE; m.emission_energy_multiplier = 0.0; flash_mats.append(m)
+	var a := Node3D.new(); a.name = "arm"; a.position = Vector3(-0.5, 0.32, 0.02); head.add_child(a)
+	var parts := [
+		["s", brass, Vector3.ZERO, Vector3.ZERO, Vector3(0.1, 0.2, 0.1)],
+		["c", dark, Vector3(-0.05, -0.08, 0.15), Vector3(1.1, 0, 0), Vector3(0.045, 0.3, 0.045)],
+		["b", yellow, Vector3(-0.08, -0.14, 0.36), Vector3.ZERO, Vector3(0.15, 0.17, 0.32)],
+		["b", red, Vector3(-0.08, -0.05, 0.36), Vector3.ZERO, Vector3(0.155, 0.03, 0.33)],
+		["c", dark, Vector3(-0.08, -0.14, 0.2), Vector3(PI / 2, 0, 0), Vector3(0.1, 0.06, 0.1)],
+		["c", brass, Vector3(-0.08, -0.14, 0.58), Vector3(PI / 2, 0, 0), Vector3(0.04, 0.16, 0.04)],
+	]
+	for p in parts:
+		var mesh: Mesh
+		match p[0]:
+			"s":
+				var sm := SphereMesh.new(); sm.radius = p[4].x; sm.height = p[4].y; mesh = sm
+			"c":
+				var cm := CylinderMesh.new(); cm.top_radius = p[4].x; cm.bottom_radius = p[4].x * 1.1; cm.height = p[4].y; cm.radial_segments = 12; mesh = cm
+			_:
+				var bm := BoxMesh.new(); bm.size = p[4]; mesh = bm
+		var mi := MeshInstance3D.new(); mi.mesh = mesh; mi.material_override = p[1]; mi.position = p[2]; mi.rotation = p[3]
+		a.add_child(mi)
+	var muzzle := Node3D.new(); muzzle.name = "crew_muzzle"; muzzle.position = Vector3(-0.08, -0.14, 0.68); a.add_child(muzzle)
+	return a
 
 func center() -> Vector3:
 	return global_position + Vector3(0, 0.6, 0)
@@ -69,6 +100,9 @@ func _physics_process(dt: float) -> void:
 	var sp := flat.length()
 	if sp > 0.05 and ball:
 		ball.rotate(Vector3(flat.z, 0, -flat.x).normalized(), sp * dt / 0.5)
+	if cap:
+		cap.rotation.x = lerpf(cap.rotation.x, clampf(sp * 0.05, 0.0, 0.22) - (0.12 if shoot_t >= 0.0 else 0.0), 1.0 - exp(-6.0 * dt))
+		cap.position.y = 0.5 + absf(sin(t * maxf(sp, 1.0) * 2.2)) * 0.03 + (absf(sin(t * 12.0)) * 0.04 if build_t > 0.0 else 0.0)
 	var face := face_dir
 	if shoot_t >= 0.0 or face.length() < 0.1:
 		face = player.global_position - global_position; face.y = 0
