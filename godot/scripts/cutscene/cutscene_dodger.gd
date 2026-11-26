@@ -67,7 +67,8 @@ func _process(dt: float) -> void:
 		tk = lerpf(tk, float(OPEN.get(shp, 0.0)) * talk, 0.8)
 		if lip_t > float(lip_cues[-1][0]) + 0.3: lip_t = -1.0
 	r.x += tk * 0.06; p.y += tk * 0.03
-	model.position += p
+	# the body only re-sets y each frame (hover bob), so x/z are set outright, never accumulated
+	model.position = Vector3(p.x, model.position.y + p.y, p.z)
 	model.rotation += r
 	eye_mat.emission_energy_multiplier *= 1.0 + tk * 0.8
 	eye_light.light_energy *= 1.0 + tk

@@ -184,7 +184,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cu(-28.0, 1.45, 70.0, 0.0)     # same framing as his last line
+	_cu(-60.0, 1.3, 70.0, -0.02)    # well off his eyeline, so Dodger stays out of frame
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
@@ -219,9 +219,10 @@ func run() -> void:
 	var mdir := mto.normalized()
 	var mcands := []
 	for k in [0.0, 0.15, 0.3, 0.45]:      # from the porch out along the line to the mast, rising
-		for up in [4.0, 7.0, 11.0]:
+		for up in [10.0, 14.0, 18.0, 7.0]:
 			mcands.append(seat + mto * k + Vector3(0, up, 0) - mdir * 2.0)
 	var mcam := _clear(mast + Vector3(0, 0.5, 0), mcands)
+	C.grade("vista", 0.0)              # thin the haze for the long lens; back to tension after
 	C.cut(mcam, mast + Vector3(0, 0.5, 0)); C.lens(180.0)
 	C.move(mcam + Vector3(0, 0.3, 0) + mdir * 0.5, mast + Vector3(0, 1.2, 0), 7.0)
 	C.lens(240.0, 7.0)
@@ -233,6 +234,7 @@ func run() -> void:
 	var cl: float = C.say_async("cs_intro_clock")
 	await C.wait(cl + 0.4)
 	C.hand = 0.0
+	C.grade("tension", 0.0)
 	vesk.look_point = mast
 	dodger.look_target = null
 	C.tw(dodger, "rotation:y", C.face_to(dodger, mast), 0.6)
@@ -361,6 +363,7 @@ func run() -> void:
 	# 14. Dodger picks up the signal, looking north to the mast
 	# his line plays over the mast: long lens, the dish pulsing, a slow push
 	var scam := _clear(mast + Vector3(0, 0.8, 0), mcands)
+	C.grade("vista", 0.0)
 	C.cut(scam, mast + Vector3(0, 0.8, 0)); C.lens(140.0)
 	C.move(scam + mdir * 0.6 + Vector3(0, 0.2, 0), mast + Vector3(0, 1.0, 0), 6.0)
 	C.lens(200.0, 6.0)
@@ -416,12 +419,16 @@ func run() -> void:
 		C.tw(chair, "scale", Vector3(1, 0.75, 1), 0.3)
 	await C.wait(0.6)
 	dodger.look_target = vesk
-	# over Vesk's shoulder onto what's left of the chair (Dodger's line plays over it)
-	var vhe: Vector3 = vh.global_position
-	var away := ((vhe - chair_pos) * Vector3(1, 0, 1)).normalized()
-	C.cut(vhe + away * 0.6 + away.cross(Vector3.UP) * 0.35 + Vector3(0, 0.1, 0), chair_pos + Vector3(0, 0.4, 0)); C.lens(40.0)
-	if chair: C.focus_on(chair, Vector3(0, 0.4, 0), 0.0, 0.8)
-	else: C.focus(0.0)
+	# Dodger, wide-eyed, the wrecked chair soft behind him
+	var dpp: Vector3 = dodger.global_position
+	var to_v := ((vesk.global_position - dpp) * Vector3(1, 0, 1)).normalized()   # he's facing Vesk
+	var dcands := []
+	for a in [0.5, -0.5, 0.9, -0.9]:
+		dcands.append(dpp + to_v.rotated(Vector3.UP, a) * 1.6 + Vector3(0, -0.1, 0))
+	C.cut(_clear(dpp, dcands), dpp); C.lens(45.0)
+	C.look_node = dodger; C.look_off = Vector3(0, 0.05, 0)
+	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.8)
+	C.light(dodger, "soft", 1.0, 0.0)
 	await C.say("intro_12", 0.4)
 	# 17. "...That was a good chair." A slow push-in that widens the background (dolly zoom), then the facepalm
 	C.mark("good_chair")
