@@ -20,6 +20,8 @@ var amb_radius := 40.0
 var amb: AudioStreamPlayer
 var chirp: AudioStream
 var chime: AudioStream
+var flock: AudioStream
+var flock_t := 12.0
 var t := 0.0
 var rng := RandomNumberGenerator.new()
 
@@ -31,6 +33,7 @@ func _ready() -> void:
 	rng.seed = 2468
 	chirp = _stream("gardens_bot", false)
 	chime = _stream("gardens_sprocket", false)
+	flock = _stream("gardens_birds", false)
 	var a := _stream("gardens_ambience", true)
 	if a:
 		amb = AudioStreamPlayer.new(); amb.stream = a; amb.volume_db = -60; amb.bus = "Master"; add_child(amb); amb.play()
@@ -267,6 +270,14 @@ func _process(dt: float) -> void:
 			if pl.global_position.distance_to(q.pos) < q.r and (not q.riding or pl.get("riding")):
 				for id in q.ids: Snd.voice(id)
 				quips.remove_at(i)
+	# now and then a little flock takes off from a nearby tree
+	flock_t -= dt
+	if flock_t <= 0.0:
+		flock_t = rng.randf_range(18.0, 35.0)
+		if flock and near and eye.distance_to(amb_center) < amb_radius:
+			var p := AudioStreamPlayer3D.new(); p.stream = flock; p.volume_db = -8; p.unit_size = 6.0
+			add_child(p); p.global_position = eye + Vector3(rng.randf_range(-10, 10), rng.randf_range(2, 5), rng.randf_range(-10, 10))
+			p.play(); p.finished.connect(p.queue_free)
 	# garden ambience fades with distance from the gardens
 	if amb:
 		var d := eye.distance_to(amb_center)
