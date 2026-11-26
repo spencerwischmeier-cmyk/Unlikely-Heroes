@@ -273,18 +273,18 @@ def planks():
     gapx = sstep(0.004, 0.012, np.minimum(fx, 1 - fx) / lens[row % rows])
     board = gapy * gapx
     t = per_id(uid, rows * 8, 62)
-    base = pal(t, ['a8774c', '9c6b44', 'b58658', '8e8070', 'a59a8a', '946240', 'bf9466'])
+    base = pal(t, ['a07e5c', '967556', 'b08a62', '8e8070', 'a59a8a', '8f7254', 'b8966e'])
     grain = noise(60, aniso=(0.05, 1.0)) * 0.6 + noise(14, aniso=(0.08, 1.0)) * 0.4
     knot = np.zeros((N, N), np.float32)
     for k in range(6):
         kx, ky = g.random() * N, g.random() * N
         d = np.hypot(((xx - kx + N / 2) % N - N / 2) * 0.5, (yy - ky + N / 2) % N - N / 2)
         knot = np.maximum(knot, sstep(18, 4, d))
-    base = base * (0.86 + 0.18 * grain[..., None]) * (1 - 0.35 * knot[..., None])
+    base = base * (0.86 + 0.18 * grain[..., None]) * (1 - 0.18 * knot[..., None])
     # bleached, sea-greyed boards and a few with old paint
     grey = sstep(0.2, 0.6, fbm(250)) * 0.5
     base = base * (1 - grey[..., None]) + base.mean(-1, keepdims=True) * np.array([0.98, 1.0, 1.04]) * 1.05 * grey[..., None]
-    painted = per_id(uid, rows * 8, 63) < 0.035
+    painted = per_id(uid, rows * 8, 63) < 0.0   # chipped paint read as stains in game: off
     pc = np.where(per_id(uid, rows * 8, 64)[..., None] < 0.5, hexc('5c8a9c'), hexc('bfa068')) * 0.6 + base * 0.4
     chips = sstep(-0.35, -0.15, noise(25) + 0.15 * noise(3))
     base = np.where(painted[..., None], base * (1 - chips[..., None]) + pc * chips[..., None], base)
