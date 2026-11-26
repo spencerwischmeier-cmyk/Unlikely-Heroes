@@ -19,6 +19,8 @@ extends Node
 ##   --et-skip1           tour: skip the phase 1 slam and go straight to the phase change
 ##   --et-cam             a fixed overview camera on the fight (for screenshots)
 ##   --et-jump            Vesk double-jumps over the sweeping jib (on in tour mode)
+##   --et-secs=<s>        quit after s game seconds (headless runs default to 240) with a summary line
+##   --et-stay            don't quit by itself when the fight is over
 ##   --et-snap=a@t,b@t    save a screenshot t seconds into each boss state a, b... to --et-out=<prefix>
 ##                        (<prefix>_<state>.png), then quit after the last one. Needs a rendering run.
 ## Prints "[enemy-test]" lines for boss state changes, hits on Vesk and kills.
@@ -39,6 +41,8 @@ var snaps: Array = []        # [state, delay, taken]
 var snapping := false
 var seen := {}
 var jump_phase := 0
+var kills := 0
+var hurts := 0
 
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
@@ -57,8 +61,8 @@ func _ready() -> void:
 			var kv := part.split("@")
 			snaps.append([kv[0], float(kv[1]) if kv.size() > 1 else 0.5, false])
 	print("[enemy-test] mode ", mode, " flags ", flags)
-	Game.player_hurt.connect(func(h): print("[enemy-test] vesk hurt, hull ", h, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
-	Game.bot_killed.connect(func(b, _p, k): print("[enemy-test] killed ", k, " returned_to_sender=", b.get_meta("returned_to_sender", false)))
+	Game.player_hurt.connect(func(h): hurts += 1; print("[enemy-test] vesk hurt, hull ", h, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
+	Game.bot_killed.connect(func(b, _p, k): kills += 1; print("[enemy-test] killed ", k, " returned_to_sender=", b.get_meta("returned_to_sender", false)))
 	Game.boss_health.connect(func(nm, f): print("[enemy-test] boss_health ", nm, " ", snappedf(f, 0.01)))
 	_setup.call_deferred()
 
@@ -85,6 +89,26 @@ func _setup() -> void:
 			for i in 3: Game.main.spawn_bot("roller", Vector3(c.x - 5 + i * 5, 0, c.y - 4), arena)
 			for i in 2: Game.main.spawn_bot("hornet", Vector3(c.x - 4 + i * 8, 0, c.y - 8), arena)
 
+## Ends the run (exit code 0) once the fight is over: the boss gone after dying, or every bot and crew
+## cleared. A time cap (--et-secs, 240 s by default when headless) ends it too, with exit code 0 as long
+## as no script went wrong; the summary line says which.
+func _check_done() -> void:
+	if snaps.size() > 0 or flags.has("stay"): return
+	var t := float(n) / Engine.physics_ticks_per_second
+	var cap := float(flags.get("secs", "240" if DisplayServer.get_name() == "headless" else "0"))
+	var why := ""
+	if boss:
+		if not is_instance_valid(boss) or (seen.has("dying") and boss.state == "off"): why = "boss defeated"
+	elif mode in ["crew", "mix", "bots"] and t > 2.0:
+		if get_tree().get_nodes_in_group("bots").filter(func(b): return not b.dead).is_empty() \
+				and get_tree().get_nodes_in_group("crews").is_empty():
+			why = "all bots cleared"
+	if why == "" and cap > 0.0 and t >= cap: why = "time cap"
+	if why == "": return
+	print("[enemy-test] done (%s) t=%.2f kills %d vesk hits %d" % [why, t, kills, hurts])
+	set_physics_process(false)
+	get_tree().quit.call_deferred(0)
+
 func _place_player(p: Vector3, yaw: float) -> void:
 	var pl := Game.player
 	pl.global_position = p; pl.velocity = Vector3.ZERO; pl.respawn_pos = p
@@ -92,6 +116,7 @@ func _place_player(p: Vector3, yaw: float) -> void:
 
 func _physics_process(dt: float) -> void:
 	n += 1
+	_check_done()
 	if flags.has("god") and Game.combat: Game.combat.hull = Game.combat.MAX_HULL
 	if boss and is_instance_valid(boss):
 		var s := "%s p%d" % [boss.state, boss.phase]
