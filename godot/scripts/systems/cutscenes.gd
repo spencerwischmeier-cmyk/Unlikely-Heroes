@@ -1,22 +1,36 @@
 extends Node
-## Animated in-engine cutscenes for Skyharbor (planet 1): camera moves, Vesk and Dodger actors, props,
-## letterbox bars and subtitles, all on one cutscene clock so they can be skipped or fast-forwarded.
-##   intro: Vesk's porch at dawn, the 8:00:00 signal, the coffee maker clocks in, a roller eats his
-##          chair, Dodger zooms off and crashes on the scrap pile (where the level picks him up).
-##   outro: after the Crane Bot. Grudd's first radio broadcast (Dodger's eye flickers orange),
-##          Nana Quill radios the coordinates, liftoff.
+## Animated in-engine cutscenes for Skyharbor (planet 1). This node is the player: one cutscene
+## clock that drives camera moves, actor tweens, letterbox, subtitles and overlays, so everything can
+## be skipped or fast-forwarded. The scenes themselves live in scripts/cutscene/scene_*.gd:
+##   intro        the sky city, Vesk's quiet morning, the 8:00:00 signal, bots go haywire, Dodger crashes
+##   broadcast    after the relay dish is aligned: Foreman Grudd's hologram broadcast over the mast
+##   crane_intro  entering the Crane Yard: the Crane Bot drops in (the real boss), Grudd on the PA
+##   outro        after the Crane Bot: Grudd's radio rant, Nana Quill, liftoff, Grudd's office, next time
 ## Story emits Game.cutscene_started(id) and waits for Game.cutscene_finished(id).
-## Skip: Jump or Esc. Debug: --cut=intro|outro plays one at start (pair with --no-bots),
-##   --cut-t=<seconds> fast-forwards into it, --cut-hold freezes it there (screenshots),
-##   --no-cutscenes finishes them at once.
+## Camera language helpers: cut / move (eased dolly or crane) / orbit / follow, look_node tracking,
+## dutch roll, handheld sway, shake, depth of field (dof 0..1, focus_d metres or auto on the look point).
+## Acting: speakers are looked at automatically (Vesk's head, Dodger's body, Grudd's head) and the
+## speaking actor gets `talk` (nods, eye pulse, loudspeaker pump).
+## Skip: hold Jump / Esc / Enter (a press shows the prompt). Debug: --cut=<id> plays one at start
+##   (pair with --no-bots), --cut-t=<seconds> fast-forwards into it, --cut-hold freezes it there
+##   (screenshots), --no-cutscenes finishes them at once.
 
 const M := preload("res://scripts/mats.gd")
 const VeskActor := preload("res://scripts/cutscene/vesk_actor.gd")
 const DroneActor := preload("res://scripts/cutscene/drone_actor.gd")
+const GruddActor := preload("res://scripts/cutscene/grudd_actor.gd")
+const Props := preload("res://scripts/cutscene/props.gd")
+const SCENES := {
+	"intro": "res://scripts/cutscene/scene_intro.gd",
+	"broadcast": "res://scripts/cutscene/scene_broadcast.gd",
+	"crane_intro": "res://scripts/cutscene/scene_crane.gd",
+	"outro": "res://scripts/cutscene/scene_outro.gd",
+}
 
 const SPEAKER_NAMES := {"vesk": "VESK", "dodger": "DODGER", "grudd": "FOREMAN GRUDD", "gizmart": "GIZMART", "nana": "NANA QUILL", "narrator": ""}
-const SPEAKER_COLORS := {"vesk": Color(1, 0.62, 0.25), "dodger": Color(0.5, 0.9, 1), "grudd": Color(1, 0.35, 0.3),
-	"gizmart": Color(0.6, 1, 0.5), "nana": Color(0.75, 1, 0.7), "narrator": Color(1, 1, 1)}
+const SPEAKER_COLORS := {"vesk": Color(1, 0.62, 0.25), "dodger": Color(0.5, 0.9, 1), "grudd": Color(1, 0.42, 0.3),
+	"gizmart": Color(0.6, 1, 0.5), "nana": Color(0.75, 1, 0.7), "narrator": Color(0.92, 0.92, 0.88)}
+const SKIP_HOLD := 0.7
 
 var playing := ""
 var ct := 0.0            # cutscene clock (seconds)
@@ -25,43 +39,82 @@ var skipping := false
 var tracks: Array = []
 var actors: Array = []   # nodes freed when the cutscene ends
 var keep_props: Array = []
+var scene: RefCounted
+var cast := {}           # speaker id -> Node3D (for auto look-at and talk)
+var auto_look := true
+var speaking := ""
+var speak_t := 0.0
 
 # camera state (tracked)
 var cam: Camera3D
+var attrs: CameraAttributesPractical
 var cam_pos := Vector3.ZERO
 var cam_look := Vector3.ZERO
 var cam_fov := 50.0
+var cam_roll := 0.0
 var sway := 1.0
 var shake := 0.0
 var look_node: Node3D   # when set, the camera looks at this node (plus look_off)
 var look_off := Vector3.ZERO
+var follow_node: Node3D # when set, the camera rides along at follow_node + follow_off
+var follow_off := Vector3.ZERO
+var orbit_on := false
+var orbit_c := Vector3.ZERO
+var orbit_r := 5.0
+var orbit_h := 2.0
+var orbit_a := 0.0
+var dof := 0.0          # 0..1 depth of field strength
+var focus_d := -1.0     # focus distance; <= 0 focuses on the look point
 
 # overlay state (tracked)
 var fade := 0.0
+var white := 0.0
 var bars := 0.0
 var clock_a := 0.0
 var live_a := 0.0
 var call_a := 0.0
 var card_a := 0.0
+var loc_a := 0.0
+var boss_a := 0.0
+var poster_a := 0.0
+var next_a := 0.0
+var hint_a := 0.0
+var skip_hold := 0.0
 
 var layer: CanvasLayer
+var root_ui: Control
 var bar_top: ColorRect
 var bar_bot: ColorRect
 var black: ColorRect
-var sub: Label
+var flash: ColorRect
+var sub: Control        # subtitle box (menus.gd hides it when subtitles are off)
+var sub_rt: RichTextLabel
 var sub_t := 0.0
 var skip_hint: Label
+var skip_bar: ColorRect
 var clock_label: Label
 var live_label: Label
 var call_box: Control
 var call_text: Label
 var card_title: Label
 var card_sub: Label
+var loc_box: Control
+var loc_title: Label
+var loc_sub: Label
+var boss_box: Control
+var boss_title: Label
+var boss_sub: Label
+var poster: Control
+var next_box: Control
 var font: SystemFont
+var font_heavy: SystemFont
 var hud_was := true
+var sun: DirectionalLight3D
+var sun_energy := -1.0
 
 var vesk: Node3D
 var dodger: Node3D
+var grudd: Node3D
 var start_args := {}
 
 func _ready() -> void:
@@ -78,7 +131,7 @@ func _ready() -> void:
 
 func _on_started(id: String) -> void:
 	if playing != "": return
-	if start_args.has("no-cutscenes") or not (id in ["intro", "outro"]):
+	if start_args.has("no-cutscenes") or not SCENES.has(id):
 		_emit_finished.call_deferred(id); return
 	_run(id)
 
@@ -101,6 +154,7 @@ func _eval() -> void:
 		if ct < k.t0: keep.append(k); continue
 		if k.a == null: k.a = k.o.get_indexed(k.p)
 		var el := minf(ct - k.t0, k.d)
+		if k.a is float and k.b is int: k.b = float(k.b)
 		k.o.set_indexed(k.p, Tween.interpolate_value(k.a, k.b - k.a, el, k.d, k.tr, k.e))
 		if ct - k.t0 < k.d: keep.append(k)
 	tracks = keep
@@ -121,25 +175,53 @@ func line_len(id: String) -> float:
 	if ResourceLoader.exists(path): return (load(path) as AudioStream).get_length()
 	return 0.8 + Snd.subtitle(id).length() * 0.065
 
-## Play a voice line (not while fast-forwarding) and wait for it plus a gap.
-func say(id: String, gap := 0.45) -> void:
+## Start a voice line without waiting (not while fast-forwarding); returns its length.
+func say_async(id: String) -> float:
 	var l := line_len(id)
 	if not ffwd(): Snd.voice(id, true)
 	elif start_args.has("cut-hold") and Snd.subtitle(id) != "":
 		_on_line(id, Snd.script_lines[id][0], Snd.subtitle(id)); sub_t = 999.0
+	return l
+
+## Play a voice line and wait for it plus a gap.
+func say(id: String, gap := 0.45) -> void:
+	var l := say_async(id)
 	await wait(l + gap)
 
 func fx(f: Callable) -> void:
 	if not ffwd(): f.call()
 
+# ---------------------------------------------------------------- camera language
 func cut(pos: Vector3, look: Vector3, fov := -1.0) -> void:
-	setv(self, "cam_pos", pos); setv(self, "cam_look", look)
+	if start_args.has("cut-log"): print("[cut] %s t=%.1f" % [playing, ct])
+	for p in ["cam_pos", "cam_look", "cam_roll", "orbit_a"]: setv(self, p, get(p))
+	cam_pos = pos; cam_look = look; cam_roll = 0.0
 	if fov > 0.0: setv(self, "cam_fov", fov)
-	look_node = null
+	look_node = null; follow_node = null; orbit_on = false
 
-func move(pos: Vector3, look: Vector3, dur: float, fov := -1.0, trans := Tween.TRANS_SINE) -> void:
-	tw(self, "cam_pos", pos, dur, 0.0, trans); tw(self, "cam_look", look, dur, 0.0, trans)
-	if fov > 0.0: tw(self, "cam_fov", fov, dur, 0.0, trans)
+## Eased dolly / crane / push-in from the current framing.
+func move(pos: Vector3, look: Vector3, dur: float, fov := -1.0, trans := Tween.TRANS_SINE, ease_ := Tween.EASE_IN_OUT) -> void:
+	tw(self, "cam_pos", pos, dur, 0.0, trans, ease_); tw(self, "cam_look", look, dur, 0.0, trans, ease_)
+	if fov > 0.0: tw(self, "cam_fov", fov, dur, 0.0, trans, ease_)
+
+## Orbit around `c` (radius r, height h above c) from angle a0 to a1 (radians, 0 = +Z side).
+func orbit(c: Vector3, r: float, h: float, a0: float, a1: float, dur: float, fov := -1.0, look_h := 0.0) -> void:
+	cut(c + Vector3(sin(a0) * r, h, cos(a0) * r), c + Vector3(0, look_h, 0), fov)
+	orbit_on = true; orbit_c = c; orbit_r = r; orbit_h = h; orbit_a = a0
+	tw(self, "orbit_a", a1, dur, 0.0, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
+
+## Close-up focus: depth of field on, focused on the look point (or `d` metres).
+func focus(amount := 1.0, d := -1.0, dur := 0.0) -> void:
+	focus_d = d
+	if dur <= 0.0: setv(self, "dof", amount)
+	else: tw(self, "dof", amount, dur)
+
+## Over-the-shoulder framing: camera behind `who`'s shoulder, looking at `at`.
+func ots(who: Node3D, at: Vector3, side := 1.0, fov := 40.0, back := 1.5, up := 1.65) -> void:
+	var p := who.global_position
+	var d := (at - p); d.y = 0; d = d.normalized()
+	var right := d.cross(Vector3.UP).normalized()
+	cut(p - d * back + right * side * 0.55 + Vector3(0, up, 0), at, fov)
 
 func _process(dt: float) -> void:
 	sub_t -= dt
@@ -148,37 +230,85 @@ func _process(dt: float) -> void:
 	if seek <= 0.0 and not (start_args.has("cut-hold") and start_args.get("cut", "") == playing):
 		ct += dt
 		_eval()
+	_skip_input(dt)
+	_acting(dt)
 	_apply(dt)
 
+func _skip_input(dt: float) -> void:
+	if skipping or ct < 0.5: return
+	var held := Input.is_action_pressed("jump") or Input.is_action_pressed("pause") or Input.is_action_pressed("ui_accept")
+	if held:
+		skip_hold += dt; hint_a = 1.0
+		if skip_hold >= SKIP_HOLD: _skip()
+	else:
+		skip_hold = maxf(0.0, skip_hold - dt * 2.0)
+		hint_a = maxf(0.0, hint_a - dt * 0.35)
+
 func _input(e: InputEvent) -> void:
-	if playing == "" or skipping or ct < 0.8 or e.is_echo(): return
-	if e.is_action_pressed("jump") or e.is_action_pressed("pause"):
+	if playing == "" or e.is_echo(): return
+	if e.is_action("jump") or e.is_action("pause") or e.is_action("ui_accept") or e is InputEventMouseButton:
+		if e.is_pressed(): hint_a = 1.0
 		get_viewport().set_input_as_handled()
-		_skip()
+
+## Speaker look-at and talk amounts.
+func _acting(dt: float) -> void:
+	var talking := Snd.voice_player != null and Snd.voice_player.playing and speaking != ""
+	for who in cast:
+		var a: Node3D = cast[who]
+		if not is_instance_valid(a) or not ("talk" in a): continue
+		var want := 1.0 if (talking and who == speaking) else 0.0
+		a.talk = move_toward(a.talk, want, dt * 5.0)
 
 func _apply(dt: float) -> void:
 	if cam:
 		var look := cam_look
 		if is_instance_valid(look_node): look = look_node.global_position + look_off
+		var pos := cam_pos
+		if orbit_on: pos = orbit_c + Vector3(sin(orbit_a) * orbit_r, orbit_h, cos(orbit_a) * orbit_r)
+		if is_instance_valid(follow_node): pos = follow_node.global_position + follow_off
 		shake = maxf(0.0, shake - dt * 2.0)
 		var tt := ct
 		var off := Vector3(sin(tt * 0.7) * 0.03 + sin(tt * 1.9) * 0.012, sin(tt * 0.9) * 0.025, 0) * sway
 		off += Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * shake * 0.08
-		cam.global_position = cam_pos + off
-		if not cam_pos.is_equal_approx(look):
-			var up := Vector3.UP if absf((look - cam_pos).normalized().y) < 0.98 else Vector3.FORWARD
+		cam.global_position = pos + off
+		if not pos.is_equal_approx(look):
+			var up := Vector3.UP if absf((look - pos).normalized().y) < 0.98 else Vector3.FORWARD
 			cam.look_at(look + off * 0.5, up)
+			if absf(cam_roll) > 0.0001: cam.rotate_object_local(Vector3(0, 0, 1), cam_roll)
 		cam.fov = cam_fov
+		if attrs:
+			var fd := focus_d if focus_d > 0.0 else pos.distance_to(look)
+			var on := dof > 0.01
+			attrs.dof_blur_far_enabled = on
+			attrs.dof_blur_near_enabled = on and fd < 8.0
+			attrs.dof_blur_far_distance = fd + maxf(0.5, fd * 0.3)
+			attrs.dof_blur_far_transition = maxf(1.0, fd * 0.9)
+			attrs.dof_blur_near_distance = fd * 0.55
+			attrs.dof_blur_near_transition = fd * 0.4
+			attrs.dof_blur_amount = 0.11 * dof
+	_overlays()
+
+func _overlays() -> void:
 	black.color.a = fade
-	var h := 92.0 * bars
-	bar_top.size = Vector2(bar_top.get_viewport_rect().size.x, h)
-	bar_bot.size = Vector2(bar_top.size.x, h); bar_bot.position.y = bar_bot.get_viewport_rect().size.y - h
+	flash.color.a = white
+	var vs := root_ui.size
+	var h := vs.y * 0.105 * bars
+	bar_top.position = Vector2.ZERO; bar_top.size = Vector2(vs.x, h)
+	bar_bot.size = Vector2(vs.x, h); bar_bot.position = Vector2(0, vs.y - h)
 	clock_label.modulate.a = clock_a; live_label.modulate.a = live_a * (0.6 + 0.4 * sin(ct * 6.0))
 	call_box.modulate.a = call_a; call_box.queue_redraw()
 	card_title.modulate.a = card_a; card_sub.modulate.a = card_a
-	skip_hint.modulate.a = clampf(bars, 0, 1) * 0.55
+	loc_box.modulate.a = loc_a; loc_box.position.x = 54 - (1.0 - loc_a) * 40.0
+	boss_box.modulate.a = boss_a; boss_box.scale = Vector2.ONE * (1.0 + maxf(0.0, 1.0 - boss_a) * 0.4)
+	boss_box.pivot_offset = boss_box.size * 0.5
+	poster.modulate.a = poster_a; poster.scale = Vector2.ONE * (0.85 + poster_a * 0.15); poster.pivot_offset = poster.size * 0.5
+	next_box.modulate.a = next_a; next_box.queue_redraw()
+	if poster_a > 0.01: poster.queue_redraw()
+	skip_hint.modulate.a = clampf(bars, 0, 1) * (0.35 + 0.65 * hint_a) if playing != "" and not skipping else 0.0
+	skip_bar.size.x = 150.0 * clampf(skip_hold / SKIP_HOLD, 0, 1); skip_bar.modulate.a = skip_hint.modulate.a
 
 func _skip() -> void:
+	if skipping: return
 	skipping = true
 	Snd.voice_queue.clear()
 	if Snd.voice_player: Snd.voice_player.stop()
@@ -189,45 +319,67 @@ func _skip() -> void:
 
 # ---------------------------------------------------------------- start / end
 func _run(id: String) -> void:
-	playing = id; ct = 0.0; skipping = false; tracks.clear()
+	playing = id; ct = 0.0; skipping = false; tracks.clear(); skip_hold = 0.0; hint_a = 0.0
 	seek = float(start_args.get("cut-t", 0.0)) if start_args.get("cut", "") == id else 0.0
 	Game.input_locked = true
 	await get_tree().process_frame   # story is still between emitting cutscene_started and awaiting the finish
-	if id == "outro" and seek <= 0.0:
-		# dip to black from gameplay before the scene is set up
+	if id != "intro" and seek <= 0.0:
+		# letterbox in and dip to black from gameplay before the scene is set up
 		fade = 0.0; bars = 0.0
 		var ft := create_tween().set_parallel()
-		ft.tween_property(self, "fade", 1.0, 0.9); ft.tween_property(self, "bars", 1.0, 0.9)
+		ft.tween_property(self, "fade", 1.0, 0.7); ft.tween_property(self, "bars", 1.0, 0.7)
 		while ft.is_running():
-			_apply_overlay_only(); await get_tree().process_frame
+			_overlays_only(); await get_tree().process_frame
 	if Game.hud: hud_was = Game.hud.visible; Game.hud.visible = false
 	if Game.player:
 		Game.player.process_mode = Node.PROCESS_MODE_DISABLED
 		Game.player.visible = false
-	cam = Camera3D.new(); cam.name = "CutsceneCam"; cam.far = 2500; Game.main.add_child(cam)
+	cam = Camera3D.new(); cam.name = "CutsceneCam"; cam.far = 2500; cam.near = 0.05
+	attrs = _make_attrs()
+	cam.attributes = attrs
+	Game.main.add_child(cam)
 	cam.current = true
-	cam_fov = 50.0; sway = 1.0; fade = 1.0; bars = 1.0
+	cam_fov = 50.0; sway = 1.0; fade = 1.0; bars = 1.0; dof = 0.0; focus_d = -1.0; cam_roll = 0.0
+	orbit_on = false; look_node = null; follow_node = null; auto_look = true; cast.clear(); speaking = ""
 	_apply(0.0)
 	Snd.music("cutscene", 2.0)
-	if id == "intro": await _intro()
-	else: await _outro()
+	scene = load(SCENES[id]).new()
+	scene.C = self
+	await scene.run()
 	await _finish(id)
+
+## Camera attributes for the cutscene camera: keep the world's exposure settings, add depth of field.
+func _make_attrs() -> CameraAttributesPractical:
+	var a := CameraAttributesPractical.new()
+	var we := Game.main.find_child("WorldEnvironment", true, false) as WorldEnvironment
+	if we == null:
+		for c in Game.main.get_children(): if c is WorldEnvironment: we = c
+	if we and we.camera_attributes is CameraAttributesPractical:
+		a = (we.camera_attributes as CameraAttributesPractical).duplicate()
+	var gc: Camera3D = Game.cam.camera if Game.cam and "camera" in Game.cam else null
+	if gc and gc.attributes is CameraAttributesPractical: a = (gc.attributes as CameraAttributesPractical).duplicate()
+	a.dof_blur_far_enabled = false; a.dof_blur_near_enabled = false
+	return a
 
 func _finish(id: String) -> void:
 	var was_skip := skipping
 	print("[cutscene] %s finished at t=%.1f%s" % [id, ct, " (skipped)" if was_skip else ""])
 	seek = 0.0; skipping = false
 	tracks.clear()
+	if scene and scene.has_method("cleanup"): scene.cleanup()
+	scene = null
 	for a in actors: if is_instance_valid(a): a.queue_free()
-	actors.clear(); vesk = null; dodger = null
-	clock_a = 0; live_a = 0; call_a = 0; card_a = 0
+	actors.clear(); vesk = null; dodger = null; grudd = null; cast.clear()
+	clock_a = 0; live_a = 0; call_a = 0; card_a = 0; loc_a = 0; boss_a = 0; poster_a = 0; next_a = 0; white = 0
+	if sun and sun_energy >= 0.0: sun.light_energy = sun_energy
+	sun_energy = -1.0
 	if Game.player:
 		Game.player.visible = true
 		Game.player.process_mode = Node.PROCESS_MODE_INHERIT
 		Game.player.velocity = Vector3.ZERO
 	if Game.hud: Game.hud.visible = hud_was
 	Game.input_locked = false
-	Snd.music("skyharbor", 2.5)
+	if id != "crane_intro": Snd.music("skyharbor", 2.5)
 	Snd.loop("wind_loop", true, -16)
 	playing = ""
 	Game.cutscene_finished.emit(id)
@@ -235,6 +387,7 @@ func _finish(id: String) -> void:
 	var game_cam: Camera3D = Game.cam.camera if Game.cam and "camera" in Game.cam else null
 	var from := cam.global_transform
 	var from_fov := cam.fov
+	var from_dof := dof
 	var t := 0.0
 	var dur := 0.4 if was_skip else 1.3
 	while t < dur:
@@ -245,47 +398,56 @@ func _finish(id: String) -> void:
 		if game_cam:
 			cam.global_transform = from.interpolate_with(game_cam.global_transform, u)
 			cam.fov = lerpf(from_fov, game_cam.fov, u)
+		if attrs: attrs.dof_blur_amount = 0.11 * from_dof * (1.0 - u)
 		fade = move_toward(fade, 0.0, dt * 2.5)
 		bars = 1.0 - u
-		_apply_overlay_only()
-	bars = 0.0; fade = 0.0; _apply_overlay_only()
+		_overlays_only()
+	bars = 0.0; fade = 0.0; _overlays_only()
 	if game_cam: game_cam.current = true
-	cam.queue_free(); cam = null
+	cam.queue_free(); cam = null; attrs = null
 
-func _apply_overlay_only() -> void:
+func _overlays_only() -> void:
 	black.color.a = fade
-	var h := 92.0 * bars
-	bar_top.size.y = h; bar_bot.size.y = h; bar_bot.position.y = bar_bot.get_viewport_rect().size.y - h
-	skip_hint.modulate.a = 0.0
-	clock_label.modulate.a = 0; live_label.modulate.a = 0; call_box.modulate.a = 0; card_title.modulate.a = 0; card_sub.modulate.a = 0
+	flash.color.a = 0.0
+	var vs := root_ui.size
+	var h := vs.y * 0.105 * bars
+	bar_top.size = Vector2(vs.x, h); bar_bot.size = Vector2(vs.x, h); bar_bot.position.y = vs.y - h
+	skip_hint.modulate.a = 0.0; skip_bar.modulate.a = 0.0
+	for c in [clock_label, live_label, call_box, card_title, card_sub, loc_box, boss_box, poster, next_box]: c.modulate.a = 0.0
 
 # ---------------------------------------------------------------- helpers for the scenes
-func _spot(name_: String, def: Vector3) -> Vector3:
+func spot(name_: String, def: Vector3) -> Vector3:
 	var v = Game.level.get(name_) if Game.level else null
 	return v if v is Vector3 else def
 
-func _actor(n: Node3D, pos: Vector3, yaw := 0.0, keep := false) -> Node3D:
+func island_center(name_: String, def: Vector3) -> Vector3:
+	if Game.level and "islands" in Game.level and Game.level.islands.has(name_):
+		var r: Rect2 = Game.level.islands[name_]
+		var y: float = Game.level.heights.get(name_, def.y) if "heights" in Game.level else def.y
+		return Vector3(r.get_center().x, y, r.get_center().y)
+	return def
+
+func island_rect(name_: String, def: Rect2) -> Rect2:
+	if Game.level and "islands" in Game.level and Game.level.islands.has(name_): return Game.level.islands[name_]
+	return def
+
+func actor(n: Node3D, pos: Vector3, yaw := 0.0, keep := false) -> Node3D:
 	Game.main.add_child(n); n.global_position = pos; n.rotation.y = yaw
 	if keep: keep_props.append(n)
 	else: actors.append(n)
 	return n
 
-func _mesh(parent: Node3D, m: Mesh, mat: Material, pos: Vector3, rot := Vector3.ZERO) -> MeshInstance3D:
-	var mi := MeshInstance3D.new(); mi.mesh = m; mi.material_override = mat; mi.position = pos; mi.rotation = rot
-	parent.add_child(mi); return mi
+func make_vesk(pos: Vector3, yaw := PI) -> Node3D:
+	vesk = actor(VeskActor.new(), pos, yaw); cast["vesk"] = vesk; return vesk
 
-func _box(parent: Node3D, size: Vector3, mat: Material, pos: Vector3, rot := Vector3.ZERO) -> MeshInstance3D:
-	var b := BoxMesh.new(); b.size = size; return _mesh(parent, b, mat, pos, rot)
+func make_dodger(pos: Vector3, yaw := PI) -> Node3D:
+	dodger = actor(DroneActor.new(), pos, yaw); cast["dodger"] = dodger; return dodger
 
-func _cyl(parent: Node3D, r: float, h: float, mat: Material, pos: Vector3, rot := Vector3.ZERO, r2 := -1.0) -> MeshInstance3D:
-	var c := CylinderMesh.new(); c.top_radius = r; c.bottom_radius = r if r2 < 0.0 else r2; c.height = h
-	return _mesh(parent, c, mat, pos, rot)
+func make_grudd(pos: Vector3, yaw := 0.0, height := 3.6, holo := false) -> Node3D:
+	var g := GruddActor.new(); g.height = height; g.holo = holo
+	grudd = actor(g, pos, yaw); cast["grudd"] = grudd; return grudd
 
-func _sphere(parent: Node3D, r: float, mat: Material, pos: Vector3, hemi := false) -> MeshInstance3D:
-	var s := SphereMesh.new(); s.radius = r; s.height = r * (1.0 if hemi else 2.0); s.is_hemisphere = hemi
-	return _mesh(parent, s, mat, pos)
-
-func _model(path: String) -> Node3D:
+func model(path: String) -> Node3D:
 	var n := Node3D.new()
 	if ResourceLoader.exists(path): n.add_child(load(path).instantiate())
 	return n
@@ -300,479 +462,50 @@ func walk(a: Node3D, to: Vector3, speed := 3.2, anim := "run") -> float:
 	tw(a, "global_position", to, dur, 0.0, Tween.TRANS_LINEAR)
 	return dur
 
-func _face_to(a: Node3D, target: Vector3) -> float:
+func face_to(a: Node3D, target: Vector3) -> float:
 	var d := target - a.global_position
 	return atan2(d.x, d.z)
 
-# ---------------------------------------------------------------- props built for the cutscenes
-func _make_coffee_maker() -> Node3D:
-	var n := Node3D.new(); n.name = "CoffeeMaker"
-	var body := M.std(Color(0.2, 0.42, 0.45), 0.6, 0.35)
-	var dark := M.std(Color(0.12, 0.13, 0.15), 0.5, 0.5)
-	_box(n, Vector3(0.26, 0.06, 0.22), dark, Vector3(0, 0.03, 0))
-	_box(n, Vector3(0.26, 0.34, 0.09), body, Vector3(0, 0.2, -0.07))
-	_box(n, Vector3(0.26, 0.07, 0.22), body, Vector3(0, 0.36, 0))
-	var glass := M.std(Color(0.5, 0.6, 0.65), 0.1, 0.05); glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; glass.albedo_color.a = 0.45
-	_cyl(n, 0.075, 0.15, glass, Vector3(0, 0.14, 0.04))
-	_cyl(n, 0.07, 0.07, M.std(Color(0.22, 0.12, 0.06), 0, 0.3), Vector3(0, 0.1, 0.04))
-	var eye := M.glow(Color(0.35, 0.9, 1.0), 2.5)
-	n.set_meta("eye", eye)
-	_sphere(n, 0.025, eye, Vector3(-0.06, 0.3, -0.02))
-	_sphere(n, 0.025, eye, Vector3(0.06, 0.3, -0.02))
-	# time-card slot and card
-	var card := _box(n, Vector3(0.11, 0.15, 0.004), M.std(Color(0.96, 0.93, 0.82), 0, 0.8), Vector3(0, 0.33, -0.07))
-	card.name = "Card"
-	var stamp := Node3D.new(); stamp.name = "Stamp"; stamp.position = Vector3(0, 0.46, 0.0); n.add_child(stamp)
-	_box(stamp, Vector3(0.05, 0.08, 0.05), dark, Vector3(0, 0, 0))
-	# tiny hard hat (pops on when it clocks in)
-	var hat := Node3D.new(); hat.name = "Hat"; hat.position = Vector3(0, 0.4, 0); hat.scale = Vector3.ONE * 0.001; n.add_child(hat)
-	var yel := M.std(Color(1, 0.78, 0.1), 0.1, 0.35)
-	_sphere(hat, 0.1, yel, Vector3.ZERO, true)
-	_cyl(hat, 0.13, 0.012, yel, Vector3(0, 0.005, 0.02))
-	return n
+## Turn an actor to face a point over `dur` seconds (shortest way round).
+func turn_to(a: Node3D, target: Vector3, dur := 0.4) -> void:
+	var y := face_to(a, target)
+	var cur := a.rotation.y
+	tw(a, "rotation:y", cur + angle_difference(cur, y), dur)
 
-func _make_toaster() -> Node3D:
-	var n := Node3D.new(); n.name = "Toaster"
-	var chrome := M.std(Color(0.8, 0.82, 0.85), 0.95, 0.2)
-	_box(n, Vector3(0.28, 0.18, 0.16), chrome, Vector3(0, 0.09, 0))
-	_box(n, Vector3(0.02, 0.04, 0.04), M.std(Color(0.1, 0.1, 0.1), 0, 0.5), Vector3(0.15, 0.12, 0))
-	var toast := Node3D.new(); toast.name = "Toast"; n.add_child(toast)
-	for x in [-0.05, 0.05]:
-		_box(toast, Vector3(0.02, 0.12, 0.11), M.std(Color(0.72, 0.45, 0.2), 0, 0.9), Vector3(x, 0.14, 0))
-	var eye := M.glow(Color(1, 0.2, 0.1), 0.0)
-	n.set_meta("eye", eye)
-	_box(n, Vector3(0.2, 0.02, 0.005), eye, Vector3(0, 0.1, 0.081))
-	return n
+## Who looks at whom: every cast member looks at `who` (except `who`, who looks at `at` if given).
+func all_look(who: String, at: Node3D = null) -> void:
+	for k in cast:
+		var a: Node3D = cast[k]
+		if not is_instance_valid(a) or not ("look_target" in a): continue
+		if k == who: a.look_target = at
+		elif cast.has(who): a.look_target = cast[who]
 
-func _make_radio() -> Node3D:
-	var n := Node3D.new(); n.name = "WreckRadio"
-	var rust := M.std(Color(0.5, 0.33, 0.22), 0.6, 0.6)
-	var dark := M.std(Color(0.16, 0.17, 0.2), 0.7, 0.4)
-	var yel := M.std(Color(0.95, 0.7, 0.15), 0.5, 0.4)
-	# a chunk of crane cab, tipped over, with its loudspeaker horn still working
-	_box(n, Vector3(2.4, 1.6, 2.0), yel, Vector3(0, 0.6, 0), Vector3(0.15, 0.3, 0.35))
-	_box(n, Vector3(1.6, 0.9, 0.08), M.std(Color(0.3, 0.4, 0.5), 0.1, 0.1), Vector3(0.1, 0.9, 1.0), Vector3(0.15, 0.3, 0.35))
-	_box(n, Vector3(3.5, 0.35, 0.35), rust, Vector3(-1.6, 0.25, 1.2), Vector3(0, 0.7, 0.1))
-	var horn := Node3D.new(); horn.name = "Horn"; horn.position = Vector3(0.9, 1.25, 1.1); horn.rotation = Vector3(-0.3, 0.4, 0); n.add_child(horn)
-	_cyl(horn, 0.32, 0.55, dark, Vector3(0, 0, 0.25), Vector3(PI / 2, 0, 0), 0.08)
-	var lamp := M.glow(Color(1, 0.15, 0.1), 0.5)
-	n.set_meta("lamp", lamp)
-	_sphere(n, 0.12, lamp, Vector3(0.4, 1.55, 0.8))
-	var l := OmniLight3D.new(); l.light_color = Color(1, 0.2, 0.1); l.light_energy = 0.0; l.omni_range = 5; l.position = Vector3(0.4, 1.8, 1.0)
-	n.add_child(l); n.set_meta("light", l)
-	return n
-
-func _make_ship() -> Node3D:
-	# Vesk's old hauler: stubby, patched and loud
-	var n := Node3D.new(); n.name = "Hauler"
-	var hull := M.std(Color(0.93, 0.5, 0.18), 0.5, 0.4)
-	var teal := M.std(Color(0.2, 0.55, 0.58), 0.6, 0.35)
-	var dark := M.std(Color(0.18, 0.2, 0.24), 0.7, 0.4)
-	var glass := M.std(Color(0.4, 0.75, 0.95), 0.2, 0.05)
-	var body := Node3D.new(); body.name = "Body"; n.add_child(body)
-	var cap := CapsuleMesh.new(); cap.radius = 1.3; cap.height = 6.5
-	_mesh(body, cap, hull, Vector3(0, 2.0, 0), Vector3(PI / 2, 0, 0))
-	_sphere(body, 0.95, glass, Vector3(0, 2.75, 1.9))
-	_box(body, Vector3(7.2, 0.25, 2.0), teal, Vector3(0, 1.8, -0.6), Vector3(0, 0, 0))
-	_box(body, Vector3(0.25, 1.6, 1.4), teal, Vector3(0, 3.6, -2.4), Vector3(-0.3, 0, 0))
-	_box(body, Vector3(1.2, 0.8, 0.9), M.std(Color(0.7, 0.72, 0.75), 0.8, 0.3), Vector3(0.9, 2.9, -0.8))  # patch
-	for x in [-2.6, 2.6]:
-		_cyl(body, 0.45, 1.8, dark, Vector3(x, 1.8, -1.0), Vector3(PI / 2, 0, 0))
-		var g := M.glow(Color(0.4, 0.9, 1.0), 0.0)
-		_cyl(body, 0.36, 0.05, g, Vector3(x, 1.8, -1.92), Vector3(PI / 2, 0, 0))
-		n.set_meta("jet%d" % (0 if x < 0 else 1), g)
-	for p in [Vector3(-1.1, 0.5, 1.6), Vector3(1.1, 0.5, 1.6), Vector3(0, 0.5, -2.2)]:
-		_cyl(body, 0.08, 1.0, dark, p)
-		_cyl(body, 0.25, 0.08, dark, p - Vector3(0, 0.5, 0))
-	var l := OmniLight3D.new(); l.light_color = Color(0.4, 0.9, 1.0); l.light_energy = 0.0; l.omni_range = 8; l.position = Vector3(0, 1.6, -2.5)
-	body.add_child(l); n.set_meta("light", l)
-	return n
-
-func _ship_jets(ship: Node3D, e: float) -> void:
-	for k in ["jet0", "jet1"]: (ship.get_meta(k) as StandardMaterial3D).emission_energy_multiplier = e
-	(ship.get_meta("light") as OmniLight3D).light_energy = e * 0.8
-
-# ---------------------------------------------------------------- INTRO
-func _intro() -> void:
-	var chair_pos := _spot("porch_chair_pos", Vector3(-2.5, 0.4, 93.5))
-	var porch_y := 0.4
-	var bench := _spot("gear_pos", Vector3(3.6, 1.45, 94))
-	var crash := _spot("dodger_crash_pos", Vector3(-12.5, 2.4, 74.5))
-	var mast := _spot("mast_top", Vector3(14, 20, -34))
-	var start: Vector3 = Game.level.start_pos if Game.level else Vector3(0, 0.5, 91)
-	var chair: Node3D = Game.level.find_child("porch_chair", false, false) if Game.level else null
-	if chair: chair_pos = chair.global_position
-	var bench_top := bench.y - 0.05
-	# actors
-	vesk = _actor(VeskActor.new(), chair_pos + Vector3(0, 0.27, 0.06), PI)
-	vesk.sit = 1.0; vesk.slump = 1.0
-	vesk.hold_mug(true)
-	dodger = _actor(DroneActor.new(), Vector3(-30, 9, 70), PI * 0.5)
-	var coffee := _actor(_make_coffee_maker(), Vector3(bench.x + 0.95, bench_top, bench.z + 0.05), PI + 0.25, true)
-	var toaster := _actor(_make_toaster(), Vector3(bench.x - 0.75, bench_top, bench.z + 0.1), PI - 0.2, true)
-	var roller := _actor(_model("res://models/roller.glb"), Vector3(-14, 0.0, 86), 0.0)
-	var roller2 := _actor(_model("res://models/roller.glb"), Vector3(15, 0.0, 76), 0.0)
-	var hornet := _actor(_model("res://models/hornet.glb"), Vector3(-30, 7, 80), PI * 0.5)
-
-	# 1. the sky city, from far out
-	Snd.loop("wind_loop", true, -12)
-	cut(Vector3(34, 46, 175), Vector3(4, 4, 30), 48.0)
-	move(Vector3(22, 30, 138), Vector3(0, 2, 40), 15.0, 44.0)
-	tw(self, "fade", 0.0, 3.0)
-	await wait(2.6)
-	await say("intro_01", 0.6)
-	# 2. over the docks and gardens, out to the junkyard
-	cut(Vector3(-66, 24, 34), Vector3(-10, 3, 44), 50.0)
-	move(Vector3(-30, 12, 70), Vector3(-2, 1.5, 86), 9.5)
-	await say("intro_02", 1.0)
-	# 3. the porch: start on the brass gear on the workbench, drift over to Vesk in his chair
-	cut(bench + Vector3(-0.35, 0.3, -1.1), bench + Vector3(0, 0.02, 0), 38.0)
-	sway = 0.5
-	move(chair_pos + Vector3(1.6, 1.15, -3.4), chair_pos + Vector3(0, 0.85, 0), 8.0, 42.0)
-	await wait(1.4)
-	await say("intro_03", 1.4)
-	# 4. "Finally. Nothing left to fix."
-	cut(chair_pos + Vector3(0.55, 1.0, -1.55), chair_pos + Vector3(0, 0.95, 0.1), 40.0)
-	move(chair_pos + Vector3(0.45, 1.0, -1.3), chair_pos + Vector3(0, 0.95, 0.1), 5.0)
-	tw(vesk, "head_turn", -0.15, 1.0)
-	await say("intro_04", 1.6)
-	# 5. Dodger swoops in from the yard
-	cut(chair_pos + Vector3(3.2, 1.4, -4.6), chair_pos + Vector3(0.8, 0.9, 0), 46.0)
-	setv(dodger, "global_position", chair_pos + Vector3(-9, 5, -14))
-	tw(dodger, "global_position", chair_pos + Vector3(4, 3.0, -6), 1.2, 0.0, Tween.TRANS_SINE, Tween.EASE_OUT)
-	tw(dodger, "global_position", chair_pos + Vector3(1.25, 1.55, -0.3), 1.1, 1.2, Tween.TRANS_BACK, Tween.EASE_OUT)
-	tw(dodger, "rotation:y", PI + 0.6, 0.8, 1.2)
-	fx(func(): Snd.at("dash", dodger.global_position, -6))
-	await wait(2.4)
-	tw(vesk, "head_turn", -0.5, 0.6)
-	await say("intro_05", 0.5)
-	# 6. "Dodger. It's my day off."
-	cut(chair_pos + Vector3(-0.6, 1.05, -1.6), chair_pos + Vector3(0.3, 1.0, 0), 40.0)
-	await say("intro_06", 2.2)
-	# 7. 7:59:57 ... 8:00:00, the relay dish on the Signal Mast pulses
-	tw(vesk, "head_turn", 0.0, 1.0)
-	cut(chair_pos + Vector3(2.4, 1.3, -3.6), chair_pos + Vector3(0.5, 0.9, 0), 46.0)
-	clock_label.text = "SKYHARBOR   7:59:57 AM"
-	tw(self, "clock_a", 1.0, 0.6)
-	for s in ["58", "59"]:
-		await wait(1.0)
-		clock_label.text = "SKYHARBOR   7:59:%s AM" % s
-	await wait(1.0)
-	clock_label.text = "SKYHARBOR   8:00:00 AM"
-	fx(func(): Snd.play("crane_warn", -6); Snd.play("checkpoint", -4))
-	cut(Vector3(-3, 3.2, 73), mast + Vector3(0, 0.5, 0), 16.0)
-	move(Vector3(-2.6, 3.4, 72), mast + Vector3(0, 1.2, 0), 7.0, 11.0)
-	tw(self, "clock_a", 0.0, 1.0, 1.2)
-	for i in 4:
-		fx(func(): FX.ring(mast + Vector3(0, 1.5, 0), Color(1, 0.5, 0.15), 3.0 + i))
-		await wait(0.5)
-	await say("intro_07", 0.6)
-	# 8. the coffee maker clocks in
-	var cm_eye: StandardMaterial3D = coffee.get_meta("eye")
-	var card: Node3D = coffee.find_child("Card", true, false)
-	var stamp: Node3D = coffee.find_child("Stamp", true, false)
-	var hat: Node3D = coffee.find_child("Hat", true, false)
-	var cpos := coffee.global_position
-	cut(cpos + Vector3(-0.55, 0.42, -0.95), cpos + Vector3(0, 0.25, 0), 34.0)
-	await wait(0.8)
-	cm_eye.emission = Color(1, 0.3, 0.1)
-	fx(func(): Snd.at("ui_select", cpos, -4))
-	tw(card, "position:y", 0.52, 0.25, 0.0, Tween.TRANS_BACK, Tween.EASE_OUT)
-	await wait(0.6)
-	tw(stamp, "position:y", 0.39, 0.08, 0.0, Tween.TRANS_EXPO, Tween.EASE_IN)
-	await wait(0.1)
-	fx(func(): Snd.at("melee_hit", cpos, -6); FX.sparks(cpos + Vector3(0, 0.45, 0), Color(1, 0.8, 0.4), 6, 2.0))
-	tw(stamp, "position:y", 0.46, 0.2, 0.05)
-	tw(card, "position:y", 0.33, 0.3, 0.4)
-	await wait(0.5)
-	tw(hat, "scale", Vector3.ONE, 0.3, 0.0, Tween.TRANS_BACK, Tween.EASE_OUT)
-	tw(hat, "position:y", 0.45, 0.3, 0.0, Tween.TRANS_BACK, Tween.EASE_OUT)
-	fx(func(): Snd.at("cell_pickup", cpos, -8))
-	await wait(0.6)
-	await say("sky_intro_coffee_1", 0.3)
-	cut(chair_pos + Vector3(0.5, 1.05, -1.45), chair_pos + Vector3(0, 1.0, 0.1), 38.0)
-	tw(vesk, "head_turn", 0.55, 0.5)
-	await say("sky_intro_coffee_2", 0.4)
-	cut(cpos + Vector3(-0.35, 0.32, -0.6), cpos + Vector3(0, 0.38, 0), 30.0)
-	await say("sky_intro_coffee_3", 0.6)
-	# 9. the toaster growls
-	var tpos := toaster.global_position
-	var t_eye: StandardMaterial3D = toaster.get_meta("eye")
-	cut(tpos + Vector3(0.5, 0.35, -0.8), tpos + Vector3(0, 0.12, 0), 34.0)
-	tw(t_eye, "emission_energy_multiplier", 4.0, 0.5)
-	for i in 6:
-		tw(toaster, "rotation:z", 0.08 if i % 2 == 0 else -0.08, 0.08)
-		await wait(0.1)
-	setv(toaster, "rotation:z", 0.0)
-	fx(func(): Snd.at("roller_fuse", tpos, -8))
-	await say("intro_08", 0.4)
-	var toast: Node3D = toaster.find_child("Toast", true, false)
-	tw(toast, "position:y", 0.35, 0.25, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)
-	tw(toast, "position:y", 0.0, 0.3, 0.3, Tween.TRANS_QUAD, Tween.EASE_IN)
-	await wait(0.8)
-	# 10. every bot goes haywire: rollers in the yard, a hornet over the wall, sparks from the generator
-	cut(Vector3(3, 5.5, 98.5), Vector3(-3, 0.5, 79), 52.0)
-	move(Vector3(1, 6.5, 99.5), Vector3(-4, 0.5, 77), 7.0)
-	tw(roller, "global_position", Vector3(-6, 0, 80), 5.0, 0.0, Tween.TRANS_LINEAR)
-	tw(roller, "rotation:y", 2.4, 5.0)
-	tw(roller2, "global_position", Vector3(4, 0, 79), 4.0, 0.3, Tween.TRANS_LINEAR)
-	tw(hornet, "global_position", Vector3(12, 5, 74), 6.0, 0.0, Tween.TRANS_LINEAR)
-	fx(func(): FX.sparks(Vector3(10, 1.4, 94.5), Color(1, 0.7, 0.3), 16, 5.0); Snd.at("bot_spawn", Vector3(-6, 0, 80), -4))
-	await wait(0.5)
-	await say("intro_09", 0.5)
-	fx(func(): FX.sparks(Vector3(10, 1.4, 94.5), Color(1, 0.7, 0.3), 10, 4.0))
-	# 11. Dodger picks up the signal, looking north to the mast
-	cut(dodger.global_position + Vector3(0.5, 0.35, 1.4), mast, 30.0)
-	tw(dodger, "rotation:y", PI, 0.6)
-	dodger.orange = 0.0
-	await say("intro_10", 0.4)
-	# 12. "Somebody else's problem."
-	cut(chair_pos + Vector3(0.5, 1.05, -1.45), chair_pos + Vector3(0, 1.0, 0.1), 38.0)
-	tw(vesk, "head_turn", 0.0, 0.5)
-	await say("intro_11", 0.6)
-	# 13. a roller trundles up the porch steps and eats the chair
-	cut(chair_pos + Vector3(4.0, 1.7, -4.2), chair_pos + Vector3(-0.3, 0.6, 0), 46.0)
-	setv(roller, "global_position", chair_pos + Vector3(-5, porch_y - 0.4, -4))
-	tw(roller, "global_position", chair_pos + Vector3(-1.4, porch_y, -0.9), 1.6, 0.0, Tween.TRANS_LINEAR)
-	tw(roller, "rotation:y", 0.9, 1.6)
-	fx(func(): Snd.at("roller_roll", chair_pos, -2))
-	await wait(1.0)
-	# Vesk hops out of the chair
-	vesk.play("jump", 0.1)
-	tw(vesk, "sit", 0.0, 0.3); tw(vesk, "slump", 0.0, 0.3)
-	tw(vesk, "global_position", chair_pos + Vector3(1.6, porch_y - 0.4 + 0.02, -0.9), 0.55, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)
-	await wait(0.55)
-	vesk.play("land", 0.05)
-	fx(func(): Snd.at("land", vesk.global_position, -4))
-	await wait(0.35)
-	vesk.play("idle", 0.3)
-	setv(vesk, "rotation:y", _face_to(vesk, chair_pos))
-	tw(roller, "global_position", chair_pos + Vector3(-0.2, porch_y, -0.3), 0.5)
-	await wait(0.5)
-	fx(func(): Snd.at("crate_break", chair_pos, -2); FX.puff(chair_pos + Vector3(0, 0.6, 0), Color(0.6, 0.5, 0.4)); FX.shake(0.3))
-	if chair:
-		tw(chair, "rotation:z", 1.45, 0.35, 0.0, Tween.TRANS_BOUNCE, Tween.EASE_OUT)
-		tw(chair, "position", chair.position + Vector3(0.35, -0.05, -0.2), 0.35)
-		tw(chair, "scale", Vector3(1, 0.75, 1), 0.3)
-	await wait(0.6)
-	await say("intro_12", 0.5)
-	# 14. "...Fine. Let's go unplug it."
-	cut(vesk.global_position + Vector3(-1.2, 1.15, -1.6), vesk.global_position + Vector3(0, 1.0, 0), 40.0)
-	setv(vesk, "rotation:y", _face_to(vesk, vesk.global_position + Vector3(-1, 0, -2)))
-	tw(roller, "global_position", Vector3(-8, 0.0, 79), 2.4, 0.4, Tween.TRANS_QUAD, Tween.EASE_IN)
-	await say("intro_13", 0.3)
-	vesk.hold_mug(false)
-	# 15. Dodger cheers, zooms off for the scrap pile... and crashes
-	var dp: Vector3 = dodger.global_position
-	cut(dp + Vector3(1.8, 0.4, 2.2), dp, 44.0)
-	tw(dodger, "rotation:y", _face_to(dodger, crash), 0.4)
-	await say("intro_14", 0.1)
-	var fly := line_len("sky_intro_crash_1")
-	if not ffwd(): Snd.voice("sky_intro_crash_1", true)
-	cut(Vector3(1.5, 2.6, 93.5), dp, 46.0)
-	look_node = dodger
-	tw(dodger, "global_position", dp + Vector3(-1, 2.5, -3), 0.7, 0.0, Tween.TRANS_SINE, Tween.EASE_OUT)
-	tw(dodger, "global_position", crash + Vector3(0.4, 1.8, 2.5), fly * 0.55, 0.7, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
-	tw(dodger, "tilt", Vector3(0.4, 0, 0.3), 0.6, 0.7)
-	tw(self, "cam_fov", 34.0, fly * 0.7)
-	fx(func(): Snd.at("dash", dp, -4))
-	await wait(0.7 + fly * 0.55)
-	tw(dodger, "global_position", crash + Vector3(0, 0.25, 0), 0.25, 0.0, Tween.TRANS_QUAD, Tween.EASE_IN)
-	await wait(0.25)
-	fx(func(): Snd.at("explode_small", crash, -4); FX.sparks(crash + Vector3(0, 0.3, 0), Color(1, 0.7, 0.3), 18, 5.0); FX.puff(crash + Vector3(0, 0.4, 0), Color(0.5, 0.45, 0.4)); FX.shake(0.4))
-	setv(dodger, "tilt", Vector3(0.9, 0.4, 1.2)); dodger.hover = 0.0; dodger.dim = 0.6
-	await wait(maxf(0.4, fly * 0.45 - 0.25) + 1.0)
-	# 16. hand over: Vesk on the porch steps, looking out at the yard
-	look_node = null
-	setv(vesk, "global_position", start + Vector3(0, -0.1, 0.9))
-	setv(vesk, "rotation:y", PI)
-	vesk.play("idle")
-	cut(start + Vector3(0.7, 2.0, 4.6), start + Vector3(0, 1.2, -3.0), 50.0)
-	walk(vesk, start + Vector3(0, -0.1, 0), 2.0)
-	await wait(0.6)
-	vesk.play("idle", 0.3)
-	await wait(0.4)
-	if chair:  # the chewed chair stays knocked over
-		chair.rotation.z = 1.45; chair.scale = Vector3(1, 0.75, 1)
-
-# ---------------------------------------------------------------- OUTRO
-func _outro() -> void:
-	var c := Vector3(0, 0, -97)
-	if Game.level and "islands" in Game.level and Game.level.islands.has("arena"):
-		var r: Rect2 = Game.level.islands.arena
-		c = Vector3(r.get_center().x, 0, r.get_center().y)
-	var mast := _spot("mast_top", Vector3(14, 20, -34))
-	var dish_glow: StandardMaterial3D = Game.level.get("dish_glow") if Game.level else null
-	var dish_col := dish_glow.emission if dish_glow else Color.WHITE
-	# actors
-	vesk = _actor(VeskActor.new(), c + Vector3(0, 0, 1), PI)
-	dodger = _actor(DroneActor.new(), c + Vector3(0.85, 1.95, 1.2), PI)
-	var radio := _actor(_make_radio(), c + Vector3(-2.5, 0, -6.5), 0.4)
-	var lamp: StandardMaterial3D = radio.get_meta("lamp")
-	var rlight: OmniLight3D = radio.get_meta("light")
-	var ship := _actor(_make_ship(), c + Vector3(0, 40, 9), PI)
-	ship.visible = false
-	var smoke := func(): FX.puff(radio.global_position + Vector3(randf_range(-1, 1), 1.6, randf_range(-1, 1)), Color(0.3, 0.3, 0.33))
-
-	# 1. the Crane Yard after the fight
-	cut(c + Vector3(17, 10, 15), c + Vector3(0, 1, -2), 50.0)
-	move(c + Vector3(9, 6, 17), c + Vector3(0, 1, -1), 11.0)
-	tw(self, "fade", 0.0, 2.0)
-	await wait(1.6)
-	for i in 3: fx(smoke)
-	await say("outro_01", 0.8)
-	# 2. the scorecard
-	cut(c + Vector3(1.9, 1.55, -2.0), c + Vector3(0.3, 1.25, 1), 40.0)
-	move(c + Vector3(1.5, 1.5, -1.6), c + Vector3(0.3, 1.25, 1), 9.0)
-	fx(smoke)
-	await say("outro_02", 0.4)
-	setv(vesk, "head_turn", 0.0); tw(vesk, "head_turn", -0.5, 0.4)
-	await say("outro_03", 0.3)
-	await say("outro_04", 1.0)
-	# 3. a radio crackles in the wreck
-	var rp := radio.global_position + Vector3(0.9, 1.3, 1.1)
-	cut(c + Vector3(1.5, 1.4, -0.5), rp, 46.0)
-	move(c + Vector3(-0.2, 1.2, -3.0), rp, 6.0, 38.0)
-	tw(vesk, "head_turn", 0.0, 0.6)
-	for i in 3:
-		fx(func(): Snd.at("ui_move", rp, -2); lamp.emission_energy_multiplier = 6.0; rlight.light_energy = 3.0)
-		await wait(0.12)
-		lamp.emission_energy_multiplier = 0.5; rlight.light_energy = 0.0
-		await wait(0.35)
-	await say("outro_05", 0.5)
-	# 4. Grudd's first broadcast: the relay dish flares orange, Dodger's eye flickers
-	live_label.text = "●  LIVE BROADCAST  ·  ALL FREQUENCIES"
-	tw(self, "live_a", 1.0, 0.3)
-	lamp.emission_energy_multiplier = 6.0; rlight.light_energy = 3.0
-	if dish_glow: dish_glow.emission = Color(1, 0.45, 0.1)
-	cut(rp + Vector3(-1.2, 0.2, 2.6), rp, 34.0)
-	tw(self, "shake", 0.6, 0.1)
-	await say("sky_outro_grudd_1", 0.5)
-	# Dodger's eye flickers orange for the whole broadcast
-	cut(dodger.global_position + Vector3(-0.5, 0.05, -1.3), dodger.global_position, 30.0)
-	move(dodger.global_position + Vector3(-0.35, 0.05, -0.95), dodger.global_position, 6.0)
-	tw(dodger, "orange", 1.0, 0.6)
-	await say("outro_06", 0.4)
-	cut(Vector3(-4, 2.2, c.z + 8), mast + Vector3(0, 1, 0), 14.0)
-	await say("outro_07", 0.4)
-	cut(rp + Vector3(-1.4, 0.4, 2.2), rp, 36.0)
-	await say("outro_08", 0.6)
-	tw(self, "live_a", 0.0, 0.5)
-	lamp.emission_energy_multiplier = 0.5; rlight.light_energy = 0.0
-	if dish_glow: dish_glow.emission = dish_col
-	fx(func(): Snd.at("explode_small", rp, -10); FX.sparks(rp, Color(1, 0.6, 0.2), 10, 3.0))
-	# 5. "Your eye's doing the orange thing again."
-	cut(c + Vector3(-1.2, 1.4, -1.0), c + Vector3(0.4, 1.4, 1.1), 40.0)
-	tw(vesk, "head_turn", -0.6, 0.5)
-	await say("sky_outro_eye_1", 0.3)
-	cut(dodger.global_position + Vector3(-0.4, 0.0, -1.1), dodger.global_position, 32.0)
-	await say("sky_outro_eye_2", 0.2)
-	tw(dodger, "orange", 0.0, 0.4)
-	await wait(0.8)
-	# 6. a giant robot foreman, of course
-	cut(c + Vector3(2.2, 1.6, -2.6), c + Vector3(0.3, 1.25, 1), 42.0)
-	tw(vesk, "head_turn", 0.0, 0.6)
-	await say("outro_09", 0.4)
-	tw(dodger, "global_position", dodger.global_position + Vector3(0.3, 0.4, -0.3), 0.6)
-	await say("outro_10", 0.4)
-	# 7. Nana Quill calls in with the coordinates
-	fx(func(): Snd.play("ui_select", -4))
-	await wait(0.35)
-	fx(func(): Snd.play("ui_select", -4))
-	call_text.text = "INCOMING CALL\nNANA QUILL"
-	tw(self, "call_a", 1.0, 0.4)
-	tw(dodger, "eye_color", Color(0.5, 1, 0.55), 0.3)
-	cut(c + Vector3(3.6, 2.0, -3.4), c + Vector3(0.4, 1.3, 1), 44.0)
-	move(c + Vector3(-1.5, 2.1, -4.4), c + Vector3(0.4, 1.3, 1), 26.0)
-	await wait(0.6)
-	await say("sky_outro_nana_1", 0.3)
-	await say("sky_outro_nana_2", 0.3)
-	await say("sky_outro_nana_3", 0.3)
-	call_text.text = "SHARD 1 DECODED\n> DUSTVEIN GULCH"
-	fx(func(): Snd.play("checkpoint", -6))
-	await say("sky_outro_nana_4", 0.3)
-	await say("sky_outro_nana_5", 0.2)
-	await say("sky_outro_nana_6", 0.6)
-	tw(self, "call_a", 0.0, 0.5)
-	tw(dodger, "eye_color", DroneActor.EYE, 0.4)
-	# 8. "Back to my chair?" "Road trip!"
-	cut(c + Vector3(-0.6, 1.1, -1.5), c + Vector3(0.1, 1.05, 1), 38.0)
-	await say("outro_11", 0.3)
-	cut(dodger.global_position + Vector3(0.6, 0.2, -1.4), dodger.global_position, 34.0)
-	tw(dodger, "global_position", dodger.global_position + Vector3(0, 0.6, 0), 0.3, 0.2, Tween.TRANS_BACK, Tween.EASE_OUT)
-	await say("outro_12", 0.4)
-	# 9. the old hauler drops in on autopilot, Vesk climbs aboard
-	ship.visible = true
-	_ship_jets(ship, 4.0)
-	var pad := c + Vector3(0, 0, 9)
-	cut(c + Vector3(-7, 1.3, -3), pad + Vector3(0, 3, 0), 52.0)
-	tw(ship, "global_position", pad, 4.0, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)
-	fx(func(): Snd.at("crane_move", pad, 0))
-	await wait(4.0)
-	fx(func(): FX.ring(pad + Vector3(0, 0.1, 0), Color(0.6, 0.9, 1.0), 2.5); Snd.at("land", pad, 0); FX.shake(0.3))
-	_ship_jets(ship, 0.8)
-	var w := walk(vesk, pad + Vector3(0, 0, -2.6), 4.5)
-	tw(dodger, "global_position", pad + Vector3(1, 3.2, -1), 1.6)
-	await wait(w)
-	vesk.play("jump", 0.1)
-	tw(vesk, "global_position", pad + Vector3(0, 2.4, -1.0), 0.45, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)
-	fx(func(): Snd.at("jump", vesk.global_position, -4))
-	await wait(0.45)
-	vesk.visible = false
-	tw(dodger, "global_position", pad + Vector3(0, 2.6, 0), 0.5)
-	await wait(0.5)
-	dodger.visible = false
-	await wait(0.6)
-	# 10. liftoff... with the handbrake on
-	cut(c + Vector3(6, 0.8, -2), pad + Vector3(0, 3, 0), 50.0)
-	_ship_jets(ship, 6.0)
-	fx(func(): Snd.at("crane_warn", pad, -2); FX.puff(pad, Color(0.8, 0.8, 0.85)))
-	tw(ship, "global_position", pad + Vector3(0, 2.5, 0), 1.0, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)
-	var body: Node3D = ship.find_child("Body", true, false)
-	for i in 4:
-		tw(body, "rotation:x", 0.2 if i % 2 == 0 else -0.12, 0.25)
-		tw(self, "shake", 0.5, 0.05)
-		await wait(0.3)
-	tw(body, "rotation:x", 0.0, 0.3)
-	var lo := line_len("sky_outro_liftoff_1")
-	if not ffwd(): Snd.voice("sky_outro_liftoff_1", true)
-	# lurch forward, snap back on the brake, then off for real
-	tw(ship, "global_position", pad + Vector3(0, 3, 3), 0.4, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)
-	tw(ship, "global_position", pad + Vector3(0, 2.8, 0.5), 0.35, 0.45, Tween.TRANS_BACK, Tween.EASE_OUT)
-	await wait(maxf(lo, 1.4) + 0.3)
-	fx(func(): FX.sparks(pad + Vector3(0, 2.5, -2.5), Color(1, 0.7, 0.3), 18, 6.0); Snd.at("dash", pad, 0))
-	_ship_jets(ship, 9.0)
-	cut(c + Vector3(0, 1.2, -6), pad + Vector3(0, 4, 0), 50.0)
-	look_node = ship; look_off = Vector3(0, 2, 0)
-	tw(ship, "global_position", pad + Vector3(-20, 30, 90), 4.0, 0.0, Tween.TRANS_QUAD, Tween.EASE_IN)
-	tw(ship, "rotation:x", -0.35, 1.5)
-	tw(self, "cam_fov", 28.0, 4.0)
-	await wait(1.5)
-	await say("outro_13", 0.4)
-	# 11. end card
-	tw(self, "fade", 1.0, 1.4)
-	await wait(1.6)
-	look_node = null
-	card_title.text = "SKYHARBOR  ·  COMPLETE"
-	card_sub.text = "Shard 1 of the signal decoded.   Next stop: Dustvein Gulch"
-	tw(self, "card_a", 1.0, 0.8)
-	await wait(4.0)
-	tw(self, "card_a", 0.0, 0.8)
-	await wait(0.9)
-	# back in the yard for a last look around
-	if Game.player: Game.player.global_position = c + Vector3(0, 0.1, 1)
+## Dim the sun for the indoor stinger (restored when the cutscene ends).
+func sun_dim(on: bool) -> void:
+	if sun == null:
+		for c in Game.main.find_children("*", "DirectionalLight3D", true, false): sun = c; break
+	if sun == null: return
+	if on:
+		if sun_energy < 0.0: sun_energy = sun.light_energy
+		sun.light_energy = 0.0
+	elif sun_energy >= 0.0:
+		sun.light_energy = sun_energy
 
 # ---------------------------------------------------------------- UI
-func _on_line(_id: String, sp: String, text: String) -> void:
+func _on_line(id: String, sp: String, text: String) -> void:
 	if playing == "": return
+	speaking = sp
+	if auto_look and cast.has(sp): all_look(sp, cast[sp].look_target if "look_target" in cast[sp] else null)
 	var who: String = SPEAKER_NAMES.get(sp, sp.to_upper())
-	sub.text = (who + ":  " if who != "" else "") + text
-	sub.add_theme_color_override("font_color", SPEAKER_COLORS.get(sp, Color.WHITE))
-	sub.modulate.a = 1.0; sub_t = maxf(1.5, line_len(_id) + 0.2)
+	var col: Color = SPEAKER_COLORS.get(sp, Color.WHITE)
+	var body := text.replace("[", "(").replace("]", ")")
+	if who != "": sub_rt.text = "[color=#%s]%s[/color]   %s" % [col.to_html(false), who, body]
+	else: sub_rt.text = "[i]%s[/i]" % body
+	sub.modulate.a = 1.0; sub_t = maxf(1.5, line_len(id) + 0.2)
 
-func _label(size: int, color: Color) -> Label:
+func _label(size: int, color: Color, heavy := false) -> Label:
 	var l := Label.new()
-	l.add_theme_font_override("font", font)
+	l.add_theme_font_override("font", font_heavy if heavy else font)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
@@ -780,49 +513,157 @@ func _label(size: int, color: Color) -> Label:
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
+func _ctl() -> Control:
+	var c := Control.new(); c.mouse_filter = Control.MOUSE_FILTER_IGNORE; return c
+
 func _build_ui() -> void:
-	font = SystemFont.new(); font.font_names = PackedStringArray(["Inter", "Segoe UI", "Arial", "sans-serif"]); font.font_weight = 700
+	font = SystemFont.new(); font.font_names = PackedStringArray(["Inter", "Segoe UI", "Arial", "sans-serif"]); font.font_weight = 600
+	font_heavy = SystemFont.new(); font_heavy.font_names = PackedStringArray(["Impact", "Arial Black", "Segoe UI Black", "Inter", "sans-serif"]); font_heavy.font_weight = 900
 	layer = CanvasLayer.new(); layer.layer = 60; add_child(layer)
-	var root := Control.new(); root.set_anchors_preset(Control.PRESET_FULL_RECT); root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(root)
+	root_ui = _ctl(); root_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(root_ui)
 	black = ColorRect.new(); black.color = Color(0, 0, 0, 0); black.set_anchors_preset(Control.PRESET_FULL_RECT); black.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash = ColorRect.new(); flash.color = Color(1, 0.95, 0.85, 0); flash.set_anchors_preset(Control.PRESET_FULL_RECT); flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_top = ColorRect.new(); bar_top.color = Color.BLACK; bar_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_bot = ColorRect.new(); bar_bot.color = Color.BLACK; bar_bot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(bar_top); root.add_child(bar_bot)
-	sub = _label(27, Color.WHITE)
-	sub.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	sub.custom_minimum_size = Vector2(1000, 80); sub.position = Vector2(-500, -88); sub.size = Vector2(1000, 80)
+	root_ui.add_child(flash)
+	root_ui.add_child(bar_top); root_ui.add_child(bar_bot)
+	# subtitles: centred in the lower letterbox bar, speaker name in their colour
+	sub = _ctl()
+	sub.anchor_left = 0.5; sub.anchor_right = 0.5; sub.anchor_top = 1.0; sub.anchor_bottom = 1.0
+	sub.offset_left = -620; sub.offset_right = 620; sub.offset_top = -92; sub.offset_bottom = -8
 	sub.modulate.a = 0.0
-	root.add_child(sub)
+	root_ui.add_child(sub)
+	sub_rt = RichTextLabel.new(); sub_rt.bbcode_enabled = true; sub_rt.scroll_active = false; sub_rt.fit_content = false
+	sub_rt.set_anchors_preset(Control.PRESET_FULL_RECT); sub_rt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sub_rt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub_rt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	sub_rt.add_theme_font_override("normal_font", font)
+	var fi := SystemFont.new(); fi.font_names = font.font_names; fi.font_weight = 500; fi.font_italic = true
+	sub_rt.add_theme_font_override("italics_font", fi)
+	sub_rt.add_theme_font_size_override("normal_font_size", 27); sub_rt.add_theme_font_size_override("italics_font_size", 27)
+	sub_rt.add_theme_color_override("default_color", Color(0.96, 0.95, 0.9))
+	sub_rt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95)); sub_rt.add_theme_constant_override("outline_size", 6)
+	sub.add_child(sub_rt)
+	# skip prompt + hold bar
 	skip_hint = _label(16, Color(1, 1, 1))
-	skip_hint.text = "JUMP / ESC  skip"
-	skip_hint.set_anchors_preset(Control.PRESET_TOP_RIGHT); skip_hint.position = Vector2(-210, 34); skip_hint.size = Vector2(190, 24)
+	skip_hint.text = "HOLD  JUMP / ESC  TO SKIP"
+	skip_hint.set_anchors_preset(Control.PRESET_TOP_RIGHT); skip_hint.position = Vector2(-300, 30); skip_hint.size = Vector2(270, 24)
 	skip_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; skip_hint.modulate.a = 0.0
-	root.add_child(skip_hint)
-	clock_label = _label(22, Color(1, 0.85, 0.5))
-	clock_label.position = Vector2(40, 32); clock_label.modulate.a = 0.0
-	root.add_child(clock_label)
+	root_ui.add_child(skip_hint)
+	skip_bar = ColorRect.new(); skip_bar.color = Color(1, 0.75, 0.3); skip_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	skip_bar.set_anchors_preset(Control.PRESET_TOP_RIGHT); skip_bar.position = Vector2(-180, 58); skip_bar.size = Vector2(0, 4)
+	root_ui.add_child(skip_bar)
+	clock_label = _label(24, Color(1, 0.85, 0.5))
+	clock_label.position = Vector2(54, 30); clock_label.modulate.a = 0.0
+	root_ui.add_child(clock_label)
 	live_label = _label(20, Color(1, 0.3, 0.25))
-	live_label.position = Vector2(40, 32); live_label.modulate.a = 0.0
-	root.add_child(live_label)
-	call_box = Control.new(); call_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	call_box.position = Vector2(-380, 112); call_box.size = Vector2(350, 110); call_box.modulate.a = 0.0
-	call_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	live_label.position = Vector2(54, 30); live_label.modulate.a = 0.0
+	root_ui.add_child(live_label)
+	call_box = _ctl(); call_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	call_box.position = Vector2(-380, 120); call_box.size = Vector2(350, 110); call_box.modulate.a = 0.0
 	call_box.draw.connect(_draw_call)
-	root.add_child(call_box)
+	root_ui.add_child(call_box)
 	call_text = _label(20, Color(0.8, 1, 0.75))
 	call_text.position = Vector2(118, 22); call_text.size = Vector2(220, 70)
 	call_box.add_child(call_text)
-	card_title = _label(58, Color(1, 0.85, 0.35)); card_sub = _label(24, Color(1, 1, 1))
-	root.add_child(black)
+	# location card (lower left, above the bar)
+	loc_box = _ctl(); loc_box.anchor_top = 1.0; loc_box.anchor_bottom = 1.0
+	loc_box.position = Vector2(54, -230); loc_box.size = Vector2(700, 110); loc_box.modulate.a = 0.0
+	loc_box.draw.connect(func(): loc_box.draw_rect(Rect2(0, 8, 6, 84), Color(1, 0.7, 0.3)))
+	root_ui.add_child(loc_box)
+	loc_title = _label(64, Color(1, 0.9, 0.7), true); loc_title.position = Vector2(22, -4); loc_box.add_child(loc_title)
+	loc_sub = _label(22, Color(1, 1, 1, 0.9)); loc_sub.position = Vector2(26, 70); loc_box.add_child(loc_sub)
+	# boss name card (centre-left, slams in)
+	boss_box = _ctl(); boss_box.anchor_top = 0.5; boss_box.anchor_bottom = 0.5
+	boss_box.position = Vector2(90, -60); boss_box.size = Vector2(900, 150); boss_box.modulate.a = 0.0
+	boss_box.draw.connect(_draw_boss)
+	root_ui.add_child(boss_box)
+	boss_title = _label(96, Color(1, 0.82, 0.2), true); boss_title.position = Vector2(20, -10); boss_box.add_child(boss_title)
+	boss_sub = _label(24, Color(1, 1, 1)); boss_sub.position = Vector2(26, 108); boss_box.add_child(boss_sub)
+	# "NOW HIRING" poster and the next-time bumper are drawn
+	poster = _ctl(); poster.set_anchors_preset(Control.PRESET_CENTER); poster.position = Vector2(-260, -340); poster.size = Vector2(520, 680)
+	poster.modulate.a = 0.0; poster.draw.connect(_draw_poster); root_ui.add_child(poster)
+	next_box = _ctl(); next_box.set_anchors_preset(Control.PRESET_FULL_RECT); next_box.modulate.a = 0.0
+	next_box.draw.connect(_draw_next); root_ui.add_child(next_box)
+	card_title = _label(58, Color(1, 0.85, 0.35), true); card_sub = _label(24, Color(1, 1, 1))
+	root_ui.add_child(black)
 	for l in [card_title, card_sub]:
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; l.modulate.a = 0.0; root.add_child(l)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; l.modulate.a = 0.0; root_ui.add_child(l)
 		l.anchor_left = 0.5; l.anchor_right = 0.5; l.anchor_top = 0.5; l.anchor_bottom = 0.5
-		l.offset_left = -600; l.offset_right = 600
+		l.offset_left = -700; l.offset_right = 700
 	card_title.offset_top = -70; card_title.offset_bottom = 10
 	card_sub.offset_top = 10; card_sub.offset_bottom = 50
+	# the bumper sits above the black so it can play over a blacked-out frame
+	next_box.move_to_front(); poster.move_to_front(); card_title.move_to_front(); card_sub.move_to_front()
+	sub.move_to_front(); skip_hint.move_to_front(); skip_bar.move_to_front()
+
+func show_location(title: String, subtitle: String, hold := 4.0) -> void:
+	loc_title.text = title; loc_sub.text = subtitle
+	tw(self, "loc_a", 1.0, 0.8, 0.0, Tween.TRANS_CUBIC, Tween.EASE_OUT)
+	tw(self, "loc_a", 0.0, 0.8, hold)
+
+func show_boss(title: String, subtitle: String, hold := 3.2) -> void:
+	boss_title.text = title; boss_sub.text = subtitle
+	tw(self, "boss_a", 1.0, 0.18, 0.0, Tween.TRANS_QUAD, Tween.EASE_OUT)
+	tw(self, "boss_a", 0.0, 0.6, hold)
+
+func _draw_boss() -> void:
+	var b := boss_box
+	var w := 640.0 * clampf(boss_a * 1.4, 0, 1)
+	b.draw_rect(Rect2(0, 96, w, 6), Color(1, 0.82, 0.2))
+	for i in 8: b.draw_rect(Rect2(w - 20 - i * 26, 104, 14, 4), Color(0.1, 0.1, 0.1, 0.8))
+
+func _draw_poster() -> void:
+	var p := poster
+	var s := p.size
+	p.draw_rect(Rect2(Vector2(8, 10), s), Color(0, 0, 0, 0.4))
+	p.draw_rect(Rect2(Vector2.ZERO, s), Color(0.96, 0.9, 0.72))
+	p.draw_rect(Rect2(Vector2(14, 14), s - Vector2(28, 28)), Color(0.75, 0.2, 0.12), false, 6)
+	p.draw_rect(Rect2(28, 28, s.x - 56, 120), Color(0.75, 0.2, 0.12))
+	var f := font_heavy
+	p.draw_string(f, Vector2(28, 118), "NOW HIRING", HORIZONTAL_ALIGNMENT_CENTER, s.x - 56, 86, Color(0.98, 0.92, 0.75))
+	# a silhouette: a stocky mechanic with a big question mark
+	var c := Vector2(s.x * 0.5, 330)
+	p.draw_circle(c + Vector2(0, -60), 54, Color(0.2, 0.18, 0.2))
+	p.draw_rect(Rect2(c.x - 90, c.y - 10, 180, 150), Color(0.2, 0.18, 0.2))
+	p.draw_string(f, Vector2(0, c.y - 30), "?", HORIZONTAL_ALIGNMENT_CENTER, s.x, 120, Color(1, 0.8, 0.3))
+	p.draw_string(f, Vector2(28, 540), "ONE MECHANIC", HORIZONTAL_ALIGNMENT_CENTER, s.x - 56, 52, Color(0.2, 0.15, 0.12))
+	p.draw_string(font, Vector2(28, 590), "You know who you are.", HORIZONTAL_ALIGNMENT_CENTER, s.x - 56, 30, Color(0.3, 0.22, 0.18))
+	p.draw_string(font, Vector2(28, 636), "Apply at the Great Works. Hard hat required.", HORIZONTAL_ALIGNMENT_CENTER, s.x - 56, 18, Color(0.35, 0.25, 0.2))
+
+## "Next time" bumper: a starfield and a turning desert planet, drawn.
+func _draw_next() -> void:
+	if next_a <= 0.01: return
+	var b := next_box
+	var s := b.size
+	b.draw_rect(Rect2(Vector2.ZERO, s), Color(0.03, 0.02, 0.07))
+	var rng := RandomNumberGenerator.new(); rng.seed = 7
+	for i in 160:
+		var p := Vector2(rng.randf() * s.x, rng.randf() * s.y)
+		p.x = fposmod(p.x - ct * (6.0 + rng.randf() * 18.0), s.x)
+		b.draw_circle(p, rng.randf_range(0.8, 2.2), Color(1, 0.95, 0.85, rng.randf_range(0.3, 0.9)))
+	var c := Vector2(s.x * 0.66, s.y * 0.5)
+	var r := s.y * 0.3
+	b.draw_circle(c, r * 1.12, Color(1, 0.6, 0.25, 0.12))
+	b.draw_circle(c, r * 1.05, Color(1, 0.65, 0.3, 0.18))
+	b.draw_circle(c, r, Color(0.86, 0.55, 0.28))
+	# canyon bands that slide across as it turns
+	for i in 9:
+		var y := -r + (i + 0.5) * (2.0 * r / 9.0)
+		var half := sqrt(maxf(0.0, r * r - y * y))
+		var col := Color(0.7, 0.4, 0.2) if i % 2 == 0 else Color(0.94, 0.68, 0.38)
+		var off := fposmod(ct * 18.0 + i * 37.0, half * 2.0 + 1.0)
+		b.draw_line(c + Vector2(-half + off * 0.3, y), c + Vector2(minf(half, -half + off), y), col, 2.0 * r / 9.0 * 0.45)
+	for k in 5:
+		var a := k * 1.3 + ct * 0.15
+		var p := c + Vector2(cos(a) * r * 0.55, sin(a * 1.7) * r * 0.45)
+		if p.distance_to(c) < r * 0.9: b.draw_circle(p, r * 0.06, Color(0.55, 0.3, 0.15))
+	# terminator shadow
+	for i in 18: b.draw_arc(c + Vector2(r * 0.25, 0), r * (0.95 - i * 0.012) + i * 0.3, -PI * 0.5, PI * 0.5, 48, Color(0.02, 0.01, 0.05, 0.05), r * 0.12)
+	var f := font_heavy
+	b.draw_string(f, Vector2(s.x * 0.08, s.y * 0.38), "NEXT TIME", HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color(1, 0.8, 0.4))
+	b.draw_string(f, Vector2(s.x * 0.08, s.y * 0.5), "DUSTVEIN GULCH", HORIZONTAL_ALIGNMENT_LEFT, -1, 84, Color(1, 0.93, 0.8))
+	b.draw_string(font, Vector2(s.x * 0.08, s.y * 0.57), "Sand. Scrap pirates. Absolutely no retirement.", HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Color(1, 1, 1, 0.85))
 
 ## Nana Quill's call card: a little portrait (antenna-covered shell, round glasses) and the text.
 func _draw_call() -> void:
@@ -832,7 +673,6 @@ func _draw_call() -> void:
 	b.draw_style_box(panel, Rect2(Vector2.ZERO, b.size))
 	var o := Vector2(56, 58)
 	var green := Color(0.45, 0.75, 0.4)
-	# antennas on the shell
 	for i in 5:
 		var a := -PI * 0.85 + i * PI * 0.17
 		var p := o + Vector2(cos(a), sin(a)) * 30
@@ -841,15 +681,16 @@ func _draw_call() -> void:
 		b.draw_circle(tip, 3, Color(1, 0.45, 0.2) if int(ct * 3 + i) % 2 == 0 else Color(0.6, 1, 0.5))
 	b.draw_circle(o + Vector2(0, 4), 32, green)
 	for i in 3: b.draw_arc(o + Vector2(0, 4), 12 + i * 9, PI, TAU, 16, Color(0.3, 0.55, 0.3), 2)
-	# face, glasses, smile
 	var f := o + Vector2(0, 14)
 	b.draw_circle(f, 19, Color(0.78, 0.8, 0.6))
 	for sx in [-8, 8]:
 		b.draw_arc(f + Vector2(sx, -3), 6, 0, TAU, 16, Color(0.2, 0.2, 0.2), 2)
 		b.draw_circle(f + Vector2(sx, -3), 2, Color(0.15, 0.15, 0.15))
 	b.draw_line(f + Vector2(-2, -3), f + Vector2(2, -3), Color(0.2, 0.2, 0.2), 2)
+	var talking := speaking == "nana" and Snd.voice_player != null and Snd.voice_player.playing
+	var mo := 3.0 + (absf(sin(ct * 14.0)) * 4.0 if talking else 0.0)
 	b.draw_arc(f + Vector2(0, 6), 6, 0.3, PI - 0.3, 10, Color(0.35, 0.2, 0.15), 2)
-	# signal bars
+	if talking: b.draw_circle(f + Vector2(0, 9), mo * 0.5, Color(0.35, 0.15, 0.12))
 	for i in 4:
 		var h := 6.0 + i * 5.0
 		var on := (int(ct * 4.0) % 5) > i
