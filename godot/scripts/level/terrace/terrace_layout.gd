@@ -223,7 +223,12 @@ static func _bazaar(L: Node3D) -> void:
 # ------------------------------------------------------------------ Tea Terrace (x -80..-62, z 12..30, y 3.6)
 static func _tea_terrace(L: Node3D) -> void:
 	var y := 3.6
-	TK.model(MODELS + "tea_house.glb", Vector3(-71.5, y, 19.0), 0.25, 6.2, true, 0.72)
+	TK.model(MODELS + "tea_house.glb", Vector3(-71.5, y, 19.0), 0.25, 6.2, false)
+	# stepped colliders that follow the walls and the domed roof, so the roof is a (secret) climb
+	var tb := Basis(Vector3.UP, 0.25)
+	TK.solid(Vector3(-71.5, y + 1.5, 19.0), Vector3(6.2, 3.0, 6.2), tb)
+	TK.solid(Vector3(-71.5, y + 2.3, 19.0), Vector3(4.4, 4.6, 4.4), tb)
+	TK.solid(Vector3(-71.5, y + 2.95, 19.0), Vector3(2.2, 5.9, 2.2), tb)
 	life.kettle_pos = Vector3(-71.5, y + 5.0, 19.0)
 	DocksDressing.steam(TK.root, Vector3(-70.2, y + 6.0, 19.6), 0.6)
 	for i in 6:
@@ -287,7 +292,7 @@ static func _loft(L: Node3D) -> void:
 	TK.tree(Vector3(-97.0, y, 19.0), 2.4, "blossom")
 	TK.tree(Vector3(-83.4, y, 19.0), 2.0)
 	TK.tree(Vector3(-94.5, y, 6.9), 2.2)
-	for rp in [Vector3(-88.0, y, 17.6), Vector3(-87.5, y, 6.6)]:
+	for rp in [Vector3(-85.5, y, 17.6), Vector3(-87.5, y, 6.6)]:
 		TK.post(rp + Vector3(-0.8, 0, 0), 2.4, 0.06, "wood_dark"); TK.post(rp + Vector3(0.8, 0, 0), 2.4, 0.06, "wood_dark")
 		TK.add(TK.box_mesh(), TK.mat("wood"), TK.tf(rp + Vector3(0, 2.35, 0), Vector3(1.9, 0.1, 0.1)))
 		for i in 4: TK.lantern(rp + Vector3(-0.6 + i * 0.4, 1.95, 0), 0.75, ["lantern", "lantern_teal", "lantern_red", "lantern"][i])
@@ -484,6 +489,7 @@ static func _spots(L: Node3D) -> void:
 	for x in [-59.5, -57.5, -55.5, -53.5]: sp.append(Vector3(x, -2.3, 58.2))                              # wash nook
 	for z in [14.8, 16.2]: sp.append(Vector3(-79.0, 4.5, z))                                              # under the loft stairs
 	sp.append(Vector3(-79.2, 0.9, 32.6))                                                                  # behind the bazaar stairs
+	for i in 4: sp.append(Vector3(-71.5 + cos(i * TAU / 4 + 0.6) * 0.9, 10.4, 19.0 + sin(i * TAU / 4 + 0.6) * 0.9))  # tea house roof                                                                  # behind the bazaar stairs
 	for p in sp: life.add_sprocket(p)
 	life.triggers = [
 		{ rect = Rect2(-80, 12, 18, 18), y = 3.6, ids = ["terrace_tea_1", "terrace_tea_2"] },
@@ -493,7 +499,7 @@ static func _spots(L: Node3D) -> void:
 	]
 	var spots := {
 		bazaar = [Vector3(-65, 0.1, 47), PI], tea = [Vector3(-66, 3.7, 28), -2.6], loft = [Vector3(-84.5, 7.9, 12), -PI / 2],
-		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-49.5, 4.1, -20.5), 0.15], perch = [Vector3(-93, 12.7, 23.5), PI],
+		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-49.5, 4.1, -20.5), 0.15], perch = [Vector3(-93, 12.7, 23.5), PI], roof = [Vector3(-78.6, 7.9, 15.6), PI / 2],
 	}
 	for k in spots: L.debug_spots["terrace_" + k] = spots[k]
 	# debug_spots is filled after the area files run, so honour --at=terrace_* here
