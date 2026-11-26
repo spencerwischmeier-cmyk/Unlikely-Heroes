@@ -517,14 +517,8 @@ func _build_terrace() -> void:
 	var gd := rect(-30, -5, 20, 18)
 	island("gardens", gd, 8.8, Color(0.88, 0.96, 0.9))
 	island("promenade", rect(-23, -27, 6, 26), 8.8, Color(0.88, 0.96, 0.9), 0.8)
-	var leaf := M.std(Color(0.31, 0.72, 0.42), 0.0, 0.7)
-	for p in [[-36, 0, 4, 2.4], [-26, -10, 4, 2.4], [-37, -8, 2.4, 4], [-27, 1, 2.4, 3]]:
-		block(p[0], p[1], p[2], p[3], 0.8, 8.8, mat_white, false)
-		for i in 6:
-			var s := SphereMesh.new(); s.radius = randf_range(0.35, 0.65); s.height = s.radius * 2.4
-			mesh_at(s, leaf, Vector3(p[0] + randf_range(-p[2] / 2 + 0.5, p[2] / 2 - 0.5), 9.9, p[1] + randf_range(-p[3] / 2 + 0.5, p[3] / 2 - 0.5)))
-	label("ROOF GARDENS", Vector3(-30, 8.8, -3), 6, Color(0.78, 1, 0.82))
-	for p in [Vector2(-21, -6), Vector2(-21, -38)]: lamp(p.x, p.y, Color(1, 0.85, 0.55), 8.8)
+	# (flower beds, lawns, lamps and the rest of the planting are in scripts/level/areas/gardens.gd)
+	lamp(-21, -38, Color(1, 0.85, 0.55), 8.8)
 	checkpoints.append({ pos = Vector3(-30, 8.9, -5), r = 3.0 })
 	checkpoints.append({ pos = Vector3(-23, 8.9, -37), r = 2.4 })
 	# gull-nest ledge (Lucky Washer): planter, then a high ledge over tier 4

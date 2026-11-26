@@ -110,6 +110,16 @@
  ["sky_outro_nana_6","nana","[chuckles] Oh, I hear everything, dear."],
  ["sky_outro_liftoff_1","dodger","[rattling] Liftoff: six out of ten. You forgot the handbrake."]
 ],
+"gardens": [
+ ["gardens_dome_1","dodger","[amazed] A glass bubble full of fish! Somebody up here really hates windows that open."],
+ ["gardens_dome_2","vesk","[grumbling] Smells like wet socks and roses."],
+ ["gardens_tree_1","vesk","[flatly] A tree. Growing out of the sky. Sure. Why not."],
+ ["gardens_crown_1","dodger","[excited] Look at that view! You can see your junkyard from here! ...It still looks like a junkyard."],
+ ["gardens_zip_1","vesk","[yelling] I am too old for vines!"],
+ ["gardens_hive_1","dodger","[whispering] Pollinator drones. Don't make eye contact. They only respect flowers."],
+ ["gardens_bot_1","dodger","[curious] That gardening bot hasn't gone haywire. Probably too busy judging your boots."],
+ ["gardens_look_1","dodger","[nervous] A rope bridge, way up here. Cool. I'll just hover. Like I always do. Because I'm smart."]
+],
 "dodger": {
  "spawn": ["Hey, bolt-brains! Over here! No, the other over here!", "Incoming bots. Try to look busy.", "More of them? Somebody's factory is working overtime.", "Rust buckets at twelve o'clock. Also two, four and nine.", "Bots inbound. I'll supervise.", "Oh good, a crowd. I love an audience."],
  "taunt": ["You call that rolling? My grandma had better bearings!", "Nice paint job. Did a toaster pick it?", "Beep boop, you're scrap.", "I've seen scarier vending machines. Actually, I know one."],
