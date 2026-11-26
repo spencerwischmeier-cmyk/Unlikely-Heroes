@@ -29,10 +29,11 @@ func _initialize() -> void:
 	var cam := Camera3D.new(); cam.fov = 40; root3.add_child(cam)
 	match which:
 		"bots":
-			_add_model("res://models/roller.glb", Vector3(-2.4, 0, 0))
-			_add_model("res://models/crew_roller.glb", Vector3(-0.8, 0, 0))
-			_add_model("res://models/hornet.glb", Vector3(0.9, 1.3, 0))
-			_add_model("res://models/crew_barricade.glb", Vector3(2.9, 0, -0.4))
+			_add_script("res://scripts/enemy_roller.gd", Vector3(-2.4, 0, 0), 0.3)
+			_add_script("res://scripts/enemy_crew_roller.gd", Vector3(-0.8, 0, 0), 0.3)
+			_add_script("res://scripts/enemy_hornet.gd", Vector3(0.9, 1.3, 0), 0.0)
+			var b := _add_script("res://scripts/crew_barricade.gd", Vector3(2.9, 0, -0.4), 0.0)
+			b.set("rise", 1.0)
 			_aim(cam, Vector3(0.2, 1.7, 7.2), Vector3(0.2, 0.8, 0))
 		"gizmart":
 			var g: Node3D = load("res://scripts/chars/gizmart_actor.gd").new(); root3.add_child(g)
@@ -57,6 +58,11 @@ func _initialize() -> void:
 
 func _aim(cam: Camera3D, pos: Vector3, at: Vector3) -> void:
 	cam.transform = Transform3D(Basis.looking_at(at - pos), pos)
+
+func _add_script(path: String, pos: Vector3, yaw: float) -> Node3D:
+	var m: Node3D = load(path).new(); root3.add_child(m); m.position = pos; m.rotation.y = yaw
+	actors.append(m)
+	return m
 
 func _add_model(path: String, pos: Vector3) -> Node3D:
 	var m: Node3D = load(path).instantiate(); root3.add_child(m); m.position = pos

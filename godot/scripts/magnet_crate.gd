@@ -5,6 +5,7 @@ extends AnimatableBody3D
 
 const Kit := preload("res://scripts/kit.gd")
 const SIZE := 1.6
+const ScrapBurst := preload("res://scripts/chars/scrap_burst.gd")
 
 var hp := 4.0
 var dead := false
@@ -57,6 +58,7 @@ func smash(drop := true) -> void:
 	remove_from_group("targets"); collision_layer = 0
 	var c := center()
 	FX.explosion(c, 0.7, glow_mats.slice(0, 1)); FX.shake(0.4)
+	ScrapBurst.burst(get_parent(), c, 1.2, glow_mats.slice(0, 2), 8)
 	Snd.at("crate_break", c, 0)
 	if drop and combat: combat.drop_nuts(c, 3)
 	queue_free()

@@ -6,6 +6,7 @@ extends StaticBody3D
 signal broken(b)
 
 const W := 2.4
+const ScrapBurst := preload("res://scripts/chars/scrap_burst.gd")
 var hp := 5.0
 var dead := false
 var rise := 0.0           # 0..1 while being built
@@ -22,8 +23,19 @@ func _ready() -> void:
 	collision_layer = 1 | 4
 	collision_mask = 0
 	add_to_group("targets"); add_to_group("barricade")
-	model = load("res://models/crew_barricade.glb").instantiate()
+	var meshy := ResourceLoader.exists("res://models/chars/crew_barricade.glb")
+	model = load("res://models/chars/crew_barricade.glb" if meshy else "res://models/crew_barricade.glb").instantiate()
 	add_child(model)
+	if meshy:
+		# squat the Meshy barricade to the 1.3 m collision box; its painted lamp gets a glowing cover
+		for c in model.get_children(): (c as Node3D).scale = Vector3(1.0, 0.68, 0.6)
+		var lm := SphereMesh.new(); lm.radius = 0.1; lm.height = 0.2; lm.radial_segments = 12; lm.rings = 6
+		var lamp_mi := MeshInstance3D.new(); lamp_mi.mesh = lm; lamp_mi.position = Vector3(0.98, 1.42, 0.0)
+		lamp_mi.scale = Vector3(1.0, 1.0, 1.0); lamp_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var lmat := StandardMaterial3D.new(); lmat.albedo_color = Color(1, 0.5, 0.1); lmat.emission_enabled = true
+		lmat.emission = Color(1, 0.45, 0.08); lmat.emission_energy_multiplier = 6.0
+		model.add_child(lamp_mi)
+		lamp_mi.set_surface_override_material(0, lmat)
 	for mi in model.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		for s in (mi as MeshInstance3D).mesh.get_surface_count():
@@ -59,6 +71,7 @@ func smash(quiet := false) -> void:
 	collision_layer = 0
 	var c := center()
 	FX.explosion(c, 0.6, flash_mats.slice(0, 1))
+	ScrapBurst.burst(get_parent(), c, 1.3, flash_mats.slice(0, 2), 9)
 	FX.puff(c, Color(1, 0.85, 0.6))
 	if not quiet:
 		Snd.at("crate_break", c, 0)

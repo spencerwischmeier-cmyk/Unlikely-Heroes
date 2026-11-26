@@ -232,6 +232,10 @@ func _damage_fx(dt: float) -> void:
 		var k := cab_squash * (0.5 + 0.5 * sin(t * 30.0))
 		cab_model.scale = Vector3.ONE * 1.25 * Vector3(1.0 + k * 0.05, 1.0 - k * 0.04, 1.0 + k * 0.05)
 	if state in ["off", "intro"] or stacks.is_empty(): return
+	# slam tell: the magnet crackles and its coil arcs while it charges over Vesk
+	if state == "slam" and randf() < dt * (14.0 if st_t < 0.6 else 6.0):
+		var a := randf() * TAU
+		FX.sparks(magnet.global_position + Vector3(cos(a) * 1.2, -0.3, sin(a) * 1.2), Color(1, 0.45, 0.3), 5, 3.5)
 	var f := hp / BOSS_HP
 	smoke_t -= dt
 	if f < 0.66 and smoke_t <= 0.0:

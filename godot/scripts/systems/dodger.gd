@@ -80,6 +80,7 @@ func _on_zone_entered(id: String) -> void:
 	if id == "junk_crash" and state == "crashed":
 		# perks up when Vesk climbs over
 		drone.dim = 0.2
+		_emote("surprised", 1.2)
 		var tw := drone.create_tween()
 		tw.tween_property(drone, "tilt", Vector3(0.5, 0.2, 0.6), 0.25).set_trans(Tween.TRANS_BACK)
 		tw.tween_property(drone, "tilt", Vector3(0.9, 0.4, 1.2), 0.4)
@@ -90,6 +91,8 @@ func _on_zone_cleared(id: String) -> void:
 func _launch() -> void:
 	state = "launch"
 	var p := drone.global_position
+	_emote("happy", 2.5)
+	Snd.at("chars_dodger_happy", p, -4, 0.0)
 	FX.sparks(p + Vector3(0, 0.3, 0), Color(1, 0.75, 0.3), 16, 5.0)
 	FX.ring(p, Color(0.4, 0.9, 1.0), 1.2)
 	Snd.at("double_jump", p, -2)

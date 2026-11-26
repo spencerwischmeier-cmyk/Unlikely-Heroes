@@ -57,6 +57,9 @@ P = {
             "bottom edge, hazard stripes, dents." + LIV, None),
  'roller_head': ("Scrap Roller head: a dome-shaped robot head unit that sits on top of a ball, wide helmet with a single big round glowing "
                  "red eye lens in front, two small horns, a rim around the base, little exhaust pipes on the back." + LIV, None),
+ 'barricade': ("Work-crew road barricade: a sturdy portable construction roadblock, two thick horizontal planks painted with bold "
+               "diagonal hazard stripes, mounted on chunky A-frame steel legs with flat feet, big bolts, a small round amber warning "
+               "lamp on top of one end, front view, wide and low, no text." + LIV, None),
  'crew_head': ("Work-crew robot head: a dome-shaped robot head unit that sits on top of a rolling ball, wearing a chunky yellow hard hat "
                "with a lamp, one big round glowing amber eye lens with a grumpy brow, a rim around the base, a small radio antenna." + LIV, None),
 }

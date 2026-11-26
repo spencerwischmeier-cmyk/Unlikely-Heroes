@@ -33,6 +33,14 @@ static func burst(parent: Node, pos: Vector3, scale := 1.0, livery_mats: Array =
 	parent.add_child(b)
 	b.global_position = pos
 	b.call("_find_ground", pos)
+	# paint the shards with the bot's livery, minus any hit flash or charge glow it had on
+	var paint: Array = []
+	for m in livery_mats:
+		if m is StandardMaterial3D and (m as StandardMaterial3D).emission_enabled:
+			var c := (m as StandardMaterial3D).duplicate() as StandardMaterial3D
+			c.emission_enabled = false; paint.append(c)
+		elif m is Material: paint.append(m)
+	livery_mats = paint
 	for i in count:
 		var mi := MeshInstance3D.new()
 		var plate := i % 3 == 2
