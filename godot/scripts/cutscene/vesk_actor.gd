@@ -441,15 +441,17 @@ func _process(dt: float) -> void:
 	if tp != Vector3.INF and hb >= 0:
 		var hp := sk.global_transform * sk.get_bone_global_pose(hb).origin
 		var d := sk.global_transform.basis.inverse() * (tp - hp)
-		want_y = clampf(atan2(d.x, d.z), -1.15, 1.15)
-		want_p = clampf(atan2(d.y, Vector2(d.x, d.z).length()), -0.5, 0.45)
+		want_y = clampf(atan2(d.x, d.z), -1.0, 1.0)
+		want_p = clampf(atan2(d.y, Vector2(d.x, d.z).length()), -0.45, 0.28)
 	var k := 1.0 - exp(-6.0 * dt)
 	_yaw = lerpf(_yaw, want_y + head_turn, k)
 	_pitch = lerpf(_pitch, want_p, k)
 	var nod := talk * (sin(t * 6.5) * 0.045 + sin(t * 2.7) * 0.03)
 	if absf(_yaw) > 0.001 or absf(_pitch) > 0.001 or absf(nod) > 0.001:
-		_rot_global("neck", Vector3.UP, _yaw * 0.4)
-		_rot_global("head", Vector3.UP, _yaw * 0.6)
+		# share the turn down the spine so the head never twists into the shoulder armour
+		_rot_global("spine", Vector3.UP, _yaw * 0.3)
+		_rot_global("neck", Vector3.UP, _yaw * 0.3)
+		_rot_global("head", Vector3.UP, _yaw * 0.4)
 		_rot_global("neck", Vector3.RIGHT, -_pitch * 0.4)
 		_rot_global("head", Vector3.RIGHT, -_pitch * 0.6 + nod)
 	_acting(dt)

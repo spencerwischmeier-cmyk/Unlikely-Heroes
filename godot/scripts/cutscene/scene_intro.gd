@@ -24,7 +24,7 @@ func run() -> void:
 	var bench_top := bench.y - 0.05
 	# actors: seated with the real chair clip when it exists, else the procedural fold
 	var vesk: Node3D = C.make_vesk(chair_pos, PI)
-	var sit_off := Vector3(0, 0.52, 0.12) if vesk.can_sit() else Vector3(0, 0.27, 0.06)
+	var sit_off := Vector3(0, 0.33, 0.2) if vesk.can_sit() else Vector3(0, 0.27, 0.06)
 	vesk.global_position = chair_pos + sit_off
 	if vesk.can_sit():
 		vesk.play("cs_sit_drink", 0.0)
@@ -32,7 +32,9 @@ func run() -> void:
 		vesk.sit = 1.0; vesk.slump = 1.0
 	vesk.hold_mug(true)
 	# camera heights for the seated shots (the real sitting clip sits him up on the chair)
-	var seat: Vector3 = chair_pos + Vector3(0, 0.5 if vesk.can_sit() else 0.0, 0)
+	var seat: Vector3 = chair_pos + Vector3(0, 0.31 if vesk.can_sit() else 0.0, 0)
+	# where Dodger hovers while he pesters Vesk: in front and to his left, a little above eye line
+	var dspot: Vector3 = seat + Vector3(0.8, 1.42, -0.9)
 	var dodger: Node3D = C.make_dodger(S.at(Vector3(-30, 9, 70)), PI * 0.5)
 	var coffee: Node3D = C.actor(Props.coffee_maker(), Vector3(bench.x + 0.95, bench_top, bench.z + 0.05), PI + 0.25, true)
 	var toaster: Node3D = C.actor(Props.toaster(), Vector3(bench.x - 0.75, bench_top, bench.z + 0.1), PI - 0.2, true)
@@ -42,11 +44,16 @@ func run() -> void:
 	# town bots for the montage: a dock worker and a mail hornet, hats ready to pop on
 	var dock_bot: Node3D = C.actor(C.model("res://models/roller.glb"), pier + Vector3(-3, 0, 2), 1.2)
 	var mail_bot: Node3D = C.actor(C.model("res://models/hornet.glb"), plaza + Vector3(4, 3.2, 6), -0.6)
+	var RollAnim := load("res://scripts/cutscene/roll_anim.gd")
+	for r in [roller, roller2, dock_bot]: r.add_child(RollAnim.new())
+	# the dock bot hauls a crate on its back
+	var cargo: Node3D = C.model("res://models/kit/crate_small.glb")
+	_ride(dock_bot, cargo, Vector3(0, 0.98, -0.05), 0.45)
 	var hats := []
 	for b in [dock_bot, mail_bot, roller]:
 		var h: Node3D = Props.hard_hat(0.28 if b != mail_bot else 0.22)
-		h.position = Vector3(0, 1.05 if b != mail_bot else 0.55, 0); h.scale = Vector3.ONE * 0.001
-		b.add_child(h); hats.append(h)
+		_ride(b, h, Vector3(0, 1.05 if b != mail_bot else 0.55, 0), 0.001)
+		hats.append(h)
 
 	var seated: bool = vesk.has_method("hold") and vesk.has("cs_sit_drink")
 	if seated: vesk.hold("cs_sit_drink", 2.6, 0.0)
@@ -71,7 +78,10 @@ func run() -> void:
 	C.mark("docks")
 	var dbp: Vector3 = dock_bot.global_position
 	C.cut(dbp + Vector3(-3.5, 1.1, 4.2), dbp + Vector3(0, 0.9, 0)); C.lens(35.0)
-	C.tw(dock_bot, "global_position", pier + Vector3(5, 0, 1), 9.0, 0.0, Tween.TRANS_LINEAR)
+	# roll, ease to a stop to let a gull pass, then carry on (eased, so the roll reads as weight)
+	var dmid: Vector3 = dbp.lerp(pier + Vector3(5, 0, 1), 0.45)
+	C.tw(dock_bot, "global_position", dmid, 3.8, 0.3, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
+	C.tw(dock_bot, "global_position", pier + Vector3(5, 0, 1), 4.6, 4.6, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
 	C.follow_node = dock_bot; C.follow_off = Vector3(-3.2, 1.2, 4.4)
 	C.look_node = dock_bot; C.look_off = Vector3(1.5, 0.9, 0)
 	C.focus_on(dock_bot, Vector3(0, 0.8, 0), 0.0, 0.5)
@@ -118,7 +128,7 @@ func run() -> void:
 	C.light(vh, "soft", 1.0)
 	C.setv(dodger, "global_position", chair_pos + Vector3(-9, 5, -14))
 	C.tw(dodger, "global_position", chair_pos + Vector3(4, 3.0, -6), 1.2, 0.0, Tween.TRANS_SINE, Tween.EASE_OUT)
-	C.tw(dodger, "global_position", seat + Vector3(1.25, 1.55, -0.3), 1.1, 1.2, Tween.TRANS_BACK, Tween.EASE_OUT)
+	C.tw(dodger, "global_position", dspot, 1.1, 1.2, Tween.TRANS_BACK, Tween.EASE_OUT)
 	C.tw(dodger, "rotation:y", PI + 0.6, 0.8, 1.2)
 	C.look_node = dodger; C.look_off = Vector3(0, -0.3, 0)
 	C.fx(func(): Snd.play("cutscenes_whoosh", -6); Snd.at("dash", dodger.global_position, -8))
@@ -128,7 +138,7 @@ func run() -> void:
 	dodger.look_target = vesk
 	dodger.act("spin")
 	# Dodger, close: Vesk soft over his shoulder
-	C.cut(seat + Vector3(1.0, 1.75, -1.75), seat + Vector3(1.25, 1.55, -0.3)); C.lens(50.0)
+	C.cut(seat + Vector3(-0.42, 1.32, 0.42), dspot); C.lens(40.0)   # over Vesk's shoulder
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.9)
 	C.light(dodger, "soft", -1.0, 0.0)
 	await C.say("intro_05", 0.4)
@@ -165,7 +175,7 @@ func run() -> void:
 	C.light(vh, "golden", -1.0)
 	vesk.mood("tired", 0.3)
 	await C.say("cs_intro_gate_2", 0.3)
-	C.cut(seat + Vector3(1.6, 1.62, -1.6), seat + Vector3(1.25, 1.55, -0.3)); C.lens(60.0)
+	C.cut(seat + Vector3(-0.38, 1.3, 0.4), dspot); C.lens(50.0)
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 1.0)
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
@@ -483,6 +493,15 @@ func run() -> void:
 
 var _vesk: Node3D
 ## Close-up on Vesk's face: camera `dist` metres out at `az` degrees from where he faces (+ = his left).
+## Parent `n` to the bot's head ("cap") so it leans and bobs with it, at `off` from the bot's origin.
+func _ride(bot: Node3D, n: Node3D, off: Vector3, sc: float) -> void:
+	var cap: Node3D = bot.find_child("cap", true, false)
+	if cap == null:
+		bot.add_child(n); n.position = off; n.scale = Vector3.ONE * sc; return
+	cap.add_child(n)
+	n.global_position = bot.global_transform * off
+	n.global_basis = bot.global_basis.orthonormalized().scaled(Vector3.ONE * sc)
+
 func _cu(az: float, dist: float, mm: float, dy := 0.0) -> void:
 	var e: Vector3 = C.head_of(_vesk).global_position
 	var f := Vector3(sin(_vesk.rotation.y), 0, cos(_vesk.rotation.y)).rotated(Vector3.UP, deg_to_rad(az))
