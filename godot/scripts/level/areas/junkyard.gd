@@ -32,6 +32,8 @@ const LINES := [
 	["junkyard_crane_2", "vesk", "It gets bored."],
 	["junkyard_lookout_1", "vesk", "My thinking spot. No talking."],
 	["junkyard_lookout_2", "dodger", "Got it. ...Is whispering talking?"],
+	["junkyard_statue_1", "dodger", "Wait. Is that supposed to be me? My eye is way bigger than that."],
+	["junkyard_statue_2", "vesk", "It says approximate."],
 	["junkyard_garden_1", "dodger", "Your bolt garden looks great, Vesk. The washers are really blooming this year."],
 ]
 
@@ -65,6 +67,7 @@ static func _chatter(L, life) -> void:
 	life.talk(Rect2(36, 68, 10, 14), -1.0, 6.0, ["junkyard_crane_1", "junkyard_crane_2"])
 	life.talk(Rect2(-8, 131, 16, 12), -1.0, 2.0, ["junkyard_lookout_1", "junkyard_lookout_2"])
 	life.talk(Rect2(-17, 102, 10, 9), -1.0, 2.0, ["junkyard_garden_1"])
+	life.talk(Rect2(9.6, 97.5, 6, 6), -1.0, 2.0, ["junkyard_statue_1", "junkyard_statue_2"])
 
 # ---------------------------------------------------------------- the tutorial yard (dressing only)
 static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
@@ -213,6 +216,27 @@ static func _home(L, B, rng: RandomNumberGenerator, life) -> void:
 	JK.litter(B, rng, Rect2(-17.5, 96.5, 35, 15), 0.0, 40, [Rect2(-7, 96, 9, 7), Rect2(-3, 96, 6, 17), Rect2(9, 104.5, 8, 6), Rect2(13.5, 102.5, 3.5, 5.5)])
 	L.lamp(-2.4, 110.8, Color(1, 0.72, 0.42))
 	life.creaks.append(tank_c + Vector3(0, 2, 0))
+	# lawn ornament: a welded scrap statue of Dodger, roughly
+	var st := Vector3(12.6, 0, 101.0)
+	L.box(st + Vector3(0, 0.35, 0), Vector3(1.4, 0.7, 1.4), JK.mat("rust"))
+	var body := MeshInstance3D.new(); body.mesh = JK.mesh("ball"); body.material_override = JK.paint(JK.CREAM)
+	body.position = st + Vector3(0, 1.55, 0); body.scale = Vector3.ONE * 1.5; L.add_child(body)
+	var band := MeshInstance3D.new(); var bt := TorusMesh.new(); bt.inner_radius = 0.72; bt.outer_radius = 0.8; band.mesh = bt
+	band.material_override = JK.paint(JK.ORANGE); band.position = st + Vector3(0, 1.55, 0); L.add_child(band)
+	var eye := MeshInstance3D.new(); var em := CylinderMesh.new(); em.top_radius = 0.28; em.bottom_radius = 0.3; em.height = 0.12; eye.mesh = em
+	eye.material_override = JK.mat("glow_cyan"); eye.rotation.x = PI / 2; eye.position = st + Vector3(0, 1.62, -0.72); L.add_child(eye)
+	for sd in [-1, 1]:
+		var arm: MeshInstance3D = L.box(st + Vector3(sd * 0.95, 1.7, 0), Vector3(0.5, 0.08, 0.08), JK.mat("dark"), false)
+		var rot := Node3D.new(); rot.position = st + Vector3(sd * 1.2, 1.78, 0); L.add_child(rot)
+		L.box(Vector3.ZERO, Vector3(0.9, 0.03, 0.12), JK.paint(JK.TEAL), false, rot)
+		L.box(Vector3.ZERO, Vector3(0.12, 0.03, 0.9), JK.paint(JK.TEAL), false, rot)
+		life.spin(rot, Vector3.UP, 0.7 * sd)
+	JK.sign(L, "DODGER (APPROX.)", st + Vector3(0, 0, -0.95), PI, 1.3, 0.3, 0.25, Color(1, 0.9, 0.6), Color(0.35, 0.22, 0.12), 0.3)
+	# steam vents poking out of the yard floor
+	for v in [Vector3(-14.2, 0, 99.5), Vector3(16.4, 0, 100.4)]:
+		L.cyl(v + Vector3(0, 0.45, 0), 0.18, 0.22, 0.9, JK.mat("dark"), 10)
+		L.cyl(v + Vector3(0, 0.92, 0), 0.24, 0.24, 0.08, JK.mat("brass"), 10)
+		DocksDressing.steam(L, v + Vector3(0, 1.0, 0), 0.45)
 
 static func _chimes(L, B, life, pos: Vector3, h: float) -> void:
 	L.cyl(pos + Vector3(0, h / 2, 0), 0.06, 0.09, h, JK.mat("dark"), 8)
