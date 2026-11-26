@@ -38,6 +38,17 @@ const LAYERS := {
 	"lobber_fire": [["thump_launch", -4.0, 0.0]],
 	"seeker_fire": [["seeker_whir", -6.0, 0.02]],
 }
+## big hits briefly push the music down (how many dB), so they land with weight
+const IMPACTS := {"explode_big": 4.0, "crane_slam": 4.0, "relay_destroy": 5.0, "boss_defeat": 6.0, "lobber_explode": 2.0,
+	"hurt": 2.5, "crate_break": 1.0}
+var impact := 0.0
+func _impact(depth: float, pos) -> void:
+	var near := 1.0
+	if pos != null:
+		var cam := get_viewport().get_camera_3d()
+		if cam: near = clampf(1.0 - ((pos as Vector3).distance_to(cam.global_position) - 10.0) / 30.0, 0.0, 1.0)
+	impact = maxf(impact, depth * near)
+
 ## how many copies of one sound may ring at once (the oldest is cut)
 const MAX_INST := {"step": 2, "blaster": 3, "bolt_hit": 3, "nut_pickup": 3, "melee_hit": 3, "debris": 2,
 	"explode_sub": 2, "hornet_buzz": 2, "roller_roll": 2, "crane_move": 2}
@@ -127,6 +138,7 @@ func play(n: String, db := 0.0, pitch_var := 0.06, gap := 0.03) -> void:
 	if pitch_var > 0.0: db += randf_range(-1.0, 0.4)
 	_play2(pick(n), db, pitch, n)
 	_layers(n, db, pitch, null)
+	if IMPACTS.has(n): _impact(IMPACTS[n], null)
 
 func _play2(c: String, db: float, pitch: float, key: String) -> void:
 	if c == "" or not streams.has(c): return
@@ -139,6 +151,7 @@ func at(n: String, pos: Vector3, db := 0.0, pitch_var := 0.08, gap := 0.03) -> v
 	if pitch_var > 0.0: db += randf_range(-1.0, 0.4)
 	_play3(pick(n), pos, db, pitch, n)
 	_layers(n, db, pitch, pos)
+	if IMPACTS.has(n): _impact(IMPACTS[n], pos)
 
 func _play3(c: String, pos: Vector3, db: float, pitch: float, key: String) -> void:
 	if c == "" or not streams.has(c): return
@@ -306,12 +319,13 @@ func set_track(t: String, fade := 1.5, db := 0.0) -> void:
 func _music_process(dt: float) -> void:
 	if sting_t > 0.0: sting_t -= dt
 	sting_duck = move_toward(sting_duck, 1.0 if sting_t > 0.0 else 0.0, dt * (5.0 if sting_t > 0.0 else 0.8))
+	impact = move_toward(impact, 0.0, dt * 6.0)
 	for k in tracks:
 		var tr: Dictionary = tracks[k]
 		var want := 1.0 if k == track else 0.0
 		tr.fade = move_toward(tr.fade, want, dt * tr.rate)
 		var p: AudioStreamPlayer = tr.p
-		p.volume_db = music_db + tr.db + linear_to_db(maxf(tr.fade, 0.001)) - sting_depth * sting_duck
+		p.volume_db = music_db + tr.db + linear_to_db(maxf(tr.fade, 0.001)) - sting_depth * sting_duck - impact
 		if tr.fade <= 0.0 and p.playing:
 			tr.pos = p.get_playback_position(); p.stop()
 
