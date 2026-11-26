@@ -43,10 +43,12 @@ static func build(L: Node3D) -> void:
 	_spire(L, fx)
 	_deck_crown(L, fx)
 	_gallery(L, fx)
+	_landing(L, fx)
 	_east_route(L, fx)
 	_pylon(L, fx)
 	_cables(L, fx)
 	_perches(L, fx)
+	_sky(L, fx)
 	_dish_beam(L, fx)
 	flush(L)
 	_story(L)
@@ -556,6 +558,18 @@ static func _gallery(L: Node3D, fx: Node3D) -> void:
 	cable(root, Vector3(9.0, 9.4, -41.4), Vector3(C.x - 1.9, 9.6, C.z - 1.9), 0.5, 0.08, mats.rubber, 8)
 	cable(root, Vector3(14.6, 10.8, -27.6), Vector3(C.x + 0.3, 11.0, C.z + 1.9), 0.4, 0.07, mats.rubber, 8)
 
+## the east landing (3), where the docks' hook chain drops you: a little loading stop at the mast's foot
+static func _landing(L: Node3D, fx: Node3D) -> void:
+	L.prop("crate_large", Vector3(25.2, 3.0, -38.8), 0.3)
+	L.prop("crate_small", Vector3(25.0, 4.6, -38.9), 0.9)
+	L.prop("barrel", Vector3(31.2, 3.0, -39.0), 0.0)
+	L.prop("barrel", Vector3(30.4, 3.0, -39.3), 1.1)
+	DocksDressing.place(L, "cable_spool", Vector3(31.0, 3.0, -29.0), 0.4, 1.3, true)
+	L.lamp(31.6, -28.4, Color(0.4, 0.95, 1.0), 3.0)
+	L.label("SIGNAL MAST", Vector3(28.4, 3.0, -35.2), 1.3, Color(1, 0.85, 0.6), PI / 2)
+	var fm := flag_mat(fx)
+	flag_pole(L, fx, Vector3(24.4, 3.0, -28.4), 4.0, Vector3(0.3, 0, 1).normalized(), Color(0.95, 0.85, 0.3), fm)
+
 # ================================================================= the long way up (east)
 static func _east_route(L: Node3D, fx: Node3D) -> void:
 	var root := Node3D.new(); root.name = "MastEast"; L.add_child(root)
@@ -753,6 +767,23 @@ static func _cables(L: Node3D, fx: Node3D) -> void:
 		var u := 0.25 + k * 0.25
 		sphere(root, a.lerp(b, u) - Vector3(0, 4.0 * 4.0 * u * (1.0 - u), 0) - Vector3(0, 0.3, 0), 0.3, M.paint(Color(0.95, 0.45, 0.15)))
 
+## life in the sky round the mast: a slow airship and gulls circling the spire
+static func _sky(L: Node3D, fx: Node3D) -> void:
+	DocksDressing.drift(DocksDressing.place(L, "airship", Vector3.ZERO, 0.0, 5.0, false), Vector3(46, 34, -74), Vector3(8, 38, -78), 55.0)
+	var wing := BoxMesh.new(); wing.size = Vector3(0.5, 0.03, 0.16)
+	var body := BoxMesh.new(); body.size = Vector3(0.1, 0.1, 0.34)
+	var wm := M.std(Color(0.95, 0.95, 0.92), 0.0, 0.8)
+	for i in 6:
+		var b := Node3D.new(); L.add_child(b)
+		var bm := MeshInstance3D.new(); bm.mesh = body; bm.material_override = wm; b.add_child(bm)
+		var wings := []
+		for sx in [-1, 1]:
+			var piv := Node3D.new(); piv.position.x = sx * 0.05; b.add_child(piv)
+			var w := MeshInstance3D.new(); w.mesh = wing; w.material_override = wm; w.position.x = sx * 0.25; piv.add_child(w)
+			wings.append(piv)
+		fx.birds.append({ node = b, wings = wings, r = randf_range(5.0, 9.0), y = randf_range(33.0, 43.0), speed = randf_range(0.25, 0.4) * (1 if i % 2 == 0 else -1),
+			phase = randf() * TAU, flap = randf() * TAU })
+
 # ================================================================= risky perches with sprockets
 static func _perches(L: Node3D, fx: Node3D) -> void:
 	var root := Node3D.new(); root.name = "MastPerches"; L.add_child(root)
@@ -833,7 +864,8 @@ static func _story(L: Node3D) -> void:
 static func _debug(L: Node3D) -> void:
 	var spots := {
 		mast_catwalk = [Vector3(21.8, C1_Y + 0.1, -29.7), PI / 2],
-		mast_pylon = [Vector3(40.0, P1_Y + 0.1, -49.0), PI * 0.75],
+		mast_pylon = [Vector3(40.0, P1_Y + 0.1, -49.0), -1.05],
+		mast_gallery = [Vector3(22.0, 8.1, -27.0), -2.2],
 		mast_top = [Vector3(43.0, P2_Y + 0.1, -50.5), -1.03],
 		mast_view = [Vector3(30.0, 3.1, -31.0), -PI * 0.75],
 	}

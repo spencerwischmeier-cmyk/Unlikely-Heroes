@@ -36,6 +36,8 @@ var power_t := -1.0
 var last_target := Vector2.ZERO
 var crank_count := 0
 # ---- sound
+var birds: Array = []         # { node, wings: [Node3D, Node3D], r, y, speed, phase, flap }
+var ping_t := 0.0
 var players: Array = []        # AudioStreamPlayer3D pool for one-shots
 var hum: AudioStreamPlayer3D
 var streams := {}
@@ -219,12 +221,27 @@ func _ambient(dt: float) -> void:
 			var sp: Vector3 = spark_spots.pick_random()
 			FX.sparks(sp, Color(0.45, 0.95, 1.0) if powered else Color(1, 0.65, 0.25), 8, 3.5)
 			play_at("mast_spark", sp, -10.0, 0.15)
+	for b in birds:
+		var a: float = t * b.speed + b.phase
+		var n: Node3D = b.node
+		n.position = Vector3(20.6 + cos(a) * b.r, b.y + sin(t * 0.7 + b.phase) * 0.8, -40.6 + sin(a) * b.r)
+		n.rotation.y = -a + (PI if b.speed > 0 else 0.0)
+		n.rotation.z = -0.35 * signf(b.speed)
+		var fl := sin(t * 9.0 + b.flap) * 0.6 if fmod(t * 0.3 + b.flap, 2.0) < 1.2 else 0.1
+		b.wings[0].rotation.z = fl; b.wings[1].rotation.z = -fl
+	# the top beacon pings softly when you are near it
+	if p and p.global_position.distance_to(Vector3(20.6, 40, -40.6)) < 34.0:
+		ping_t -= dt
+		if ping_t <= 0.0:
+			ping_t = 1.0 / 0.75
+			play_at("mast_beacon", Vector3(20.6, 49.1, -40.6), -16.0, 0.02)
 	screen_t -= dt
 	for i in bars.size():
 		var b: MeshInstance3D = bars[i]
 		var h := 0.25 + 0.75 * absf(sin(t * (1.3 + i * 0.37) + i * 1.7)) * (1.0 if powered else 0.55 + 0.45 * float(int(t * 4.0 + i) % 3 == 0))
-		b.scale.y = lerpf(b.scale.y, h, 1.0 - exp(-8.0 * dt))
-		b.position.y = b.get_meta("y0") + b.scale.y * 0.5 * b.get_meta("h")
+		var full: float = b.get_meta("h")
+		b.scale.y = lerpf(b.scale.y, h * full, 1.0 - exp(-8.0 * dt))
+		b.position.y = b.get_meta("y0") - full * 0.5 + b.scale.y * 0.5
 	if screen_t <= 0.0:
 		screen_t = 0.45
 		for l: Label3D in screen_labels:
