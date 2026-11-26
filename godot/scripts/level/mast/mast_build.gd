@@ -26,6 +26,8 @@ const LAUNCH := Vector3(42.4, 23.0, -49.8)     # where the hook chain to the dec
 const HOOK1 := Vector3(37.8, 29.4, -47.0)
 const HOOK2 := Vector3(29.2, 29.4, -41.9)
 const RING_Y := 16.2                           # maintenance ring round the tower
+const HELIX_Y0 := 20.3                         # spiral catwalk round the spire: bottom (by the deck) ...
+const HELIX_Y1 := 28.4                         # ... and the lookout at the top
 const PERCH_C1 := Rect2(24.9, -27.9, 1.8, 1.8) # wind perch off the catwalk, top 12.8
 const PERCH_P2 := Rect2(49.4, -59.4, 2.6, 2.6) # storm perch off P2, top 24.6
 const PERCH_P2_Y := 24.6
@@ -286,7 +288,7 @@ static func flag_pole(parent: Node3D, fx: Node3D, base: Vector3, h: float, dir: 
 	sphere(parent, base + Vector3(0, h + 0.05, 0), 0.09, mats.brass)
 	pennant(parent, base + Vector3(0, h - 0.1, 0), dir, 2.2, col, mat)
 
-static func windsock(parent: Node3D, fx: Node3D, base: Vector3, h: float, dir: Vector3, gust := -1) -> void:
+static func windsock(parent: Node3D, fx: Node3D, base: Vector3, h: float, dir: Vector3, gust := "") -> void:
 	cylm(parent, base + Vector3(0, h * 0.5, 0), 0.05, 0.08, h, mats.white, 8)
 	var piv := Node3D.new(); piv.position = base + Vector3(0, h, 0); parent.add_child(piv)
 	var ring := TorusMesh.new(); ring.inner_radius = 0.22; ring.outer_radius = 0.28
@@ -384,30 +386,103 @@ static func _spire(L: Node3D, fx: Node3D) -> void:
 	cylm(root, s + Vector3(0, 46.5, 0), 0.03, 0.1, 5.0, mats.white, 8)
 	beacon(fx, root, s + Vector3(0, 49.1, 0), 0.32, true, 0.75, 0.0)
 	beacon(fx, root, s + Vector3(0, 44.2, 0), 0.24, false, 0.75, 0.0)
-	beacon(fx, root, s + Vector3(0.75, 32.0, 0), 0.2, false, 0.75, 0.5)
-	beacon(fx, root, s + Vector3(-0.75, 32.0, 0), 0.2, false, 0.75, 0.5)
+	beacon(fx, root, s + Vector3(0.55, 35.2, 0), 0.2, false, 0.75, 0.5)
+	beacon(fx, root, s + Vector3(-0.55, 35.2, 0), 0.2, false, 0.75, 0.5)
 	# yardarm with dangling whips, a crow's nest and a little dish
 	strut(root, s + Vector3(-2.6, 38.0, 0), s + Vector3(2.6, 38.0, 0), 0.14, mats.steel)
 	for x in [-2.4, -1.2, 1.2, 2.4]:
 		cylm(root, s + Vector3(x, 36.6, 0), 0.02, 0.03, 2.8, mats.white, 6)
 		sphere(root, s + Vector3(x, 35.2, 0), 0.07, mats.cyan)
-	boxm(root, s + Vector3(0, 28.0, 0), Vector3(2.4, 0.18, 2.4), mats.grate)
-	for e in [[Vector3(0, 28.55, -1.2), Vector3(2.4, 0.06, 0.06)], [Vector3(0, 28.55, 1.2), Vector3(2.4, 0.06, 0.06)],
-			[Vector3(-1.2, 28.55, 0), Vector3(0.06, 0.06, 2.4)], [Vector3(1.2, 28.55, 0), Vector3(0.06, 0.06, 2.4)]]:
+	boxm(root, s + Vector3(0, 33.0, 0), Vector3(2.0, 0.18, 2.0), mats.grate)
+	for e in [[Vector3(0, 33.55, -1.0), Vector3(2.0, 0.06, 0.06)], [Vector3(0, 33.55, 1.0), Vector3(2.0, 0.06, 0.06)],
+			[Vector3(-1.0, 33.55, 0), Vector3(0.06, 0.06, 2.0)], [Vector3(1.0, 33.55, 0), Vector3(0.06, 0.06, 2.0)]]:
 		boxm(root, s + e[0], e[1], mats.white)
-	var small := Kit.place(root, "dish_small", s + Vector3(0.6, 28.1, 0.6), PI * 0.25, 1.2, false)
+	var small := Kit.place(root, "dish_small", s + Vector3(0.5, 33.1, 0.5), PI * 0.25, 1.0, false)
 	if small: small.rotation.x = -0.3
 	# braces tying the spire to the tower
 	for y in [12.0, 16.0]:
 		strut(root, s + Vector3(-0.7, y, 0.7), Vector3(C.x + 1.8, y + 0.8, C.z - 1.8), 0.14, mats.steel)
 	# a flag from the crow's nest
-	flag_pole(root, fx, s + Vector3(-1.1, 28.1, -1.1), 2.6, Vector3(0, 0, 1), Color(0.95, 0.42, 0.18), flag_mat(fx))
+	flag_pole(root, fx, s + Vector3(-0.9, 33.1, -0.9), 2.6, Vector3(0, 0, 1), Color(0.95, 0.42, 0.18), flag_mat(fx))
+	_helix(L, fx, root)
+
+## a box collider (and optional mesh) with an arbitrary basis (columns scaled by size)
+static func obox(parent: Node3D, basis: Basis, size: Vector3, pos: Vector3, mat: Material, collide := true) -> void:
+	if mat:
+		var mi := MeshInstance3D.new(); mi.mesh = unit_box(); mi.material_override = mat
+		parent.add_child(mi); mi.transform = Transform3D(basis.scaled_local(size), pos)
+	if collide:
+		var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var sh := BoxShape3D.new(); sh.size = size
+		cs.shape = sh; sb.add_child(cs); parent.add_child(sb); sb.transform = Transform3D(basis, pos)
+
+## the spiral catwalk round the spire: from the dish deck's north-east corner (20) one and a half turns up to
+## a windy lookout (28.4) with sprockets
+static func _helix(L: Node3D, fx: Node3D, root: Node3D) -> void:
+	var s := SPIRE
+	var r := 1.95; var y0 := HELIX_Y0; var y1 := HELIX_Y1
+	var a0 := deg_to_rad(135.0); var turn := deg_to_rad(540.0); var n := 18
+	for i in n:
+		var aa := a0 + turn * i / n; var ab := a0 + turn * (i + 1) / n; var am := (aa + ab) * 0.5
+		var pa := Vector3(s.x + cos(aa) * r, lerpf(y0, y1, float(i) / n), s.z + sin(aa) * r)
+		var pb := Vector3(s.x + cos(ab) * r, lerpf(y0, y1, float(i + 1) / n), s.z + sin(ab) * r)
+		var rad := Vector3(cos(am), 0, sin(am))
+		var dir := (pb - pa).normalized()
+		var up := dir.cross(rad)
+		var x := rad
+		if up.y < 0: up = -up; x = -rad
+		var b := Basis(x, up, dir)
+		var mid := (pa + pb) * 0.5 + rad * 0.0
+		var len := pa.distance_to(pb) + 0.16
+		obox(root, b, Vector3(1.15, 0.16, len), mid - up * 0.08, mats.grate)
+		obox(root, b, Vector3(1.2, 0.05, len), mid - up * 0.2, mats.steel, false)
+		# outer rail (solid) and inner guard (solid, a thin pipe to look at)
+		obox(root, b, Vector3(0.08, 0.9, len), mid - rad * 0.62 + up * 0.45, null)
+		if i > 0:   # the first step is open on the outside: that's where the bridge from the deck joins
+			obox(root, b, Vector3(0.08, 1.05, len), mid + rad * 0.62 + up * 0.5, null)
+			strut(root, pa + rad * 0.62 + Vector3(0, 1.0, 0), pb + rad * 0.62 + Vector3(0, 1.0, 0), 0.07, mats.white)
+			strut(root, pa + rad * 0.62 + Vector3(0, 0.88, 0), pb + rad * 0.62 + Vector3(0, 0.88, 0), 0.03, mats.cyan)
+		strut(root, pa - rad * 0.62 + Vector3(0, 0.85, 0), pb - rad * 0.62 + Vector3(0, 0.85, 0), 0.05, mats.steel)
+		strut(root, pa + rad * 0.62, pa + rad * 0.62 + Vector3(0, 1.0, 0), 0.06, mats.white)
+		# a bracket back to the spire
+		strut(root, pa - rad * 0.55 - Vector3(0, 0.15, 0), Vector3(s.x, pa.y - 1.2, s.z) + rad * 0.45, 0.07, mats.steel)
+	# bridge from the deck corner onto the first step
+	var d0 := Vector3(C.x + 3.6, 20.0, C.z - 3.6)
+	var h0 := Vector3(s.x + cos(a0) * r, y0, s.z + sin(a0) * r)
+	var dir0 := (h0 - d0).normalized()
+	var side0 := dir0.cross(Vector3.UP).normalized()
+	var b0 := Basis(side0, dir0.cross(side0) if dir0.cross(side0).y > 0 else -dir0.cross(side0), dir0)
+	obox(root, b0, Vector3(1.1, 0.16, d0.distance_to(h0) + 0.3), (d0 + h0) * 0.5 - Vector3(0, 0.08, 0), mats.grate)
+	# the lookout at the top
+	var ae := a0 + turn
+	var rd := Vector3(cos(ae), 0, sin(ae))
+	var lc := Vector3(s.x, y1, s.z) + rd * 3.5
+	var lb := Basis(Vector3.UP, atan2(rd.x, rd.z))
+	var lx := lb.x; var lz := lb.z
+	var lr := Rect2(lc.x - 1.4, lc.z - 1.4, 2.8, 2.8)
+	obox(root, lb, Vector3(2.4, 0.24, 2.4), Vector3(lc.x, y1 - 0.12, lc.z), mats.grate)
+	for e in [[lz * 1.2, Vector3(2.4, 0.22, 0.2)], [lx * 1.2, Vector3(0.2, 0.22, 2.4)], [-lx * 1.2, Vector3(0.2, 0.22, 2.4)]]:
+		obox(root, lb, e[1], Vector3(lc.x, y1 - 0.08, lc.z) + e[0], mats.hazard, false)
+	# far railing (solid); the sides are open to the wind
+	obox(root, lb, Vector3(2.4, 1.05, 0.1), Vector3(lc.x, y1 + 0.52, lc.z) + lz * 1.2, null)
+	strut(root, Vector3(lc.x, y1 + 1.0, lc.z) + lz * 1.2 - lx * 1.2, Vector3(lc.x, y1 + 1.0, lc.z) + lz * 1.2 + lx * 1.2, 0.08, mats.white)
+	strut(root, Vector3(lc.x, y1 + 0.88, lc.z) + lz * 1.2 - lx * 1.2, Vector3(lc.x, y1 + 0.88, lc.z) + lz * 1.2 + lx * 1.2, 0.03, mats.cyan)
+	for k in [-1.2, 0.0, 1.2]: strut(root, Vector3(lc.x, y1, lc.z) + lz * 1.2 + lx * k, Vector3(lc.x, y1 + 1.0, lc.z) + lz * 1.2 + lx * k, 0.06, mats.white)
+	strut(root, Vector3(lc.x, y1 - 0.25, lc.z), Vector3(s.x, y1 - 3.2, s.z) + rd * 0.4, 0.14, mats.steel)
+	for i in 5: sprocket(L, fx, "helix%d" % i, Vector3(lc.x, y1, lc.z) + lx * (-0.8 + (i % 3) * 0.8) + lz * (-0.6 + (i / 3) * 0.9))
+	beacon(fx, root, Vector3(lc.x, y1 + 1.2, lc.z) + lz * 1.2 + lx * 1.2, 0.14, false, 0.75, 0.2)
+	# a coin-op viewer, because of course there is one
+	var vw := Node3D.new(); vw.position = Vector3(lc.x, y1, lc.z) + lz * 0.85 - lx * 0.8; vw.rotation.y = atan2(rd.x, rd.z); root.add_child(vw)
+	cylm(vw, Vector3(0, 0.55, 0), 0.08, 0.14, 1.1, mats.steel, 8)
+	boxm(vw, Vector3(0, 1.2, 0), Vector3(0.36, 0.3, 0.42), mats.teal)
+	for x in [-0.09, 0.09]: cylm(vw, Vector3(x, 1.24, 0.28), 0.07, 0.07, 0.2, mats.brass, 10).rotation.x = PI / 2
+	_gust(root, fx, "lookout", lr.grow(1.4), y1 - 1.0, y1 + 4.0, Vector3(1, 0, 0.3).normalized(), 3.5, 6.5, 1.2, [], lc + Vector3(0, 1, 0))
+	L.label("LOOKOUT", Vector3(lc.x, y1, lc.z) - lz * 0.2, 0.9, Color(1, 0.85, 0.5), atan2(rd.x, rd.z) + PI)
 
 static func _deck_crown(L: Node3D, fx: Node3D) -> void:
 	var root := Node3D.new(); root.name = "MastCrown"; L.add_child(root)
 	var fm := flag_mat(fx)
 	# beacon posts on the deck corners, windsock and pennants on the north-west corner
-	for s in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+	for s in [Vector2(-1, -1), Vector2(1, 1), Vector2(-1, 1)]:
 		var p := Vector3(C.x + s.x * 3.75, 20.0, C.z + s.y * 3.75)
 		cylm(root, p + Vector3(0, 0.45, 0), 0.08, 0.12, 0.9, mats.steel, 8)
 		beacon(fx, root, p + Vector3(0, 1.05, 0), 0.16, false, 0.75, 0.25)
@@ -420,9 +495,8 @@ static func _deck_crown(L: Node3D, fx: Node3D) -> void:
 	cable(root, Vector3(C.x - 3.5, 20.1, C.z + 1.2), Vector3(C.x - 0.5, 20.05, C.z - 0.2), 0.0, 0.07, mats.rubber, 4)
 	fx.spark_spots.append(Vector3(C.x - 3.5, 20.9, C.z + 1.2))
 	# bunting from the spire's crow's nest down to the deck corners and the gallery
-	bunting(root, fx, SPIRE + Vector3(0, 28.0, 0), Vector3(C.x + 3.75, 21.2, C.z - 3.75), 1.6, 14, fm)
-	bunting(root, fx, SPIRE + Vector3(0, 26.0, 0), Vector3(31.6, 6.5, -39.6), 3.0, 26, fm)
-	bunting(root, fx, SPIRE + Vector3(0, 24.0, 0), Vector3(5.4, 11.6, -42.6), 2.5, 26, fm)
+	bunting(root, fx, SPIRE + Vector3(0, 31.5, 0), Vector3(31.6, 6.5, -39.6), 3.0, 30, fm)
+	bunting(root, fx, SPIRE + Vector3(0, 30.5, 0), Vector3(5.4, 11.6, -42.6), 2.5, 30, fm)
 
 # ================================================================= the gallery (8)
 static func _gallery(L: Node3D, fx: Node3D) -> void:
@@ -462,7 +536,7 @@ static func _gallery(L: Node3D, fx: Node3D) -> void:
 		for k in 5:
 			sphere(bank, Vector3(x - 0.3 + k * 0.15, 1.2, 0.4), 0.035, [mats.cyan, mats.warm, M.glow(Color(1, 0.2, 0.2), 3.0)][(i + k) % 3])
 	# windsocks and flags on the gallery corners
-	windsock(root, fx, Vector3(22.4, 8.0, -25.6), 3.6, Vector3(0, 0, 1), 0)
+	windsock(root, fx, Vector3(22.4, 8.0, -25.6), 3.6, Vector3(0, 0, 1), "c1")
 	windsock(root, fx, Vector3(5.6, 8.0, -42.4), 3.6, Vector3(0.4, 0, 1).normalized())
 	flag_pole(root, fx, Vector3(5.6, 8.0, -25.6), 4.5, Vector3(0.2, 0, 1).normalized(), Color(0.95, 0.42, 0.18), fm)
 	flag_pole(root, fx, Vector3(22.4, 8.0, -42.4), 4.5, Vector3(0.2, 0, 1).normalized(), Color(0.95, 0.85, 0.3), fm)
@@ -504,8 +578,8 @@ static func _east_route(L: Node3D, fx: Node3D) -> void:
 		shelters.append(Rect2(bx + 0.05, C1.position.y, 1.3, C1.size.y))
 	# gusts from the north sweep the catwalk (and the little perch south of it)
 	var gr := Rect2(C1.position.x, C1.position.y - 0.5, C1.size.x, C1.size.y + 4.0)
-	_gust(root, fx, gr, C1_Y - 1.0, C1_Y + 5.0, Vector3(0, 0, 1), 5.0, 7.0, 0.0, shelters, Vector3(c.x, C1_Y + 1.5, c.y - 2.5))
-	windsock(root, fx, Vector3(30.3, C1_Y, C1.position.y + 0.15), 2.4, Vector3(0, 0, 1), 0)
+	_gust(root, fx, "c1", gr, C1_Y - 1.0, C1_Y + 5.0, Vector3(0, 0, 1), 5.0, 7.0, 0.0, shelters, Vector3(c.x, C1_Y + 1.5, c.y - 2.5))
+	windsock(root, fx, Vector3(30.3, C1_Y, C1.position.y + 0.15), 2.4, Vector3(0, 0, 1), "c1")
 	fx.loop_at("mast_flag_loop", Vector3(c.x, C1_Y + 1.5, c.y), -14.0, 4.0, 25.0)
 	var wl := Label3D.new(); wl.font_size = 44; wl.pixel_size = 0.005; wl.outline_size = 8; wl.set_meta("kind", "wind")
 	wl.position = Vector3(22.6, C1_Y + 2.3, C1.position.y + 0.02); wl.text = "WIND"; wl.modulate = Color(0.6, 0.95, 1)
@@ -546,7 +620,7 @@ static func cable_rail(L: Node3D, parent: Node3D, points: Array) -> int:
 	L.rails.append({ curve = curve, path = path, locked = false, glow = g, length = curve.get_baked_length() })
 	return L.rails.size() - 1
 
-static func _gust(parent: Node3D, fx: Node3D, r: Rect2, y0: float, y1: float, dir: Vector3, power: float, period: float, offset: float, shelters: Array, snd: Vector3) -> void:
+static func _gust(parent: Node3D, fx: Node3D, gname: String, r: Rect2, y0: float, y1: float, dir: Vector3, power: float, period: float, offset: float, shelters: Array, snd: Vector3) -> void:
 	var p := CPUParticles3D.new()
 	var bm := BoxMesh.new(); bm.size = Vector3(0.025, 1.6, 0.025); p.mesh = bm
 	var m := StandardMaterial3D.new(); m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -563,7 +637,7 @@ static func _gust(parent: Node3D, fx: Node3D, r: Rect2, y0: float, y1: float, di
 	var c := r.get_center()
 	p.position = Vector3(c.x, (y0 + y1) * 0.5, c.y) - dir * (r.size.y * 0.5 + 3.0)
 	parent.add_child(p)
-	fx.gusts.append({ rect = r, y0 = y0, y1 = y1, dir = dir, power = power, period = period, offset = offset, shelters = shelters,
+	fx.gusts.append({ name = gname, rect = r, y0 = y0, y1 = y1, dir = dir, power = power, period = period, offset = offset, shelters = shelters,
 		parts = p, snd = snd, amount = 0.0, was = 0.0 })
 
 # ================================================================= relay pylon (P1 13, lift, P2 23)
@@ -640,7 +714,7 @@ static func _pylon(L: Node3D, fx: Node3D) -> void:
 	var sd := Kit.place(root, "dish_small", cr + Vector3(0, P2_Y + 4.0, 0.3), 0.6, 1.0, false)
 	if sd: sd.rotation.x = -0.4
 	var fm := flag_mat(fx)
-	windsock(root, fx, Vector3(P2.position.x + 0.3, P2_Y, -52.6), 2.8, Vector3(1, 0, 0), 1)
+	windsock(root, fx, Vector3(P2.position.x + 0.3, P2_Y, -52.6), 2.8, Vector3(1, 0, 0), "p2")
 	flag_pole(root, fx, Vector3(P2.end.x - 0.3, P2_Y, P2.end.y - 0.3), 3.2, Vector3(1, 0, 0), Color(0.85, 0.25, 0.22), fm)
 	flag_pole(root, fx, Vector3(P1.position.x + 0.3, P1_Y, P1.position.y + 0.3), 4.0, Vector3(0.6, 0, 0.8).normalized(), Color(0.25, 0.7, 0.75), fm)
 	# the hook chain from the launch corner to the dish deck
@@ -669,8 +743,8 @@ static func _cables(L: Node3D, fx: Node3D) -> void:
 	var rub: Material = mats.rubber
 	cable(root, Vector3(C.x + 1.75, 18.6, C.z - 1.75), tops[0] + Vector3(0, 1.4, 0), 4.0, 0.14, rub, 24)
 	cable(root, Vector3(C.x - 1.75, 18.2, C.z - 1.75), tops[2] + Vector3(-0.3, 1.4, 0), 3.0, 0.12, rub, 24)
-	cable(root, SPIRE + Vector3(0.4, 30.0, -0.4), tops[1] + Vector3(0, 1.4, 0), 6.0, 0.12, rub, 28)
-	cable(root, SPIRE + Vector3(-0.4, 26.0, -0.4), tops[0] + Vector3(0.3, 1.4, 0), 5.0, 0.1, rub, 24)
+	cable(root, SPIRE + Vector3(0.3, 34.5, -0.3), tops[1] + Vector3(0, 1.4, 0), 6.0, 0.12, rub, 28)
+	cable(root, SPIRE + Vector3(-0.3, 33.0, -0.3), tops[0] + Vector3(0.3, 1.4, 0), 5.0, 0.1, rub, 24)
 	cable(root, Vector3(P1.position.x + 0.5, P1_Y - 0.5, P1.position.y + 0.5), tops[2] + Vector3(0.3, 1.2, 0.3), 2.0, 0.12, rub, 16)
 	cable(root, Vector3(P1.end.x - 0.5, P1_Y - 0.5, P1.position.y + 0.5), tops[1] + Vector3(-0.3, 1.2, 0), 3.0, 0.12, rub, 16)
 	# warning orbs hanging along the big spans
@@ -695,7 +769,7 @@ static func _perches(L: Node3D, fx: Node3D) -> void:
 	strut(root, Vector3(pp.x, PERCH_P2_Y - 0.4, pp.y), Vector3(P2.end.x - 0.3, P1_Y + 2.0, P2.position.y + 0.3), 0.16, mats.steel)
 	for i in 4: sprocket(L, fx, "p2_%d" % i, Vector3(pp.x - 0.6 + (i % 2) * 1.2, PERCH_P2_Y, pp.y - 0.6 + (i / 2) * 1.2))
 	beacon(fx, root, Vector3(PERCH_P2.end.x - 0.1, PERCH_P2_Y + 0.25, PERCH_P2.position.y + 0.1), 0.12, false, 0.75, 0.3)
-	_gust(root, fx, PERCH_P2.grow(1.2), PERCH_P2_Y - 1.0, PERCH_P2_Y + 4.0, Vector3(1, 0, 0), 4.5, 6.0, 2.5, [], Vector3(pp.x, PERCH_P2_Y + 1.0, pp.y))
+	_gust(root, fx, "p2", PERCH_P2.grow(1.2), PERCH_P2_Y - 1.0, PERCH_P2_Y + 4.0, Vector3(1, 0, 0), 4.5, 6.0, 2.5, [], Vector3(pp.x, PERCH_P2_Y + 1.0, pp.y))
 	# the maintenance ring under the deck: drop down from the deck, grab them, climb out by the fourth ledge
 	for p in [Vector3(C.x - 1.6, RING_Y, C.z - 2.6), Vector3(C.x, RING_Y, C.z - 2.6), Vector3(C.x + 1.6, RING_Y, C.z - 2.6), Vector3(C.x + 2.6, RING_Y, C.z)]:
 		sprocket(L, fx, "ring%d" % int(p.x * 10 + p.z), p)

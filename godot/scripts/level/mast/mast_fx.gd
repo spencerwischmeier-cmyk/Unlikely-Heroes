@@ -6,6 +6,7 @@ extends Node3D
 var level: Node3D
 var t := 0.0
 var traversing := false
+var helix_testing := false
 
 # ---- beacons: { mat: StandardMaterial3D, light: OmniLight3D or null, phase: float, base: float }
 var beacons: Array = []
@@ -41,6 +42,7 @@ var streams := {}
 
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args(): if a.begins_with("--traverse"): traversing = true
+	helix_testing = OS.get_cmdline_user_args().has("--mast-helix-test")
 	for i in 4:
 		var p := AudioStreamPlayer3D.new(); p.unit_size = 10.0; p.max_distance = 110.0; p.bus = "SFX"
 		add_child(p); players.append(p)
@@ -95,6 +97,11 @@ func gust_amount(g: Dictionary) -> float:
 	if ph < 2.8: return 1.0
 	return clampf(1.0 - (ph - 2.8) / 0.6, 0.0, 1.0)
 
+func gust_named(n: String) -> Dictionary:
+	for g in gusts:
+		if g.name == n: return g
+	return {}
+
 func _wind(dt: float) -> void:
 	var p: CharacterBody3D = Game.player
 	flag_gust = 0.0
@@ -119,7 +126,8 @@ func _wind(dt: float) -> void:
 	for m: ShaderMaterial in flag_mats: m.set_shader_parameter("gust", flag_gust)
 	for s in socks:
 		var a: float = 0.35
-		if s.gust >= 0 and s.gust < gusts.size(): a = maxf(a, gusts[s.gust].amount)
+		var g := gust_named(s.gust)
+		if not g.is_empty(): a = maxf(a, g.amount)
 		else: a = maxf(a, flag_gust * 0.7)
 		var piv: Node3D = s.pivot
 		var want := atan2(s.dir.x, s.dir.z)
@@ -228,12 +236,37 @@ func _ambient(dt: float) -> void:
 				"freq":
 					l.text = "FREQ %d.%02d\nGAIN %d%%" % [118 + int(t) % 7, randi() % 100, (96 + randi() % 4) if powered else (12 + randi() % 30)]
 				"wind":
-					var g: float = gusts[0].amount if gusts.size() > 0 else 0.0
+					var g: float = gust_named("c1").get("amount", 0.0)
 					l.text = "WIND %d KN\n%s" % [int(14 + g * 38 + randf() * 3), "GUST!" if g > 0.3 else "STEADY"]
 					l.modulate = Color(1, 0.4, 0.3) if g > 0.3 else Color(0.6, 0.95, 1)
 
+## debug: --mast-helix-test walks Vesk from the dish deck up the spiral catwalk and prints how high he got
+var helix_t := -1.0
+func _helix_test(dt: float) -> void:
+	var p: CharacterBody3D = Game.player
+	if p == null: return
+	if helix_t < 0.0:
+		helix_t = 0.0
+		p.global_position = Vector3(16.8, 20.1, -36.8); p.velocity = Vector3.ZERO
+	helix_t += dt
+	var sp := Vector3(20.6, 0, -40.6)
+	var d := Vector3(p.global_position.x - sp.x, 0, p.global_position.z - sp.z)
+	var yaw: float
+	if helix_t < 1.6 and d.length() > 2.4: yaw = atan2(-d.x, -d.z)
+	else:
+		var tng := Vector3(-d.z, 0, d.x).normalized()   # counter-clockwise in x/z = increasing angle
+		var inward := -d.normalized() * (d.length() - 1.95) * 0.6
+		var w := tng + inward
+		yaw = atan2(w.x, w.z)
+	Game.cam.yaw = yaw
+	Input.action_press("move_forward")
+	if fmod(helix_t, 0.25) < dt: print("[helix] t=%.1f pos=%s" % [helix_t, p.global_position])
+	if helix_t > 16.0:
+		print("[helix] done pos=%s" % p.global_position); get_tree().quit()
+
 func _physics_process(dt: float) -> void:
 	t += dt
+	if helix_testing: _helix_test(dt)
 	_wind(dt)
 	_sprockets(dt)
 
