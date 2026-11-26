@@ -81,7 +81,7 @@ func play_at(n: String, pos: Vector3, db := 0.0, pitch_var := 0.06) -> void:
 	for p: AudioStreamPlayer3D in players:
 		if not p.playing:
 			p.stream = s; p.volume_db = db; p.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
-			p.global_position = pos; p.play(); return
+			p.global_position = to_global(pos); p.play(); return   # pos in this node's (the mast's original) space
 
 ## a looping positional sound (ambience); returns the player
 func loop_at(n: String, pos: Vector3, db := -6.0, unit := 6.0, max_d := 45.0) -> AudioStreamPlayer3D:
@@ -119,7 +119,7 @@ func _wind(dt: float) -> void:
 		g.was = a
 		if traversing or p == null or a < 0.31: continue
 		if p.get("riding") or p.get("swing_hook") != null: continue
-		var pp := p.global_position
+		var pp := to_local(p.global_position)
 		if pp.y < g.y0 or pp.y > g.y1 or not (g.rect as Rect2).has_point(Vector2(pp.x, pp.z)): continue
 		var sheltered := false
 		for s: Rect2 in g.shelters:
@@ -165,14 +165,14 @@ func _dish(dt: float) -> void:
 	if level.dish_target.distance_to(last_target) > 0.01:
 		last_target = level.dish_target
 		crank_count += 1
-		play_at("mast_crank", dp.global_position, 2.0)
+		play_at("mast_crank", to_local(dp.global_position), 2.0)
 		for k in 3:
 			get_tree().create_timer(0.15 * k).timeout.connect(func():
 				FX.sparks(dp.global_position + Vector3(randf_range(-1.5, 1.5), randf_range(-2.0, -0.5), randf_range(-1.5, 1.5)), Color(1, 0.7, 0.3), 14, 5.0))
 	var aligned: bool = level.dish_glow != null and level.dish_glow.emission.b > 0.8 and level.dish_glow.emission.r < 0.5
 	if aligned and not powered:
 		powered = true; power_t = 0.0
-		play_at("mast_dish_powerup", dp.global_position, 4.0, 0.0)
+		play_at("mast_dish_powerup", to_local(dp.global_position), 4.0, 0.0)
 		FX.shake(0.3)
 	if powered:
 		power_t += dt
@@ -217,12 +217,12 @@ func _ambient(dt: float) -> void:
 		(b.mat as StandardMaterial3D).emission_energy_multiplier = e
 		if b.light: (b.light as OmniLight3D).light_energy = 2.2 if on else 0.0
 	var p: Node3D = Game.player
-	if p and p.global_position.distance_to(Vector3(20, 14, -40)) < 45.0 and spark_spots.size() > 0:
+	if p and to_local(p.global_position).distance_to(Vector3(20, 14, -40)) < 45.0 and spark_spots.size() > 0:
 		spark_t -= dt
 		if spark_t <= 0.0:
 			spark_t = randf_range(1.6, 4.2)
 			var sp: Vector3 = spark_spots.pick_random()
-			FX.sparks(sp, Color(0.45, 0.95, 1.0) if powered else Color(1, 0.65, 0.25), 8, 3.5)
+			FX.sparks(to_global(sp), Color(0.45, 0.95, 1.0) if powered else Color(1, 0.65, 0.25), 8, 3.5)
 			play_at("mast_spark", sp, -10.0, 0.15)
 	for b in birds:
 		var a: float = t * b.speed + b.phase
@@ -239,7 +239,7 @@ func _ambient(dt: float) -> void:
 			broadcast_t = 3.2
 			FX.ring(level.dish_pivot.global_position, Color(1.0, 0.45, 0.1), 3.5)
 	# the top beacon pings softly when you are near it
-	if p and p.global_position.distance_to(Vector3(20.6, 40, -40.6)) < 34.0:
+	if p and to_local(p.global_position).distance_to(Vector3(20.6, 40, -40.6)) < 34.0:
 		ping_t -= dt
 		if ping_t <= 0.0:
 			ping_t = 1.0 / 0.75
@@ -273,10 +273,11 @@ func _helix_test(dt: float) -> void:
 	if p == null: return
 	if helix_t < 0.0:
 		helix_t = 0.0
-		p.global_position = Vector3(16.8, 20.1, -36.8); p.velocity = Vector3.ZERO
+		p.global_position = to_global(Vector3(16.8, 20.1, -36.8)); p.velocity = Vector3.ZERO
 	helix_t += dt
 	var sp := Vector3(20.6, 0, -40.6)
-	var d := Vector3(p.global_position.x - sp.x, 0, p.global_position.z - sp.z)
+	var lp := to_local(p.global_position)
+	var d := Vector3(lp.x - sp.x, 0, lp.z - sp.z)
 	var yaw: float
 	if helix_t < 1.6 and d.length() > 2.4: yaw = atan2(-d.x, -d.z)
 	else:
@@ -296,7 +297,7 @@ func _gust_test(dt: float) -> void:
 	var p: CharacterBody3D = Game.player
 	if p == null: return
 	if gust_test_t < 0.0:
-		gust_test_t = 0.0; p.global_position = Vector3(26.0, 12.9, -29.9); p.respawn_pos = p.global_position
+		gust_test_t = 0.0; p.global_position = to_global(Vector3(26.0, 12.9, -29.9)); p.respawn_pos = p.global_position
 	gust_test_t += dt
 	if fmod(gust_test_t, 0.5) < dt: print("[gust] t=%.1f amount=%.2f pos=%s" % [gust_test_t, gust_named("c1").get("amount", 0.0), p.global_position])
 	if gust_test_t > 9.0: get_tree().quit()
@@ -317,7 +318,7 @@ func _lift() -> void:
 		var ph := fmod(m.t / m.period, 1.0)
 		if (ph < lift_phase and lift_phase > 0.9) or (ph >= 0.5 and lift_phase < 0.5):
 			Snd.at("lift_move", m.body.global_position, -6.0)
-			play_at("mast_crank", m.body.global_position, -8.0, 0.1)
+			play_at("mast_crank", to_local(m.body.global_position), -8.0, 0.1)
 		lift_phase = ph
 
 func _process(dt: float) -> void:

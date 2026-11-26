@@ -74,6 +74,12 @@ const TOUR := [
 	["pier_c", Vector3(64, 6.1, -38), -PI / 2, -0.22], ["gallery", Vector3(20, 8.1, -40), -PI / 2, -0.25],
 	["dish", Vector3(17, 20.1, -31), -PI * 0.75, -0.3], ["yard", Vector3(0, 0.1, -60), PI, -0.25],
 	["row", Vector3(-38, 0.1, -70), PI, -0.25], ["arena", Vector3(-12, 0.1, -88), PI * 0.8, -0.22],
+	# the routes between the areas (already final positions: 5th element true)
+	["halt", Vector3(0, 0.1, 109), PI, -0.18, true], ["viaduct", Vector3(0, 0.1, 75), PI, -0.2, true],
+	["works", Vector3(-20, 0.1, 103), -PI / 2, -0.2, true], ["lantern", Vector3(-24, 0.1, 33), -PI / 2, -0.2, true],
+	["gangway", Vector3(24, 0.1, 30), PI / 2, -0.2, true], ["approach", Vector3(-6, 0.1, 0), PI, -0.2, true],
+	["haul_span", Vector3(-6, 0.1, -40), PI, -0.2, true], ["cableway", Vector3(-27, 6.7, -40), PI / 2, -0.2, true],
+	["barge", Vector3(58, 3.1, -34), -PI / 2, -0.2, true],
 ]
 var tour_prefix := ""
 var _ti := -1
@@ -97,7 +103,8 @@ func _process(dt: float) -> void:
 			for f in tour_fps: tot += f
 			print("[ground-tour] done, mean fps %.1f" % (tot / maxf(1.0, tour_fps.size())))
 			get_tree().quit(); return
-		var s: Array = TOUR[_ti]
+		var s: Array = TOUR[_ti].duplicate()
+		if s.size() < 5: s[1] = preload("res://scripts/level/layout/spread.gd").at(s[1])   # original positions
 		p.global_position = s[1]; p.velocity = Vector3.ZERO; p.face_yaw = s[2]
 		if cam: cam.yaw = s[2]; cam.pitch = s[3]; cam.global_position = s[1] + Vector3(0, 1.55, 0); cam.cam_y = s[1].y
 		return
