@@ -18,7 +18,7 @@ static func build(L) -> void:
 	if not args.has("--no-skyworld"): SkyWorld.build(L, A)
 	# my debug spots (level._build re-assigns debug_spots after the area files run, so apply --at here too)
 	var spots := { canyon = [Vector3(58, 0.1, 30), PI / 2], depot = [Vector3(87, 0.1, 39.5), PI / 2],
-		berth = [Vector3(115, 0.1, 30), PI / 2], depot_in = [Vector3(88.5, 0.1, 27), PI * 0.6],
+		berth = [Vector3(115, 0.1, 30), PI / 2], depot_in = [Vector3(86.5, 0.1, 28.0), PI * 0.42],
 		canyon_top = [Vector3(59, 4.9, 26.2), PI * 0.6], docks_vista = [Vector3(64, 6.1, -38), PI * 0.1] }
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--at=") and spots.has(a.substr(5)):

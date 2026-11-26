@@ -229,7 +229,7 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	if DocksDressing.place_fit(L, "rope_bridge", Vector3(53, -0.25, 30), 0.0, Vector3(6.6, 2.3, 3.6)) == null: gw.visible = true
 	for zz in [28.2, 31.8]: L.railing(50.2, zz, 55.8, zz, 0.0)
 	L.label("CONTAINER CANYON", Vector3(61, 0, 30), 2.6, Color(1, 0.8, 0.45), PI / 2)
-	L.hint_sign("FREIGHT DEPOT 7. HARD HATS REQUIRED. SOFT HEADS DISCOURAGED.", Vector3(57.5, 0, 26.6), PI * 0.5)
+	L.hint_sign("DEPOT 7: HARD HATS ONLY", Vector3(57.5, 0, 26.6), PI * 0.5)
 	L.checkpoints.append({ pos = Vector3(58, 0.1, 30), r = 2.5 })
 	A.triggers.append({ box = AABB(Vector3(56, -1, 26), Vector3(5, 5, 8)), fn = A.say.bind(["depot_canyon_1", "depot_canyon_2"]), done = false })
 	A.triggers.append({ box = AABB(Vector3(84.5, -1, 16), Vector3(6, 6, 28)), fn = A.say.bind(["depot_belt_1", "depot_belt_2"]), done = false })
@@ -431,7 +431,7 @@ static func _warehouse(L: Node3D, A: Node3D) -> void:
 	# steps up to its west end
 	L.block(86.5, 30.5, 1.4, 3.0, 1.0, 0.0, M.deck(Color(0.75, 0.75, 0.72)))
 	L.block(87.6, 32.6, 1.6, 1.4, 2.0, 0.0, M.deck(Color(0.75, 0.75, 0.72)))
-	L.hint_sign("LINE 1 RUNS AWAY FROM THE BUTTON. OBVIOUSLY.", Vector3(86.4, 0, 27.0), -PI / 2)
+	L.hint_sign("LINE 1: BUTTON AT THE FAR END", Vector3(85.4, 0, 35.2), -PI / 2)
 	# the button stand at the east end (too high to reach from the floor)
 	var bs: Rect2 = L.rect(108, 30.5, 4, 5)
 	L.block(bs.get_center().x, bs.get_center().y, bs.size.x, bs.size.y, y1, 0.0, M.deck(Color(0.7, 0.72, 0.75)))
@@ -452,7 +452,7 @@ static func _warehouse(L: Node3D, A: Node3D) -> void:
 		var u := (i + 0.5) / ramp_supports
 		var p: Vector3 = Vector3(89.5, 0.05, 19.5).lerp(Vector3(104, y2, 19.5), u)
 		for s in [-1, 1]: L.box(Vector3(p.x, (p.y - 0.4) / 2, 19.5 + s * 1.2), Vector3(0.3, maxf(p.y - 0.4, 0.1), 0.3), L.mat_dark, false)
-	L.hint_sign("LINE 2: UP TO THE MEZZANINE (WHEN SOMEBODY FLIPS IT)", Vector3(88.2, 0, 22.4), -PI / 2)
+	L.hint_sign("LINE 2: TO THE MEZZANINE", Vector3(86.0, 0, 16.2), -PI / 2)
 	# the mezzanine (x 104..111.4, z 14.6..26)
 	var mz: Rect2 = Rect2(104, 14.6, 7.4, 11.4)
 	L.block(mz.get_center().x, mz.get_center().y, mz.size.x, mz.size.y, 0.5, y2 - 0.5, M.deck(Color(0.8, 0.78, 0.72)))
