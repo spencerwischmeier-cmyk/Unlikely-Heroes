@@ -29,7 +29,12 @@ def noise(n, scale):
     r -= r.min(); return r / (r.max() + 1e-9)
 
 
+MIRROR = ('pier_text', 'yard_text', 'mast_text', 'bay_text', 'arena_ring', 'hopscotch')
+
+
 def save(name, img):
+    # Godot's decals project the texture mirrored in X as seen from above: pre-flip anything with lettering
+    if name in MIRROR: img = img.transpose(Image.FLIP_LEFT_RIGHT)
     img.save(os.path.join(OUT, name + '.png'), optimize=True)
     print('wrote', name)
 
@@ -64,9 +69,14 @@ def oil(name, seed):
 def tyre():
     w, h = 128, 512
     img = Image.new('RGBA', (w, h), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
-    for x0 in (14, 78):
-        for y in range(0, h, 14):
-            d.polygon([(x0, y), (x0 + 36, y + 4), (x0 + 36, y + 10), (x0, y + 6)], fill=(25, 22, 20, 150))
+    for x0 in (10, 72):
+        y = 0.0
+        while y < h:
+            bend = 14 * math.sin(y / h * math.pi * 1.3 + x0)
+            if random.random() > 0.18:
+                a = random.randint(90, 170)
+                d.polygon([(x0 + bend, y), (x0 + bend + 38, y + 4), (x0 + bend + 38, y + 9), (x0 + bend, y + 5)], fill=(25, 22, 20, a))
+            y += random.uniform(10, 17)
     img = img.filter(ImageFilter.GaussianBlur(1.2))
     a = np.asarray(img).astype(np.float32)
     fade = np.clip(np.sin(np.linspace(0, math.pi, h)) * 1.6, 0, 1)[:, None]

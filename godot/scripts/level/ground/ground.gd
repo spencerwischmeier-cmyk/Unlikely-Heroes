@@ -337,7 +337,7 @@ const CLUTTER := {
 	JUNK: [0.4, [["pebble", 2], ["nut", 2], ["scrap", 3], ["tuft", 3]]],
 	COBBLE: [0.2, [["leaf", 4], ["paper", 1], ["pebble", 1], ["tuft", 2]]],
 	TERRA: [0.16, [["petal", 3], ["leaf", 2], ["paper", 1]]],
-	FLAG: [0.32, [["leaf", 3], ["petal", 3], ["tuft", 3]]],
+	FLAG: [0.22, [["leaf", 3], ["petal", 3], ["tuft", 3]]],
 	PLANKS: [0.08, [["nut", 1], ["paper", 1], ["leaf", 1], ["rope", 1]]],
 	SAND: [0.12, [["petal", 2], ["leaf", 2]]],
 	TREAD: [0.06, [["nut", 3], ["scrap", 1]]],
@@ -350,7 +350,7 @@ const DECALS := {
 		["chalk_bot", 2.0, 2.0, 1, true], ["leaves", 2.2, 2.2, 3, false], ["crack", 2.0, 2.0, 1, false]]],
 	TERRA: [40.0, [["rug_a", 2.6, 1.7, 2, false], ["rug_b", 2.6, 1.7, 2, false], ["leaves", 2.0, 2.0, 2, false]]],
 	FLAG: [30.0, [["leaves", 2.4, 2.4, 1, false]]],
-	PLANKS: [45.0, [["oil1", 2.2, 2.2, 2, false], ["oil2", 1.8, 1.8, 1, false], ["pier_text", 4.4, 1.1, 1, true]]],
+	PLANKS: [60.0, [["leaves", 1.8, 1.8, 1, false], ["pier_text", 4.4, 1.1, 2, true]]],
 	TREAD: [40.0, [["mast_text", 3.6, 0.9, 1, true], ["stripes", 3.6, 0.9, 2, false], ["oil2", 1.4, 1.4, 1, false]]],
 	SAND: [28.0, [["rug_a", 2.8, 1.8, 3, false], ["rug_b", 2.8, 1.8, 3, false], ["leaves", 2.0, 2.0, 1, false]]],
 	CONCRETE: [20.0, [["oil1", 2.8, 2.8, 3, false], ["oil2", 2.2, 2.2, 2, false], ["arrow", 1.4, 2.8, 2, false], ["stripes", 4.0, 1.0, 2, false],
@@ -455,7 +455,8 @@ func _dress() -> void:
 	for sp in [["arena", "arena_ring", Vector2(0, 0), 13.0, 13.0, 0.0], ["arena", "skid", Vector2(-7, 9), 6.0, 6.0, 0.6],
 			["arena", "oil1", Vector2(6, -6), 4.5, 4.5, 0.0], ["yard_gate", "bay_text", Vector2(4, 1), 6.0, 2.25, PI],
 			["yard_gate", "skid", Vector2(-8, 0), 5.0, 5.0, 2.0], ["yard_row", "skid", Vector2(0, 4), 6.0, 6.0, 1.0],
-			["yard_row", "oil1", Vector2(-3, -6), 4.0, 4.0, 0.0], ["yard_pen", "skid", Vector2(0, 0), 6.0, 6.0, 2.6]]:
+			["yard_row", "oil1", Vector2(-3, -6), 4.0, 4.0, 0.0], ["arena", "skid", Vector2(-9, 4), 6.5, 6.5, 2.4],
+			["arena", "bay_text", Vector2(-4, 10), 6.0, 2.25, PI / 2], ["arena", "oil2", Vector2(-13, -2), 3.5, 3.5, 0.0], ["yard_pen", "skid", Vector2(0, 0), 6.0, 6.0, 2.6]]:
 		if not L.islands.has(sp[0]): continue
 		var c: Vector2 = (L.islands[sp[0]] as Rect2).get_center() + sp[2]
 		var y: float = L.heights.get(sp[0], 0.0)
