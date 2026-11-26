@@ -24,6 +24,10 @@ extends Node
 ##   banner (String) clear banner, default "AREA CLEAR" ("" for none; reach zones default to none),
 ##   y_range (float) vertical tolerance for being inside (default 6).
 ## The level may define on_switch(zone_id, index, done, total) and on_zone_cleared(zone_id).
+##
+## Cutscenes inside the level (systems/cutscenes.gd): CUT_AFTER plays one when a zone is cleared
+## (instead of its clear_lines), and the "boss" zone opens with the "crane_intro" cutscene, which
+## calls drop_boss() at its dramatic moment (story drops it itself if the cutscene was skipped).
 
 const CraneBot := preload("res://scripts/cranebot.gd")
 const Relay := preload("res://scripts/relay.gd")
@@ -42,6 +46,25 @@ var switched := 0
 var finished := false
 var debug_auto := false  # --story-auto: throws switches / clears fights by itself (flow test)
 var debug_t := 0.0
+var boss_pos := Vector3.ZERO
+var boss_dropped := false
+var boss_zone: Dictionary = {}
+
+const CUT_AFTER := {"mast": "broadcast"}
+
+func _cuts_on() -> bool:
+	return Game.main.has_method("has_cutscenes") and Game.main.has_cutscenes() and not OS.get_cmdline_user_args().has("--no-cutscenes")
+
+## Play a cutscene and wait for it to finish.
+func play_cutscene(id: String) -> void:
+	if not _cuts_on(): return
+	var cs: Node = Game.main.get_node_or_null("Cutscenes")
+	while cs and cs.get("playing") != "":
+		await Game.cutscene_finished
+	Game.cutscene_started.emit(id)
+	while true:
+		var done: String = await Game.cutscene_finished
+		if done == id: break
 
 func start() -> void:
 	zones = Game.level.zones
@@ -106,8 +129,10 @@ func _check_skip(p: Vector3) -> void:
 func _begin(z: Dictionary) -> void:
 	active = true; wave_delay = 0.6
 	Game.zone_entered.emit(z.id)
-	for l in z.get("enter_lines", []): Game.say(l)
-	if z.has("name"): Game.hud.show_banner(z.name, z.get("objective", ""))
+	var cut_lines: bool = z.get("kind", "") == "boss" and _cuts_on()
+	if not cut_lines:
+		for l in z.get("enter_lines", []): Game.say(l)
+	if z.has("name") and not cut_lines: Game.hud.show_banner(z.name, z.get("objective", ""))
 	match z.get("kind", ""):
 		"reach":
 			_clear(z)
@@ -133,11 +158,26 @@ func _begin(z: Dictionary) -> void:
 			boss = CraneBot.new(); boss.combat = Game.combat; boss.player = Game.player
 			boss.spawn_roller = func(p: Vector3): alive.append(Game.main.spawn_bot("roller", p, z.rect))
 			Game.main.add_child(boss)
-			boss.spawn(z.boss_pos, z.rect)
+			boss_pos = z.boss_pos; boss_zone = z; boss_dropped = false
 			boss.half.connect(func(): Game.say("boss_half", true))
 			boss.dead_at.connect(func(p: Vector3): _boss_down(z, p))
-			Game.boss_started.emit("CRANE BOT")
-			Snd.music("boss", 1.0)
+			_boss_intro(z)
+
+## The Crane Bot intro cutscene (it drops the boss in itself), then the fight.
+func _boss_intro(z: Dictionary) -> void:
+	if _cuts_on():
+		Snd.music("cutscene", 1.0)
+		await play_cutscene("crane_intro")
+	drop_boss()
+	if z.has("name"): Game.hud.show_banner(z.name, z.get("objective", ""))
+	Game.boss_started.emit("CRANE BOT")
+	Snd.music("boss", 1.0)
+
+## Spawn the Crane Bot onto its mark (it falls out of the sky). Safe to call twice.
+func drop_boss() -> void:
+	if boss_dropped or not is_instance_valid(boss): return
+	boss_dropped = true
+	boss.spawn(boss_pos, boss_zone.rect)
 
 func _progress(z: Dictionary) -> void:
 	var total: int = z.get("switches", []).size()
@@ -179,7 +219,10 @@ func _clear(z: Dictionary) -> void:
 	switches.clear()
 	Game.complete(z.id); Game.zone_cleared.emit(z.id)
 	_apply_effects(z)
-	for l in z.get("clear_lines", []): Game.say(l)
+	if CUT_AFTER.has(z.id) and _cuts_on():
+		play_cutscene(CUT_AFTER[z.id])
+	else:
+		for l in z.get("clear_lines", []): Game.say(l)
 	if z.get("kind", "") == "relay": Game.boss_defeated.emit("SIGNAL RELAY")
 	var banner: String = z.get("banner", "" if z.get("kind", "") == "reach" else "AREA CLEAR")
 	if banner != "": Game.hud.show_banner(banner, z.get("name", ""), Color(0.5, 1, 0.6))
