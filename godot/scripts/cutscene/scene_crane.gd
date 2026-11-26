@@ -21,6 +21,11 @@ func run() -> void:
 	var vesk: Node3D = C.make_vesk(stand - fwd * 2.5, atan2(fwd.x, fwd.z))
 	var dodger: Node3D = C.make_dodger(stand + side * 1.1 + Vector3(0, 1.8, 0) - fwd * 2.8, atan2(fwd.x, fwd.z))
 	var boss: Node3D = story.boss if story and is_instance_valid(story.get("boss")) else null
+	var preview: Node3D = null
+	if boss == null and C.start_args.has("cut"):
+		# --cut=crane_intro preview (no story running): a stand-in Crane Bot
+		preview = load("res://scripts/cranebot.gd").new(); preview.combat = Game.combat; preview.player = Game.player
+		C.actor(preview, Vector3.ZERO); boss = preview
 
 	# 1. establishing: high over the yard, craning down toward the heroes walking in
 	C.cut(c + Vector3(-14, 16, 10), c + Vector3(0, 0, 4), 50.0)
@@ -39,12 +44,14 @@ func run() -> void:
 	await C.say("cs_ci_vesk_1", 0.4)
 	# 3. the horn. A shadow ring on the ground. Look up.
 	C.focus(0.0)
-	if story and story.has_method("drop_boss"): story.drop_boss()
+	if story and story.has_method("drop_boss") and preview == null: story.drop_boss()
+	elif preview: preview.spawn(boss_pos, r)
 	var low := boss_pos + (stand - boss_pos).normalized() * 7.0 + side * 3.0 + Vector3(0, 0.4, 0)
 	C.cut(low, boss_pos + Vector3(0, 2.0, 0), 56.0)
 	vesk.look_point = boss_pos + Vector3(0, 8, 0)
 	dodger.look_target = null
 	dodger.emote("shock")
+	C.fx(func(): Snd.play("cutscenes_drop_whoosh", -2, 0.0))
 	await C.wait(0.9)
 	if boss:
 		C.look_node = boss; C.look_off = Vector3(0, 2.0, 0)
@@ -64,7 +71,7 @@ func run() -> void:
 	C.focus(0.5)
 	await C.wait(0.9)
 	C.show_boss("CRANE BOT", "Heavy lifter. Unit Seven. Hates weekends.", 2.6)
-	C.fx(func(): Snd.play("victory_sting", -8, 0.0, 0.0))
+	C.fx(func(): Snd.play("cutscenes_boss_sting", -3, 0.0))
 	await C.wait(2.6)
 	C.focus(0.0)
 	# 5. "That crane is looking at us."

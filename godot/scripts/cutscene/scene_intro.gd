@@ -84,7 +84,7 @@ func run() -> void:
 	C.tw(dodger, "global_position", chair_pos + Vector3(4, 3.0, -6), 1.2, 0.0, Tween.TRANS_SINE, Tween.EASE_OUT)
 	C.tw(dodger, "global_position", chair_pos + Vector3(1.25, 1.55, -0.3), 1.1, 1.2, Tween.TRANS_BACK, Tween.EASE_OUT)
 	C.tw(dodger, "rotation:y", PI + 0.6, 0.8, 1.2)
-	C.fx(func(): Snd.at("dash", dodger.global_position, -6))
+	C.fx(func(): Snd.play("cutscenes_whoosh", -6); Snd.at("dash", dodger.global_position, -8))
 	await C.wait(2.4)
 	dodger.look_target = vesk
 	dodger.emote("spin")
@@ -116,7 +116,7 @@ func run() -> void:
 		C.clock_label.text = "SKYHARBOR   7:59:%s AM" % s
 	await C.wait(1.0)
 	C.clock_label.text = "SKYHARBOR   8:00:00 AM"
-	C.fx(func(): Snd.play("crane_warn", -6); Snd.play("checkpoint", -4))
+	C.fx(func(): Snd.play("cutscenes_factory_whistle", -2, 0.0); Snd.play("checkpoint", -6))
 	C.cut(Vector3(-3, 3.2, 73), mast + Vector3(0, 0.5, 0), 16.0)
 	C.move(Vector3(-2.6, 3.4, 72), mast + Vector3(0, 1.2, 0), 7.0, 11.0)
 	C.tw(C, "clock_a", 0.0, 1.0, 1.2)
@@ -280,7 +280,7 @@ func run() -> void:
 	C.tw(dodger, "global_position", crash + Vector3(0.4, 1.8, 2.5), fly * 0.55, 0.7, Tween.TRANS_SINE, Tween.EASE_IN_OUT)
 	C.tw(dodger, "tilt", Vector3(0.4, 0, 0.3), 0.6, 0.7)
 	C.tw(C, "cam_fov", 34.0, fly * 0.7)
-	C.fx(func(): Snd.at("dash", dp, -4))
+	C.fx(func(): Snd.at("dash", dp, -4); Snd.play("cutscenes_whoosh", -8))
 	await C.wait(0.7 + fly * 0.55)
 	C.tw(dodger, "global_position", crash + Vector3(0, 0.25, 0), 0.25, 0.0, Tween.TRANS_QUAD, Tween.EASE_IN)
 	await C.wait(0.25)

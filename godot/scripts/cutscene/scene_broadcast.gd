@@ -49,7 +49,7 @@ func run() -> void:
 	await C.wait(1.2)
 	await C.say("sky_shard_1", 0.2)
 	# 2. the beam rises, the hologram stutters on. Wide: two tiny heroes, one enormous foreman
-	C.fx(func(): Snd.at("crane_warn", dish, -6); Snd.at("bot_spawn", holo_base, 0))
+	C.fx(func(): Snd.play("cutscenes_holo_on", -2, 0.0); Snd.at("bot_spawn", holo_base, -6))
 	C.tw(beam, "scale", Vector3.ONE, 0.8, 0.0, Tween.TRANS_EXPO, Tween.EASE_OUT)
 	C.tw(grudd, "glitch", 0.08, 1.6, 0.4)
 	C.tw(C, "white", 0.35, 0.08, 0.3); C.tw(C, "white", 0.0, 0.5, 0.4)
@@ -97,7 +97,7 @@ func run() -> void:
 	C.cut(wide + Vector3(0, -0.6, 0) + to_dish * 2.0, holo_base + Vector3(0, 3.6, 0), 46.0)
 	grudd.gesture("fist")
 	await C.say("cs_bc_grudd_5", 0.2)
-	C.fx(func(): Snd.at("explode_small", holo_base, -10); Snd.at("ui_move", dish, 0))
+	C.fx(func(): Snd.play("cutscenes_holo_off", -3, 0.0))
 	C.tw(grudd, "glitch", 1.0, 0.4)
 	C.tw(grudd, "holo_mat:shader_parameter/strength", 0.0, 0.5, 0.3)
 	C.tw(grudd, "scale", Vector3(1.0, 0.02, 1.0), 0.35, 0.5, Tween.TRANS_EXPO, Tween.EASE_IN)

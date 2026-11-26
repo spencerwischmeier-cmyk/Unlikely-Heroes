@@ -50,8 +50,9 @@ func run() -> void:
 	C.focus(0.0)
 	C.move(c + Vector3(-0.2, 1.2, -3.0), rp, 6.0, 38.0)
 	vesk.look_target = horn; dodger.look_target = horn
+	C.fx(func(): Snd.at("cutscenes_radio_crackle", rp, 2, 0.0))
 	for i in 3:
-		C.fx(func(): Snd.at("ui_move", rp, -2); lamp.emission_energy_multiplier = 6.0; rlight.light_energy = 3.0)
+		C.fx(func(): Snd.at("ui_move", rp, -6); lamp.emission_energy_multiplier = 6.0; rlight.light_energy = 3.0)
 		await C.wait(0.12)
 		lamp.emission_energy_multiplier = 0.5; rlight.light_energy = 0.0
 		await C.wait(0.35)
@@ -227,7 +228,7 @@ func _stinger() -> void:
 	grudd.gesture("fist")
 	C.tw(C, "shake", 0.8, 0.05, 0.4)
 	await C.say("cs_tease_grudd_3", 0.2)
-	C.fx(func(): Snd.play("crane_slam", -6))
+	C.fx(func(): Snd.play("cutscenes_poster_slam", -2, 0.0); Snd.play("crane_slam", -12))
 	C.tw(C, "poster_a", 1.0, 0.18, 0.0, Tween.TRANS_BACK, Tween.EASE_OUT)
 	await C.wait(2.6)
 	C.tw(C, "fade", 1.0, 0.5)
@@ -236,6 +237,7 @@ func _stinger() -> void:
 	C.setv(C, "poster_a", 0.0)
 	# next time on...
 	C.tw(C, "next_a", 1.0, 0.6)
+	C.fx(func(): Snd.music("", 0.5); Snd.play("cutscenes_next_jingle", -4, 0.0))
 	await C.wait(0.6)
 	await C.say("cs_tease_narr_2", 1.2)
 	C.tw(C, "next_a", 0.0, 0.6)
