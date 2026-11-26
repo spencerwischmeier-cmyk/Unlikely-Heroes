@@ -588,9 +588,15 @@ func _hanging(pos: Vector3, rot_y: float, mat: Material) -> void:
 	var c := box(pos + Vector3(0, 1.25, 0), Vector3(5, 2.5, 2.4), mat)
 	c.rotation.y = rot_y
 	if mat is StandardMaterial3D: DocksDressing.skin_box(c, "container", (mat as StandardMaterial3D).albedo_color.lightened(0.15))
+	# held up by a striped cargo balloon: two cables from the container's ends to a ring under it
+	var ring := pos + Vector3(0, 10.0, 0)
 	for s in [-1, 1]:
 		var off: Vector3 = Vector3(cos(rot_y), 0, -sin(rot_y)) * 1.8 * s
-		cyl(pos + off + Vector3(0, 2.5 + 6, 0), 0.04, 0.04, 12, mat_dark, 6)
+		var a := pos + off + Vector3(0, 2.5, 0)
+		var cab := cyl((a + ring) / 2, 0.04, 0.04, a.distance_to(ring), mat_dark, 6)
+		cab.look_at_from_position(cab.position, ring, Vector3.UP if absf(off.x) > 0.01 else Vector3.RIGHT)
+		cab.rotate_object_local(Vector3.RIGHT, PI / 2)
+	DocksDressing.balloon(self, ring, rot_y, mat)
 
 func _build_mast() -> void:
 	# the Signal Mast at the center: east landing (3) -> gallery (8) -> spiral ledges -> dish deck (20)

@@ -34,4 +34,6 @@ static func traversal_cases(moves: Dictionary) -> Dictionary:
 		# crate step, then up onto a one-high container in corridor A
 		canyon_crate = [Vector3(67.3, 0.1, 31.0), PI, moves.sj, 1.3, Rect2(66.3, 28.0, 2.0, 2.0)],
 		canyon_top = [Vector3(67.3, 1.4, 28.6), PI, hop, 2.4, Rect2(62, 25, 6, 2.5)],
+		# LINE 2 (running downhill until the button flips it) carries Vesk back down to the floor
+		belt_carry = [Vector3(98, 3.1, 19.5), PI / 2, [[0.0, "move_left", false]], 0.0, Rect2(80, 16, 10, 7)],
 	}

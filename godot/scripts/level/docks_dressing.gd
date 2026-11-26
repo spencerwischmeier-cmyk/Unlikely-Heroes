@@ -76,6 +76,30 @@ static func skin_box(box_mi: MeshInstance3D, name: String, tint: Color) -> void:
 					_tinted[key] = c
 				mi.set_surface_override_material(i, _tinted[key])
 
+## A striped cargo balloon whose ring sits at `ring` (it floats the hanging containers over the rails).
+static func balloon(L: Node3D, ring: Vector3, rot_y: float, tint_mat: Material) -> void:
+	var n := Node3D.new(); n.position = ring; n.rotation.y = rot_y; L.add_child(n)
+	var c: Color = (tint_mat as StandardMaterial3D).albedo_color if tint_mat is StandardMaterial3D else Color(0.9, 0.4, 0.2)
+	var key := "balloon_" + c.to_html()
+	if not _tinted.has(key): _tinted[key] = M.cloth(c.lightened(0.1))
+	if not _tinted.has("balloon_cream"): _tinted["balloon_cream"] = M.cloth(Color(0.95, 0.9, 0.8))
+	var tor := TorusMesh.new(); tor.inner_radius = 0.3; tor.outer_radius = 0.42; tor.ring_segments = 8; tor.rings = 16
+	var rm := MeshInstance3D.new(); rm.mesh = tor; rm.material_override = M.brass(); n.add_child(rm)
+	var env := SphereMesh.new(); env.radius = 2.6; env.height = 5.2; env.radial_segments = 24; env.rings = 12
+	var em := MeshInstance3D.new(); em.mesh = env; em.material_override = _tinted[key]; em.position.y = 3.6
+	em.scale = Vector3(1.25, 0.95, 1.0); n.add_child(em)
+	for k in [-1, 0, 1]:   # cream bands round the envelope
+		var b := TorusMesh.new(); b.inner_radius = 2.45 - absf(k) * 0.5; b.outer_radius = 2.68 - absf(k) * 0.5; b.rings = 24; b.ring_segments = 6
+		var bm := MeshInstance3D.new(); bm.mesh = b; bm.material_override = _tinted["balloon_cream"]
+		bm.position = Vector3(k * 1.5, 3.6, 0); bm.rotation.z = PI / 2; bm.scale = Vector3(1, 1.0, 0.98)
+		n.add_child(bm)
+	for s in [-1, 1]:   # rigging lines from the ring to the envelope
+		var l := CylinderMesh.new(); l.top_radius = 0.025; l.bottom_radius = 0.025; l.height = 1.9; l.radial_segments = 4
+		var lm := MeshInstance3D.new(); lm.mesh = l; lm.material_override = M.std(Color(0.2, 0.2, 0.22), 0.3, 0.7)
+		lm.position = Vector3(s * 0.7, 0.9, 0); lm.rotation.z = -s * 0.65; n.add_child(lm)
+	var fin := BoxMesh.new(); fin.size = Vector3(1.2, 1.4, 0.08)
+	var fm := MeshInstance3D.new(); fm.mesh = fin; fm.material_override = _tinted["balloon_cream"]; fm.position = Vector3(-3.3, 3.8, 0); n.add_child(fm)
+
 static func steam(parent: Node3D, pos: Vector3, scale := 1.0) -> void:
 	var p := CPUParticles3D.new()
 	var q := QuadMesh.new(); q.size = Vector2(0.7, 0.7) * scale; p.mesh = q

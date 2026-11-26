@@ -213,6 +213,7 @@ static func build(L: Node3D, A: Node3D) -> void:
 	_canyon(L, A)
 	_warehouse(L, A)
 	_berth(L, A)
+	_piers_abc(L, A)
 
 # ------------------------------------------------------------------ Pier D: the container canyon
 static func _canyon(L: Node3D, A: Node3D) -> void:
@@ -226,6 +227,9 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	L.label("CONTAINER CANYON", Vector3(61, 0, 30), 2.6, Color(1, 0.8, 0.45), PI / 2)
 	L.hint_sign("FREIGHT DEPOT 7. HARD HATS REQUIRED. SOFT HEADS DISCOURAGED.", Vector3(57.5, 0, 26.6), PI * 0.5)
 	L.checkpoints.append({ pos = Vector3(58, 0.1, 30), r = 2.5 })
+	A.triggers.append({ box = AABB(Vector3(56, -1, 26), Vector3(5, 5, 8)), fn = A.say.bind(["depot_canyon_1", "depot_canyon_2"]), done = false })
+	A.triggers.append({ box = AABB(Vector3(84.5, -1, 16), Vector3(6, 6, 28)), fn = A.say.bind(["depot_belt_1", "depot_belt_2"]), done = false })
+	A.triggers.append({ box = AABB(Vector3(112.5, -1, 24), Vector3(6, 6, 12)), fn = A.say.bind(["depot_berth_1", "depot_berth_2"]), done = false })
 	# --- the canyon walls (x, z, level, along_x, colour)
 	var stacks := [
 		# corridor A, north wall (z 25..27.5)
@@ -404,6 +408,7 @@ static func _warehouse(L: Node3D, A: Node3D) -> void:
 	L.fence(bs, y1, [["w", 29, 32]], "nse")
 	button(L, A, Vector3(108.3, y1, 30.5), "REVERSE\nLINE 2", func():
 		A.set_belt("line2", 5.0)
+		Game.say("depot_button_1")
 		Anim.Snd3.at(A, "docks_button", Vector3(108.3, y1, 30.5), 0.0)
 		if Game.hud and Game.hud.has_method("toast_small"): Game.hud.toast_small("LINE 2 REVERSED", Color(0.5, 1, 0.6))
 		FX.ring(Vector3(108.3, y1 + 0.1, 30.5), Color(1, 0.4, 0.3)))
@@ -512,3 +517,44 @@ static func _berth(L: Node3D, A: Node3D) -> void:
 	for z in range(19, 42, 3):
 		beacon(L, A, Vector3(137.85, 0.15, z), Color(1, 0.3, 0.2) if z < 30 else Color(0.25, 1, 0.45), 2.0, z * 0.03, 0.2, 0.1)
 	A.horns.append({ node = ship, every = 38.0, t = 12.0, sound = "docks_ship_horn", db = 2.0 })
+
+# ------------------------------------------------------------------ extra life on Piers A, B and C
+static func _piers_abc(L: Node3D, A: Node3D) -> void:
+	# corner and edge signal lights: red to port (north), green to starboard
+	for c in [[28.3, 16.3, 0.0], [49.7, 16.3, 0.0], [28.3, 43.7, 0.0], [49.7, 43.7, 0.0], [50.3, -15.7, 4.0], [65.7, -15.7, 4.0],
+			[65.7, -0.3, 4.0], [60.3, -45.7, 6.0], [75.7, -45.7, 6.0], [75.7, -30.3, 6.0], [60.3, -30.3, 6.0]]:
+		beacon(L, A, Vector3(c[0], c[2] + 1.35, c[1]), Color(1, 0.25, 0.2) if c[1] < 0 else Color(0.25, 1, 0.45), 2.0, randf(), 0.25, 0.14)
+		L.cyl(Vector3(c[0], c[2] + 0.6, c[1]), 0.06, 0.08, 1.2, L.mat_dark, 6)
+	# fuel lines along Pier A's south rail and Pier B's east edge
+	_fuel_line(L, [Vector3(30, 0.35, 43.4), Vector3(48, 0.35, 43.4)])
+	_fuel_line(L, [Vector3(65.4, 4.35, -12), Vector3(65.4, 4.35, -3.5)])
+	# a tall crane pylon east of Pier C swinging a load over the deck (well above head height)
+	jib_crane(L, A, Vector3(82, -11, -38), 20.0, 12.0, PI, 0.5, 34.0, 0)
+	L.box(Vector3(82, -11.5, -38), Vector3(5, 1.0, 5), L.mat_dark, false)
+	# cargo drones ferrying crates between the piers, the depot and the berth
+	_drone(L, A, [Vector3(39, 14, 30), Vector3(70, 15, 19), Vector3(98, 15, 12), Vector3(126, 17, 26), Vector3(98, 16, 8), Vector3(70, 15, 15)], 6.0)
+	_drone(L, A, [Vector3(58, 15, -8), Vector3(70, 16, -38), Vector3(92, 18, -22), Vector3(100, 16, 4)], 5.0)
+	_drone(L, A, [Vector3(60, 13, 46), Vector3(100, 14, 50), Vector3(126, 15, 44), Vector3(90, 13, 40)], 5.5)
+	_drone(L, A, [Vector3(34, 12, 12), Vector3(44, 13, -12), Vector3(76, 14, -14), Vector3(62, 12, 8)], 4.5)
+
+## a little quad-rotor cargo drone with a crate slung underneath
+static func _drone(L: Node3D, A: Node3D, pts: Array, speed: float) -> void:
+	var n := Node3D.new(); L.add_child(n)
+	var body := _m("drone_body", func(): return M.paint(Color(0.95, 0.72, 0.15))) as Material
+	L.box(Vector3(0, 0, 0), Vector3(1.1, 0.4, 1.1), body, false, n)
+	L.box(Vector3(0, 0.25, 0), Vector3(0.6, 0.2, 0.6), L.mat_dark, false, n)
+	for c in [Vector3(-0.9, 0.1, -0.9), Vector3(0.9, 0.1, -0.9), Vector3(-0.9, 0.1, 0.9), Vector3(0.9, 0.1, 0.9)]:
+		var arm: MeshInstance3D = L.box(c * 0.55, Vector3(0.9, 0.08, 0.1), L.mat_dark, false, n)
+		arm.rotation.y = atan2(-c.z, c.x)
+		var rotor := Node3D.new(); rotor.position = c + Vector3(0, 0.12, 0); n.add_child(rotor)
+		var disc := CylinderMesh.new(); disc.top_radius = 0.55; disc.bottom_radius = 0.55; disc.height = 0.02; disc.radial_segments = 16
+		var dm := M.std(Color(0.2, 0.22, 0.25, 0.35), 0.2, 0.5); dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		L.mesh_at(disc, _m("rotor_disc", func(): return dm), Vector3.ZERO, rotor)
+		L.box(Vector3.ZERO, Vector3(1.0, 0.03, 0.1), L.mat_dark, false, rotor)
+		A.spinners.append({ node = rotor, axis = Vector3.UP, speed = 30.0 })
+	L.cyl(Vector3(0, -0.8, 0), 0.02, 0.02, 1.2, L.mat_dark, 4).reparent(n, false)
+	DocksDressing.place(n, "crates", Vector3(0, -2.4, 0), randf() * TAU, 1.0, false)
+	beacon(L, A, Vector3(0, -0.25, 0.58), Color(1, 0.3, 0.2), 0.8, randf(), 0.3, 0.07, false, n)
+	var pv := PackedVector3Array(pts)
+	n.position = pv[0]
+	A.loopers.append({ node = n, pts = pv, len = Anim.loop_len(pv), speed = speed, d = randf() * 20.0, yaw_off = 0.0 })

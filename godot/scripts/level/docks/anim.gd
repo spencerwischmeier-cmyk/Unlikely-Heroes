@@ -16,6 +16,7 @@ var lanes: Array = []      # { node: Node3D, a: Vector3, b: Vector3, speed: floa
 var flocks: Array = []     # { node: Node3D, c: Vector3, r: Vector2, h: float, w: float, ph: float }
 var spinners: Array = []   # { node: Node3D, axis: Vector3, speed: float }
 var bobbers: Array = []    # { node: Node3D, base: Vector3, amp: float, w: float, ph: float, roll: float }
+var triggers: Array = []   # { box: AABB, fn: Callable, done: bool } one-shot (voice lines on entering a spot)
 var horns: Array = []      # { player: AudioStreamPlayer3D, every: float, t: float }
 var t := 0.0
 
@@ -59,6 +60,9 @@ func _physics_process(dt: float) -> void:
 	for bk in blinkers:
 		var ph: float = fposmod(t / bk.period + bk.ph, 1.0)
 		bk.mat.emission_energy_multiplier = bk.peak if ph < bk.on else bk.low
+	for tg in triggers:
+		if not tg.done and (tg.box as AABB).has_point(pp):
+			tg.done = true; tg.fn.call()
 	for d in doors:
 		if d.trigger != null and not d.open and (d.trigger as AABB).has_point(pp): open_door(d)
 	for bt in buttons:
@@ -110,6 +114,9 @@ func _physics_process(dt: float) -> void:
 		if h.t <= 0.0:
 			h.t = h.every + randf() * h.every * 0.5
 			if h.node.global_position.distance_to(pp) < h.get("near", 140.0): Snd3.at(self, h.sound, h.node.global_position, h.db, 200.0)
+
+func say(ids: Array) -> void:
+	for id in ids: Game.say(id)
 
 func _along(pts: PackedVector3Array, d: float) -> Vector3:
 	var acc := 0.0
