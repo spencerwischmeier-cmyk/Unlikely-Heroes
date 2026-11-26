@@ -493,13 +493,16 @@ static func model(path: String, pos: Vector3, yaw := 0.0, height := 1.0, collide
 ## a sign: a wooden board with a painted label, facing +z of yaw
 static func sign_board(text: String, pos: Vector3, yaw := 0.0, w := 3.0, col := Color(1, 0.9, 0.62), board := "wood_dark") -> void:
 	var bas := Basis(Vector3.UP, yaw)
-	add(box_mesh(), mat(board), Transform3D(bas * Basis.from_scale(Vector3(w, 0.62, 0.1)), pos))
-	add(box_mesh(), mat("brass"), Transform3D(bas * Basis.from_scale(Vector3(w + 0.1, 0.06, 0.12)), pos + Vector3(0, 0.33, 0)), false)
-	add(box_mesh(), mat("brass"), Transform3D(bas * Basis.from_scale(Vector3(w + 0.1, 0.06, 0.12)), pos - Vector3(0, 0.33, 0)), false)
+	var px := 0.0042
+	var lines := ceili(text.length() * 64.0 * px * 0.62 / (w * 0.92))
+	var h := lines * 64.0 * px * 1.15 + 0.22
+	add(box_mesh(), mat(board), Transform3D(bas * Basis.from_scale(Vector3(w, h, 0.1)), pos))
+	add(box_mesh(), mat("brass"), Transform3D(bas * Basis.from_scale(Vector3(w + 0.1, 0.06, 0.12)), pos + Vector3(0, h / 2 + 0.02, 0)), false)
+	add(box_mesh(), mat("brass"), Transform3D(bas * Basis.from_scale(Vector3(w + 0.1, 0.06, 0.12)), pos - Vector3(0, h / 2 + 0.02, 0)), false)
 	for s in [1, -1]:
-		var l := Label3D.new(); l.text = text; l.font_size = 64; l.pixel_size = 0.0055
+		var l := Label3D.new(); l.text = text; l.font_size = 64; l.pixel_size = px
 		l.modulate = col; l.outline_size = 8; l.outline_modulate = Color(0.2, 0.1, 0.05)
-		l.width = w / 0.0055 * 0.95; l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.width = w / px * 0.92; l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.position = pos + bas * Vector3(0, 0, 0.07 * s); l.rotation.y = yaw + (0.0 if s == 1 else PI)
 		l.double_sided = false
 		root.add_child(l)

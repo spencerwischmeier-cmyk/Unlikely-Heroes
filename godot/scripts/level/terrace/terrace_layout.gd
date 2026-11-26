@@ -208,7 +208,7 @@ static func _bazaar(L: Node3D) -> void:
 	for p in [Vector3(-78.6, 0, 46), Vector3(-51.4, 0, 33.6)]: TK.tree(p, 2.6, "blossom")
 	TK.tree(Vector3(-78.6, 0, 40.5), 2.2)
 	for p in [Vector3(-79, 0, 50.2), Vector3(-68.2, 0, 34.6), Vector3(-61.6, 0, 46.2)]:
-		TK.model("res://models/docks/barrels.glb", p, p.x, 1.2, true)
+		TK.goods_heap(p, p.x, 0.9)
 	TK.model("res://models/docks/crates.glb", Vector3(-78.8, 0, 34.0), 0.4, 1.6, true)
 	# fences
 	TK.rail_fence(Vector3(-80, 0, 30.2), Vector3(-80, 0, 54))
