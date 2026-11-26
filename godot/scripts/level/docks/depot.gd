@@ -254,12 +254,15 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	step_crates(L, Vector3(69.2, 0, 40.2), 1.3, 1.2)
 	step_crates(L, Vector3(82.6, 0, 38.4), 1.4, 2.0)
 	step_crates(L, Vector3(57.4, 0, 23.0), 1.3, 0.2)
+	step_crates(L, Vector3(74.4, 0, 38.9), 1.3, 0.7)
+	L.crate_spots.append(Vector3(81.5, CH * 3, 35.75))   # a sprocket crate on the tallest stack
 	# sprockets along the tops (upper route) and down the corridors
 	var top1 := CH + 0.9; var top2 := CH * 2 + 0.9; var top3 := CH * 3 + 0.9
 	sprocket_line(A, Vector3(63, top1, 26.2), Vector3(67, top1, 26.2), 3)
 	sprocket_line(A, Vector3(57, top2, 26.2), Vector3(61, top2, 26.2), 3)
 	sprocket_line(A, Vector3(63, top2, 33.8), Vector3(67, top2, 33.8), 3)
 	sprocket_line(A, Vector3(74.4, top2, 26.5), Vector3(74.4, top2, 31.5), 3)
+	sprocket_line(A, Vector3(74.4, top1, 33.0), Vector3(74.4, top1, 36.5), 2)
 	sprocket_line(A, Vector3(66.75, top2, 36.5), Vector3(66.75, top2, 40.8), 3)
 	sprocket_line(A, Vector3(77.5, top3, 35.75), Vector3(81.5, top3, 35.75), 3, 10)
 	sprocket_line(A, Vector3(60, 1.0, 30), Vector3(66, 1.0, 30), 4)
@@ -268,8 +271,9 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	# dock bots trundling the corridors, a forklift doing laps of the north yard
 	looper(L, A, "dock_bot", 1.3, [Vector3(62, 0, 28.6), Vector3(66, 0, 28.6), Vector3(71.5, 0, 31.5), Vector3(71.5, 0, 40.5),
 		Vector3(70.5, 0, 31.5), Vector3(66, 0, 28.9)], 1.6, 0.0, Vector3(0.9, 1.2, 0.9))
-	looper(L, A, "forklift", 2.3, [Vector3(63, 0, 16.5), Vector3(78, 0, 16.5), Vector3(78.5, 0, 20.5), Vector3(63, 0, 20.5)], 2.6, 0.0, Vector3(1.4, 2.0, 1.4))
+	var fk1 := looper(L, A, "forklift", 2.3, [Vector3(63, 0, 16.5), Vector3(78, 0, 16.5), Vector3(78.5, 0, 20.5), Vector3(63, 0, 20.5)], 2.6, -PI / 2, Vector3(1.4, 2.0, 1.4))
 	looper(L, A, "dock_bot", 1.2, [Vector3(76, 0, 47.5), Vector3(60, 0, 47.5)], 1.3, 0.0, Vector3(0.9, 1.1, 0.9))
+	A.horns.append({ node = fk1, every = 11.0, t = 3.0, sound = "docks_forklift_beep", db = -8.0, near = 22.0 })
 	# jib cranes swinging loads over the canyon and the north yard
 	jib_crane(L, A, Vector3(59.6, 0, 13.2), 4.5, 12.0, PI * 0.15, 0.55, 26.0, 4)
 	jib_crane(L, A, Vector3(81.5, 0, 47.5), 4.5, 12.0, PI * 1.1, 0.45, 30.0, 1)
@@ -446,7 +450,8 @@ static func _warehouse(L: Node3D, A: Node3D) -> void:
 	DocksDressing.place(L, "crates", Vector3(88.5, 0, 44.0), 0.6, 1.6, true)
 	DocksDressing.place(L, "barrels", Vector3(110.5, 0, 36), 1.0, 1.3, true)
 	DocksDressing.place(L, "cable_spool", Vector3(93, 0, 16.2), 0.0, 1.2, true)
-	looper(L, A, "forklift", 2.3, [Vector3(88, 0, 36.5), Vector3(108, 0, 36.5), Vector3(108, 0, 40), Vector3(88, 0, 40)], 2.2, 0.0, Vector3(1.4, 2.0, 1.4))
+	var fk2 := looper(L, A, "forklift", 2.3, [Vector3(88, 0, 36.5), Vector3(108, 0, 36.5), Vector3(108, 0, 40), Vector3(88, 0, 40)], 2.2, -PI / 2, Vector3(1.4, 2.0, 1.4))
+	A.horns.append({ node = fk2, every = 12.0, t = 6.0, sound = "docks_forklift_beep", db = -8.0, near = 22.0 })
 	looper(L, A, "dock_bot", 1.3, [Vector3(95, 0, 24.5), Vector3(102, 0, 24.5), Vector3(102, 0, 27), Vector3(95, 0, 27)], 1.2, 0.0, Vector3(0.9, 1.2, 0.9))
 	# overhead gantry trolley on a beam (purely visual)
 	L.box(Vector3(98, 7.6, 34.5), Vector3(27, 0.4, 0.5), M.paint(Color(0.95, 0.72, 0.15)), false)
