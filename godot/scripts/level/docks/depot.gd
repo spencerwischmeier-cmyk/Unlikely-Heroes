@@ -556,6 +556,15 @@ static func _piers_abc(L: Node3D, A: Node3D) -> void:
 	# a tall crane pylon east of Pier C swinging a load over the deck (well above head height)
 	jib_crane(L, A, Vector3(82, -11, -38), 20.0, 12.0, PI, 0.5, 34.0, 0)
 	L.box(Vector3(82, -11.5, -38), Vector3(5, 1.0, 5), L.mat_dark, false)
+	# sprocket trails along the grind rails (collect them on the ride)
+	for ri in [L.R_DOCKS_1, L.R_DOCKS_2, L.get_meta("rail_depot", -1)]:
+		if ri < 0 or ri >= L.rails.size(): continue
+		var cv: Curve3D = L.rails[ri].curve
+		var ln: float = cv.get_baked_length()
+		var u := 3.0
+		while u < ln - 2.0:
+			sprocket(A, cv.sample_baked(u) + Vector3(0, 0.9, 0))
+			u += 2.2
 	# cargo drones ferrying crates between the piers, the depot and the berth
 	_drone(L, A, [Vector3(39, 14, 30), Vector3(70, 15, 19), Vector3(98, 15, 12), Vector3(126, 17, 26), Vector3(98, 16, 8), Vector3(70, 15, 15)], 6.0)
 	_drone(L, A, [Vector3(58, 15, -8), Vector3(70, 16, -38), Vector3(92, 18, -22), Vector3(100, 16, 4)], 5.0)
