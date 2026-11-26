@@ -143,6 +143,7 @@ func _bridge_out(u: float) -> void:
 
 func _process(dt: float) -> void:
 	if not is_visible_in_tree(): return
+	dt = minf(dt, 0.1)   # a long hitch (loading, shader compiles) must not skip the whole visit
 	t -= dt
 	var lamp: StandardMaterial3D = get_meta("lamp")
 	match state:

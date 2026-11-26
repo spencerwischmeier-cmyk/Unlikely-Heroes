@@ -47,8 +47,8 @@ func _plan_crowd() -> void:
 	for h in by_h: layer_of[h] = crowd.add_layer("h%.1f" % h, h, by_h[h])
 	var lay := func(island: String) -> int: return layer_of[snappedf(L.heights.get(island, 0.0), 0.1)]
 	# [island, roamers, evacuees]
-	var homes := [["plaza", 12, 8], ["terrace", 6, 2], ["gardens", 5, 0], ["promenade", 2, 0], ["conservatory", 2, 0],
-		["pier_a", 3, 4], ["pier_b", 2, 0], ["pier_c", 2, 0], ["pier_d", 3, 0], ["berth", 7, 0], ["causeway", 2, 0],
+	var homes := [["plaza", 12, 6], ["terrace", 6, 2], ["gardens", 5, 0], ["promenade", 2, 0], ["conservatory", 2, 0],
+		["pier_a", 3, 9], ["pier_b", 2, 0], ["pier_c", 2, 0], ["pier_d", 3, 0], ["berth", 7, 0], ["causeway", 2, 0],
 		["tier2", 1, 0], ["tier3", 1, 0], ["tier4", 1, 0], ["plaza_park", 2, 0]]
 	for h in homes:
 		if not L.islands.has(h[0]): continue
@@ -185,10 +185,15 @@ func _debug_cam() -> void:
 	if _cam == null and not has_meta("nocam"):
 		set_meta("nocam", true)
 		for a in OS.get_cmdline_user_args():
+			if a == "--panic-cam-ship" and evac:
+				# follow the evacuation shuttle from the pier
+				_cam = Camera3D.new(); _cam.fov = 55.0; _cam.far = 4000.0; add_child(_cam)
+				_cam.position = Vector3(30, 4, 34); _cam.set_meta("ship", true); _cam.set_meta("at", Vector3.ZERO)
 			if a.begins_with("--panic-cam="):
 				var v := a.substr(12).split_floats(",")
 				_cam = Camera3D.new(); _cam.fov = 60.0; _cam.far = 4000.0; add_child(_cam)
 				_cam.position = Vector3(v[0], v[1], v[2]); _cam.set_meta("at", Vector3(v[3], v[4], v[5]))
 	if _cam:
 		_cam.current = true
-		_cam.look_at(_cam.get_meta("at"))
+		if _cam.has_meta("ship") and evac.ship.visible: _cam.set_meta("at", evac.ship.global_position)
+		if _cam.get_meta("at") != Vector3.ZERO: _cam.look_at(_cam.get_meta("at"))

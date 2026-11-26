@@ -291,7 +291,7 @@ func _go(p: Dictionary, run := true) -> void:
 	p.state = "walk"
 	var carrying: bool = p.role == "evac" and p.slot >= 0 and p.flee_from == Vector3.ZERO
 	if p.luggage: p.luggage.visible = carrying
-	if carrying: p.speed = rng.randf_range(1.7, 2.1); _play(p, "carry")
+	if carrying: p.speed = rng.randf_range(2.3, 2.8); _play(p, "carry", 0.25, 1.3)
 	elif run and not calm: p.speed = rng.randf_range(4.2, 5.6); _play(p, p.run_clip, 0.2, p.speed / 5.0)
 	elif calm: p.speed = 3.0; _play(p, "run2", 0.25, 0.62)
 	else: p.speed = 1.5; _play(p, "sneak")
@@ -342,7 +342,8 @@ func _step(p: Dictionary, dt: float, pp: Vector3) -> void:
 		p.active = act
 		if p.ap: p.ap.active = act
 	p.node.visible = d < SHOW_D
-	if not act: return
+	# far away people stand still, except those on their way somewhere (evacuees must still reach the queue)
+	if not act and p.state != "walk": return
 	# threats: a bot close by makes people duck and run (queuers just flinch)
 	p.threat_t -= dt
 	if p.threat_t <= 0.0:
