@@ -485,23 +485,16 @@ func _build_terrace() -> void:
 	# and the Roof Gardens on top
 	var t1 := rect(-39, 37, 22, 26)
 	island("terrace", t1, 0.0, Color(1.0, 0.95, 0.88))
-	fence(t1, 0.0, [["e", 29, 37], ["w", 24, 50], ["n", -50, -28]], "nsew")
-	var awn := [Color(1, 0.42, 0.29), Color(0.29, 0.69, 1), Color(1, 0.75, 0.25), Color(0.48, 0.82, 0.42)]
-	for s in [[-46, 44, PI / 2, 0], [-46, 36, PI / 2, 1], [-34, 46, PI, 2], [-34, 28, 0, 3]]:
-		var n := Node3D.new(); n.position = Vector3(s[0], 0, s[1]); n.rotation.y = s[2]; add_child(n)
-		box(Vector3(0, 0.55, 0), Vector3(3.2, 1.1, 1.2), mat_white, true, n)
-		for sx in [-1, 1]: box(Vector3(1.5 * sx, 1.3, -0.5), Vector3(0.1, 2.6, 0.1), mat_dark, false, n)
-		var aw := box(Vector3(0, 2.6, 0.1), Vector3(3.6, 0.15, 1.8), M.std(awn[s[3]], 0.1, 0.55), false, n)
-		aw.rotation_degrees.x = 14
-	for p in [Vector2(-30, 48), Vector2(-48, 26)]: lamp(p.x, p.y, Color(1, 0.82, 0.5))
+	# (the market dressing, the bazaar, tea terrace and loft are built in scripts/level/terrace/)
+	fence(t1, 0.0, [["e", 29, 37], ["w", 24, 50]], "nsew")
 	label("MARKET TERRACE", Vector3(-39, 0, 38), 7)
 	checkpoints.append({ pos = Vector3(-36, 0.1, 37), r = 3.0 })
 	hint_sign("DOUBLE JUMP: JUMP AGAIN IN THE AIR", Vector3(-47, 0, 31), PI / 2)
 	# tier 2 (2.4) and tier 3 (4.8): double jumps
 	island("tier2", rect(-56, 22, 12, 16), 2.4, Color(0.95, 0.9, 0.82), 3.6)
 	island("tier3", rect(-55, 3, 14, 12), 4.8, Color(0.95, 0.9, 0.82), 1.6)
-	prop("planter", Vector3(-59, 2.4, 26)); prop("vent_stack", Vector3(-60, 2.4, 16), 0.0, 1.0, true)
-	prop("chimney", Vector3(-60, 4.8, 7), 0.0, 1.0, true)
+	prop("planter", Vector3(-53, 2.4, 21)); prop("vent_stack", Vector3(-60, 2.4, 16), 0.0, 1.0, true)
+	prop("chimney", Vector3(-60.5, 4.8, -0.5), 0.0, 1.0, true)
 	checkpoints.append({ pos = Vector3(-55, 4.9, 3), r = 3.0 })
 	hint_sign("GLIDE: HOLD JUMP AFTER THE DOUBLE JUMP", Vector3(-50, 4.8, -2), PI)
 	# the glide gap to tier 4 (4.0)
