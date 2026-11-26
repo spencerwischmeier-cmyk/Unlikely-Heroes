@@ -633,30 +633,40 @@ func _build_mast() -> void:
 	R_YARD = rail([Vector3(14, 20.45, -36.6), Vector3(13, 19.4, -41), Vector3(11, 15.5, -47), Vector3(7, 9.5, -53), Vector3(3, 4, -58.5), Vector3(1, 1.0, -61.5)], true)
 
 func _build_crane_yard() -> void:
-	# causeway from the plaza: walkway, sliding platform, pads, then the gate island and the arena
+	# causeway from the plaza: walkway, sliding platform, pads, then the gate island. From the gate island a
+	# conveyor bridge runs west to Container Row (the gauntlet), whose catwalk enters the boss arena through
+	# its west gate. The holding pen sits east of the gate island. Dressing: scripts/level/areas/yard.gd
 	island("causeway", rect(-6, 4, 8, 10), 0.0, Color(0.9, 0.9, 0.92), 0.8)
 	moving_platform(Vector3(-6, -0.3, -6), Vector3(-6, -0.3, -22), 8.0)
 	island("causeway_2", rect(-6, -30, 8, 8), 0.0, Color(0.9, 0.9, 0.92), 0.8)
 	sky_pad(-6, -40, 4, 4); sky_pad(-3, -46, 4, 4); sky_pad(0, -52, 4, 4)
-	var gi := rect(0, -64, 28, 14)
+	var gi := rect(0, -64, 36, 14)
 	island("yard_gate", gi, 0.0, Color(0.86, 0.88, 0.9))
-	fence(gi, 0.0, [], "ew")
-	prop("gantry", Vector3(8, 0, -70), 0.0, 1.0, false)
-	for p in [Vector3(9, 0, -60), Vector3(11, 0, -66)]: prop("cargo_container", p, PI / 2)
-	lamp(-13, -58, Color(1, 0.45, 0.3)); lamp(13, -58, Color(1, 0.45, 0.3))
+	fence(gi, 0.0, [["w", -67, -61], ["e", -68.5, -63.5], ["s", -3, 3]])
 	label("CRANE YARD", Vector3(0, 0, -62), 6, Color(1, 0.78, 0.85))
 	checkpoints.append({ pos = Vector3(0, 0.1, -62), r = 3.0 })
-	gate("yard_gate", Vector3(0, 0, -71.6), 50.0, 12.0)
-	walkway(-3, -82, 3, -71)
-	# the boss arena
-	var y := rect(0, -97, 36, 30)
+	gate("yard_gate", Vector3(0, 0, -57.2), 7.0, 4.0)
+	# west: the conveyor bridge to Container Row (built in yard.gd), gated until the gate island is cleared
+	gate("yard_west", Vector3(-18.2, 0, -64), 6.0, 4.0, false)
+	var row := rect(-44, -81, 28, 38)
+	island("yard_row", row, 0.0, Color(0.84, 0.82, 0.78))
+	fence(row, 0.0, [["e", -67, -61], ["e", -99, -93]])
+	checkpoints.append({ pos = Vector3(-34, 0.1, -64), r = 2.4 })
+	walkway(-30, -99, -22, -93)
+	gate("arena_gate", Vector3(-22.4, 0, -96), 6.0, 5.0, false)
+	# east: the holding pen, over a crane-slung pallet
+	var pen := rect(40, -74, 24, 22)
+	island("yard_pen", pen, 0.0, Color(0.82, 0.8, 0.76))
+	fence(pen, 0.0, [["w", -68.5, -63.5]])
+	moving_platform(Vector3(20.6, -0.3, -66), Vector3(25.6, -0.3, -66), 5.0, Vector3(4.4, 0.6, 4.4), "yard_pallet")
+	# the boss arena (centre and boss spot unchanged; 44 x 34)
+	var y := rect(0, -97, 44, 34)
 	island("arena", y, 0.0, Color(0.86, 0.88, 0.9))
-	fence(y, 0.0, [["s", -3, 3]])
+	fence(y, 0.0, [["w", -99, -93]])
 	var c := y.get_center()
 	for o in [Vector2(-10, -9), Vector2(10, -9), Vector2(-10, 9), Vector2(10, 9)]: block(c.x + o.x, c.y + o.y, 2.4, 2.4, 1.6, 0, mat_blue)
-	for o in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]: lamp(c.x + o.x * 16.6, c.y + o.y * 13.6, Color(1, 0.45, 0.3))
-	prop("gantry", Vector3(0, 0, -111), 0.0, 1.6, false)
-	checkpoints.append({ pos = Vector3(0, 0.1, -84.5), r = 2.4 })
+	for o in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]: lamp(c.x + o.x * 20.6, c.y + o.y * 16.6, Color(1, 0.45, 0.3))
+	checkpoints.append({ pos = Vector3(-26, 0.1, -96), r = 2.4 })
 
 func _define_zones() -> void:
 	shop_spots = [{ pos = Vector3(-15, 0, 42), yaw = PI * 0.5, stock = ["scatter_bloom", "thump_lobber"] },
@@ -724,7 +734,10 @@ func _define_zones() -> void:
 			unlock_rails = [R_YARD], open_gates = ["causeway_gate", "yard_gate"], grants = ["shard_1"] },
 		{ id = "yard_gate", name = "CRANE YARD GATE", rect = islands.yard_gate, objective = "Ride the rail down to the Crane Yard",
 			enter_lines = ["sky_yard_gate_1"], clear_lines = ["sky_yard_gate_clear_1", "sky_yard_gate_clear_2"],
-			waves = [{ roller = 3 }, { crew = 1, hornet = 1 }, { roller = 2, hornet = 2 }] },
+			waves = [{ roller = 3 }, { crew = 1, hornet = 1 }, { roller = 2, hornet = 2 }], open_gates = ["yard_west"] },
+		{ id = "yard_row", name = "CONTAINER ROW", rect = islands.yard_row, objective = "Ride the conveyor west and fight through Container Row",
+			waves = [{ roller = 3, hornet = 1 }, { crew = 1, roller = 2 }, { hornet = 2, roller = 2 }, { crew = 1, hornet = 2 }],
+			banner = "ROW CLEAR", open_gates = ["arena_gate"] },
 		{ id = "yard", name = "CRANE YARD", kind = "boss", rect = islands.arena, objective = "Take on whatever is in the Crane Yard",
 			enter_lines = ["yard_intro_1", "yard_intro_2", "yard_intro_3"], boss_pos = Vector3(0, 0, -102) },
 	]
