@@ -55,6 +55,7 @@ var weights := {}
 var debug := false
 var verb := 0.08
 var prev_swing := false
+var prev_hook = null
 var emit_t := 1.0
 var turbines_done := false
 var chat_t := 2.0
@@ -437,6 +438,11 @@ func _update_emitters() -> void:
 		fountain_done = true
 		var f := Node3D.new(); f.name = "FountainSnd"; Game.level.add_child(f); f.global_position = Vector3(0, 1.2, 28)
 		_attach(f, "fountain", -6.0, 3.0, 26.0)
+	# hidden pickups (washers, pages) glint audibly when you're close
+	var col: Node = Game.main.get_node_or_null("Collectibles") if Game.main else null
+	if col and col.get("items") != null:
+		for it in col.items:
+			if it is Dictionary and it.has("node") and is_instance_valid(it.node): _attach(it.node, "sparkle_loop", -9.0, 1.5, 11.0)
 	if Game.main:
 		var dg: Node = Game.main.get_node_or_null("Dodger")
 		if dg and dg.get("drone") != null: _attach(dg.drone, "drone_hum", -18.0, 2.0, 16.0)
@@ -482,6 +488,9 @@ func _update_hero() -> void:
 	Snd.menu_duck = menu
 	var lp := Snd.bus_fx("Music", "AudioEffectLowPassFilter")
 	if lp: lp.cutoff_hz = lowpass
+	var ht = pl.get("hook_target")
+	if ht != null and ht != prev_hook and pl.get("swing_hook") == null and not paused: Snd.play("hook_lock", -11.0, 0.0, 0.3)
+	prev_hook = ht
 	var swinging: bool = pl.get("swing_hook") != null
 	if swinging and not prev_swing: Snd.play("rope_swing", -10.0, 0.08, 0.3)
 	prev_swing = swinging
