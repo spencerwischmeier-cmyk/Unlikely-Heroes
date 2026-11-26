@@ -1,5 +1,5 @@
 extends Node
-## Screenshot + fps tour of the Crane Bot arena (see areas/yz_arena.gd, --arena-shots=<prefix>).
+## Screenshot + fps tour of the Crane Bot arena (see areas/y_yard_arena.gd, --arena-shots=<prefix>).
 ## Positions are offsets from the arena's centre (x, z), so they follow the layout spread.
 
 var prefix := ""
@@ -9,6 +9,7 @@ const SPOTS := [
 	["stands", Vector2(-10, -3), Vector3(28, 0, 0), -0.18],
 	["gate", Vector2(13, -2), Vector3(-24, 0, 1), -0.16],
 	["foundry", Vector2(2, -13), Vector3(0, 0, -40), -0.1],
+	["sky", Vector2(4, 4), Vector3(-6, 0, -44), 0.32],
 	["over", Vector2(0, 14), Vector3(0, 0, -6), 0.0, true],
 ]
 var only := []

@@ -1,5 +1,5 @@
 extends RefCounted
-## Crane Bot arena look pass (built by areas/yz_arena.gd, in final coordinates, after the floors).
+## Crane Bot arena look pass (built by areas/y_yard_arena.gd, in final coordinates, after the floors).
 ## Chases the Junkyard look target (art/lookdev/junkyard_look.py) on the boss stage and the foundry behind it:
 ##   - weathered paint-over-steel on the Crane Yard's structure (shaders/painted_steel.gdshader): rounded
 ##     edges, chipped paint, rust streaks and grime, instead of flat clean colours
@@ -19,11 +19,11 @@ const STEEL_SHADER := "res://shaders/painted_steel.gdshader"
 
 ## yard_kit material key -> [paint colour, paint metallic, paint roughness, chip, rust, streaks, hazard]
 const PAINTS := {
-	"yellow": [Color(0.93, 0.64, 0.1), 0.1, 0.42, 1.0, 0.55, 0.8, 0.0],
-	"red": [Color(0.7, 0.17, 0.12), 0.1, 0.45, 0.9, 0.5, 0.7, 0.0],
+	"yellow": [Color(0.9, 0.6, 0.1), 0.1, 0.42, 1.15, 0.75, 1.0, 0.0],
+	"red": [Color(0.66, 0.16, 0.11), 0.1, 0.45, 1.0, 0.65, 0.9, 0.0],
 	"cream": [Color(0.84, 0.79, 0.68), 0.05, 0.5, 0.9, 0.5, 0.8, 0.0],
-	"steel": [Color(0.3, 0.31, 0.33), 0.55, 0.42, 0.6, 0.45, 0.6, 0.0],
-	"dark": [Color(0.15, 0.155, 0.17), 0.45, 0.48, 0.55, 0.4, 0.5, 0.0],
+	"steel": [Color(0.3, 0.31, 0.33), 0.55, 0.42, 0.7, 0.6, 0.8, 0.0],
+	"dark": [Color(0.15, 0.155, 0.17), 0.45, 0.48, 0.65, 0.55, 0.7, 0.0],
 	"hazard": [Color(0.93, 0.64, 0.1), 0.1, 0.45, 0.9, 0.45, 0.5, 1.0],
 }
 
@@ -31,14 +31,17 @@ static func on() -> bool:
 	return not OS.get_cmdline_user_args().has("--no-arena-look")
 
 static func build(L) -> void:
-	var r: Rect2 = L.islands.get("arena")
-	var c2 := r.get_center()
-	var c := Vector3(c2.x, 0, c2.y)
+	# the arena's centre, taken from the crane bridge yard.gd hangs over it (so it follows any layout spread)
+	var br: Node3D = L.find_child("ArenaBridge", true, false)
+	if br == null: return
+	var c := Vector3(br.global_position.x, 0, br.global_position.z)
+	var c2 := Vector2(c.x, c.z)
 	var t0 := Time.get_ticks_msec()
 	var n := _materials(L, Rect2(c2.x - 80, c2.y - 60, 160, 160))
 	_floor(L, c)
 	_fx(L, c)
 	_dress(L, c)
+	_cover_bales(L, c)
 	_lights(L, c)
 	print("[arena-look] %d pieces repainted, built in %d ms" % [n, Time.get_ticks_msec() - t0])
 
@@ -86,25 +89,34 @@ static func _materials(L: Node3D, region: Rect2) -> int:
 # ------------------------------------------------------------------ the stage floor
 ## Darker, oilier concrete on the arena and foundry floors (a copy of the Crane Yard floor material).
 static func _floor(L: Node3D, c: Vector3) -> void:
-	var stage := Rect2(c.x - 26, c.z - 52, 52, 72)
-	var done := {}
-	for mi in L.find_children("*", "MeshInstance3D", true, false):
-		var g := mi as MeshInstance3D
-		var sm := g.material_override as ShaderMaterial
-		if sm == null or sm.shader == null or not sm.shader.resource_path.ends_with("ground.gdshader"): continue
-		var gp := g.global_position
-		if not stage.has_point(Vector2(gp.x, gp.z)): continue
-		if not done.has(sm):
-			var d := sm.duplicate() as ShaderMaterial
-			var tint: Color = d.get_shader_parameter("tint") if d.get_shader_parameter("tint") != null else Color.WHITE
-			d.set_shader_parameter("tint", Color(tint.r * 0.62, tint.g * 0.58, tint.b * 0.55))
-			d.set_shader_parameter("oil", 1.0)
-			d.set_shader_parameter("puddles", 0.7)
-			d.set_shader_parameter("edge_grime", 0.85)
-			d.set_shader_parameter("grime_col", Color(0.2, 0.15, 0.11))
-			d.set_shader_parameter("moss", 0.0)
-			done[sm] = d
-		g.material_override = done[sm]
+	# the stage and foundry decks get their own copy of the Crane Yard concrete (ground.gd): darker, oil-soaked
+	# and grimy
+	var gnd: Node = null
+	for ch in L.get_children():
+		if ch.get_script() == preload("res://scripts/level/ground/ground.gd"): gnd = ch
+	if gnd == null or not ("mats" in gnd) or not (gnd.mats as Dictionary).has(7): return
+	var d := (gnd.mats[7] as ShaderMaterial).duplicate() as ShaderMaterial
+	d.set_shader_parameter("tint", Color(0.52, 0.48, 0.45))
+	d.set_shader_parameter("side_tint", Color(0.5, 0.46, 0.43))
+	d.set_shader_parameter("oil", 1.0)
+	d.set_shader_parameter("puddles", 0.6)
+	d.set_shader_parameter("edge_grime", 0.9)
+	d.set_shader_parameter("grime_col", Color(0.18, 0.14, 0.1))
+	d.set_shader_parameter("moss", 0.0)
+	var swapped := 0
+	for probe in [c + Vector3(3, -0.05, 3), c + Vector3(-6, -1.05, -38), c + Vector3(6, -1.05, -30)]:
+		for gi in L.find_children("*", "MeshInstance3D", true, false):
+			var g := gi as MeshInstance3D
+			if g.mesh == null or g.material_override == d: continue
+			var om := g.material_override as ShaderMaterial
+			if om == null or om.shader == null or not om.shader.resource_path.ends_with("ground.gdshader"): continue
+			var ab: AABB = g.global_transform * g.mesh.get_aabb()
+			if not ab.grow(0.02).has_point(probe) or ab.size.x < 10.0 or ab.size.z < 10.0: continue
+			g.material_override = d
+			g.set_instance_shader_parameter("rect", Vector4(ab.position.x, ab.position.z, ab.end.x, ab.end.z))
+			g.set_instance_shader_parameter("seed", fposmod(ab.get_center().x * 0.137 + ab.get_center().z * 0.291, 10.0))
+			swapped += 1
+	print("[arena-look] floors restyled: %d" % swapped)
 	# soot fans and scorch where the boss's magnet slams land, and around the grates
 	var C: Node3D = Chaos.make(L, "arena_floor")
 	C.center = c; C.radius = 90.0
@@ -124,6 +136,7 @@ static func _fx(L: Node3D, c: Vector3) -> void:
 		var top: Vector3 = c + s + Vector3(0, 22.6, 0)
 		_drop_particles_near(L, top + Vector3(0, 0.4, 0), 2.0)
 		C.column(top, 1.4, 34.0, 0.22)
+		print("[arena-look] stack column at ", top)
 	# burning scrap at the foundry and the stage's back corners
 	for f in [[Vector3(-19.5, y0, -28.0), 1.3], [Vector3(21.0, y0, -30.0), 1.1], [Vector3(-3.0, y0, -44.0), 1.5],
 			[Vector3(-23.5, 0.0, -14.5), 0.9], [Vector3(31.5, 0.0, 15.5), 0.8]]:
@@ -217,7 +230,41 @@ static func _lights(L: Node3D, c: Vector3) -> void:
 		var sp := SpotLight3D.new()
 		sp.light_color = Color(1.0, 0.86, 0.66); sp.light_energy = 6.0; sp.spot_range = 34.0; sp.spot_angle = 26.0
 		sp.spot_attenuation = 0.9; sp.light_volumetric_fog_energy = 3.0
-		sp.shadow_enabled = s > 0.0          # one shadowed beam is enough
+		sp.shadow_enabled = false            # the sun already shadows the stage; beams are for the haze
 		L.add_child(sp)
 		sp.global_position = base
 		sp.look_at(c + Vector3(-5.0 * s, 0, 6.0), Vector3.UP)
+
+## The four cover blocks on the stage (level_skyharbor.gd builds them as plain rust boxes) become stacks of
+## crushed-scrap bales, like the Junkyard's Sorting Works. The boxes stay as the colliders.
+static func _cover_bales(L: Node3D, c: Vector3) -> void:
+	if not JK.hd_on(): return
+	var want := []
+	for o in [Vector2(-10, -9), Vector2(10, -9), Vector2(-10, 9), Vector2(10, 9)]: want.append(Vector3(c.x + o.x, 0, c.z + o.y))
+	var B := JK.Batch.new()
+	var rng := RandomNumberGenerator.new(); rng.seed = 3203
+	var hid := 0
+	for mi in L.find_children("*", "MeshInstance3D", true, false):
+		var g := mi as MeshInstance3D
+		if not (g.mesh is BoxMesh) or not g.visible: continue
+		var sz := (g.mesh as BoxMesh).size
+		if absf(sz.x - 2.4) > 0.05 or absf(sz.z - 2.4) > 0.05 or absf(sz.y - 1.6) > 0.05: continue
+		var gp := g.global_position
+		var hit := false
+		for w in want:
+			if Vector2(gp.x - w.x, gp.z - w.z).length() < 0.6: hit = true
+		if not hit: continue
+		g.visible = false
+		hid += 1
+		var base := Vector3(gp.x, gp.y - sz.y * 0.5, gp.z)
+		for k in 2:
+			var rot := (k % 2) * PI / 2 + rng.randf_range(-0.05, 0.05)
+			var bas := Basis(Vector3.UP, rot)
+			for j in 2:
+				var off := bas * Vector3((j - 0.5) * 1.2, 0, 0)
+				var p := base + off + Vector3(0, 0.4 + k * 0.8, 0)
+				B.add("bale", "bale", JK.xform(p, Vector3(rng.randf_range(-0.02, 0.02), rot, 0), Vector3(1.17, 0.78, 2.36)),
+					JK.PALETTE[rng.randi() % JK.PALETTE.size()])
+	var host := Node3D.new(); host.name = "ArenaCoverBales"; L.add_child(host)
+	B.flush(host, JK)
+	print("[arena-look] cover blocks baled: %d" % hid)
