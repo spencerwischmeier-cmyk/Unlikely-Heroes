@@ -412,6 +412,36 @@ static func _wash_nook(L: Node3D) -> void:
 
 # ------------------------------------------------------------------ sky lanterns drifting up
 static func _sky_lanterns() -> void:
+	# kites tethered to the market, bobbing in the wind
+	for k in [[Vector3(-79.6, 1.0, 52.6), Vector3(-90, 17, 64), "crimson", "saffron"], [Vector3(-50.6, 2.4, 14.8), Vector3(-44, 16, 4), "teal", "cream"],
+			[Vector3(-96.8, 7.8, 19.6), Vector3(-108, 21, 28), "plum", "saffron"]]:
+		var kn := Node3D.new(); kn.position = k[1]; TK.root.add_child(kn)
+		for i in 2:
+			var km := MeshInstance3D.new(); km.mesh = TK.pennant_mesh(); km.material_override = TK.mat("cloth_" + (k[2] if i == 0 else k[3]))
+			km.scale = Vector3(1.6, 1.3 if i == 0 else 0.5, 1); km.rotation.z = 0.0 if i == 0 else PI
+			kn.add_child(km)
+		for j in 4:
+			var tail := MeshInstance3D.new(); tail.mesh = TK.pennant_mesh(); tail.material_override = TK.mat("cloth_" + k[3])
+			tail.scale = Vector3(0.3, 0.3, 1); tail.position = Vector3(0, -1.6 - j * 0.45, 0); tail.rotation.z = PI
+			kn.add_child(tail)
+		kn.look_at_from_position(k[1], k[0], Vector3.UP)
+		life.add_swinger(kn, 0.25, 0.8)
+		TK.rope(k[0], k[1] + Vector3(0, -0.6, 0), 2.0, 10, 0.012)
+	# a goods basket on a pulley, going up and down between the bazaar and the tea terrace
+	TK.post(Vector3(-79.3, 3.6, 29.5), 4.4, 0.1, "wood_dark")
+	TK.add(TK.box_mesh(), TK.mat("wood"), TK.tf(Vector3(-79.3, 7.9, 30.4), Vector3(0.2, 0.2, 2.0)))
+	TK.add(TK.cyl_mesh(12), TK.mat("brass"), TK.tf(Vector3(-79.3, 7.75, 31.2), Vector3(0.5, 0.12, 0.5), Vector3(PI / 2, 0, 0)), false)
+	var basket := Node3D.new(); basket.position = Vector3(-79.3, 1.8, 31.2); TK.root.add_child(basket)
+	var bm := MeshInstance3D.new(); bm.mesh = TK.cyl_mesh(10); bm.material_override = TK.mat("wood"); bm.scale = Vector3(0.9, 0.6, 0.9); basket.add_child(bm)
+	for i in 3:
+		var fr := MeshInstance3D.new(); fr.mesh = TK.sphere_mesh(); fr.material_override = TK.mat(["spice_orange", "spice_green", "spice_red"][i])
+		fr.scale = Vector3.ONE * 0.32; fr.position = Vector3(cos(i * 2.1) * 0.2, 0.35, sin(i * 2.1) * 0.2); basket.add_child(fr)
+	TK.add(TK.cyl_mesh(5), TK.mat("rope"), TK.tf(Vector3(-79.3, 4.6, 31.2), Vector3(0.03, 6.3, 0.03)), false)
+	var tw := basket.create_tween().set_loops()
+	tw.tween_interval(3.0)
+	tw.tween_property(basket, "position:y", 4.4, 4.0).set_trans(Tween.TRANS_SINE)
+	tw.tween_interval(3.0)
+	tw.tween_property(basket, "position:y", 1.8, 4.0).set_trans(Tween.TRANS_SINE)
 	var bases := [Vector3(-92, 9, 12), Vector3(-66, 2, 45), Vector3(-72, 6, 20), Vector3(-100, 6, 26), Vector3(-58, 1, 60), Vector3(-84, 3, 40)]
 	for i in bases.size():
 		var n := Node3D.new(); TK.root.add_child(n)
