@@ -33,9 +33,12 @@ const AREAS := {
 const ISLAND_AREA := [["junkyard", "junkyard"], ["junk", "junkyard"], ["causeway_2", "yard"], ["causeway", "plaza"],
 	["plaza", "plaza"], ["vault", "plaza"], ["terrace", "terrace"], ["market", "terrace"], ["tier4", "gardens"], ["tier", "terrace"],
 	["garden", "gardens"], ["promenade", "gardens"], ["pier", "docks"], ["dock", "docks"], ["cargo", "docks"],
-	["gallery", "mast"], ["mast", "mast"], ["dish", "mast"], ["yard", "yard"], ["arena", "yard"], ["crane", "yard"]]
+	["hive", "gardens"], ["conservatory", "gardens"], ["grove", "gardens"], ["bazaar", "terrace"], ["tea", "terrace"],
+	["lantern", "terrace"], ["chime", "terrace"], ["wash", "terrace"], ["depot", "docks"], ["berth", "docks"],
+	["foundry", "yard"], ["gallery", "mast"], ["mast", "mast"], ["dish", "mast"], ["yard", "yard"], ["arena", "yard"], ["crane", "yard"]]
 ## island name prefix -> footstep surface (beats the area default)
-const ISLAND_SURFACE := [["promenade", "wood"], ["pier", "wood"], ["tier4", "grass"], ["gallery", "metal"],
+const ISLAND_SURFACE := [["hive", "grass"], ["tea", "wood"], ["lantern", "wood"], ["berth", "wood"], ["junk_raft", "wood"],
+	["junk_hull", "metal"], ["promenade", "wood"], ["pier", "wood"], ["tier4", "grass"], ["gallery", "metal"],
 	["dish", "metal"], ["mast", "metal"], ["causeway", "metal"]]
 
 var island_area := {}       # island name -> area
@@ -91,6 +94,7 @@ func _ready() -> void:
 	for t in [0.5, 3.0]: get_tree().create_timer(t).timeout.connect(_route_all)
 	if args.has("--audio-test"): _self_test.call_deferred()
 	for a in args: if a.begins_with("--audio-mix="): _mix_capture.call_deferred(a.substr(12))
+	for a in args: if a.begins_with("--audio-tour="): _tour.call_deferred(a.substr(13))
 
 ## Other systems' own players (area sounds, props) default to the Master bus, which skips the volume
 ## sliders, the reverb and the dialogue duck: route them into the mix.
@@ -366,7 +370,7 @@ func _update_world(dt: float) -> void:
 	if rv: rv.wet = verb
 	# more wind higher up
 	var y: float = Game.player.global_position.y
-	Snd.loop_extra["wind_loop"] = clampf((y - 5.0) / 14.0, 0.0, 1.0) * 9.0
+	Snd.loop_extra["wind_loop"] = clampf((y - 5.0) / 14.0, 0.0, 1.0) * 6.0
 	Snd.loop_extra["city_loop"] = -clampf((y - 8.0) / 12.0, 0.0, 1.0) * 6.0
 
 func _in_pause_menu() -> bool:
@@ -544,6 +548,10 @@ func _self_test() -> void:
 	var ok := true
 	if not _level_ok(): print("[audio-test] FAIL no level"); get_tree().quit(1); return
 	Snd.music("skyharbor", 0.5)
+	_map_islands()
+	var by_area := {}
+	for n in island_area: (by_area.get_or_add(island_area[n], []) as Array).append(n)
+	for a in by_area: print("[audio-test] islands %s: %s" % [a, ", ".join(by_area[a])])
 	var spots: Dictionary = Game.level.debug_spots
 	var expect := {"start": "junkyard", "plaza": "plaza", "docks": "docks", "pier_c": "docks", "terrace": "terrace",
 		"glide": "terrace", "gardens": "gardens", "gallery": "mast", "dish": "mast", "yard": "yard", "arena": "yard"}
@@ -645,4 +653,25 @@ func _mix_capture(path: String) -> void:
 	var w := rec.get_recording()
 	if w: w.save_to_wav(path); print("[audio-mix] saved ", path, " ", w.get_length())
 	else: print("[audio-mix] no recording")
+	get_tree().quit()
+
+## Debug: record 8 s of the mix at each debug spot to <dir>/tour_<spot>.wav (level checks per area).
+func _tour(dir: String) -> void:
+	await get_tree().create_timer(1.0).timeout
+	var rec := AudioEffectRecord.new()
+	AudioServer.add_bus_effect(0, rec)
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--tour-mute="):
+			for b in a.substr(12).split(","): AudioServer.set_bus_mute(AudioServer.get_bus_index(b), true)
+	var spots: Dictionary = Game.level.debug_spots
+	for k in ["start", "plaza", "docks", "pier_c", "terrace", "gardens", "gallery", "dish", "yard", "arena"]:
+		if not spots.has(k): continue
+		Game.player.global_position = spots[k][0]; Game.player.velocity = Vector3.ZERO
+		await get_tree().create_timer(4.0).timeout
+		rec.set_recording_active(true)
+		await get_tree().create_timer(8.0).timeout
+		rec.set_recording_active(false)
+		var w := rec.get_recording()
+		if w: w.save_to_wav("%s/tour_%s.wav" % [dir, k])
+		print("[audio-tour] ", k, " area=", area, " track=", Snd.track)
 	get_tree().quit()
