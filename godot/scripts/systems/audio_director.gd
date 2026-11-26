@@ -37,7 +37,7 @@ const ISLAND_AREA := [["junkyard", "junkyard"], ["junk", "junkyard"], ["causeway
 	["lantern", "terrace"], ["chime", "terrace"], ["wash", "terrace"], ["depot", "docks"], ["berth", "docks"],
 	["foundry", "yard"], ["gallery", "mast"], ["mast", "mast"], ["dish", "mast"], ["yard", "yard"], ["arena", "yard"], ["crane", "yard"]]
 ## island name prefix -> footstep surface (beats the area default)
-const ISLAND_SURFACE := [["hive", "grass"], ["tea", "wood"], ["lantern", "wood"], ["berth", "wood"], ["junk_raft", "wood"],
+const ISLAND_SURFACE := [["hive", "grass"], ["plaza_park", "grass"], ["park", "grass"], ["tea", "wood"], ["lantern", "wood"], ["berth", "wood"], ["junk_raft", "wood"],
 	["junk_hull", "metal"], ["promenade", "wood"], ["pier", "wood"], ["tier4", "grass"], ["gallery", "metal"],
 	["dish", "metal"], ["mast", "metal"], ["causeway", "metal"]]
 
