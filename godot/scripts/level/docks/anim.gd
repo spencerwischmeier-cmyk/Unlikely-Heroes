@@ -16,6 +16,7 @@ var lanes: Array = []      # { node: Node3D, a: Vector3, b: Vector3, speed: floa
 var flocks: Array = []     # { node: Node3D, c: Vector3, r: Vector2, h: float, w: float, ph: float }
 var spinners: Array = []   # { node: Node3D, axis: Vector3, speed: float }
 var bobbers: Array = []    # { node: Node3D, base: Vector3, amp: float, w: float, ph: float, roll: float }
+var powerlines: Array = [] # { mat: StandardMaterial3D, turbine: int, on: bool } lit once that turbine spins
 var triggers: Array = []   # { box: AABB, fn: Callable, done: bool } one-shot (voice lines on entering a spot)
 var horns: Array = []      # { player: AudioStreamPlayer3D, every: float, t: float }
 var t := 0.0
@@ -60,6 +61,12 @@ func _physics_process(dt: float) -> void:
 	for bk in blinkers:
 		var ph: float = fposmod(t / bk.period + bk.ph, 1.0)
 		bk.mat.emission_energy_multiplier = bk.peak if ph < bk.on else bk.low
+	if not powerlines.is_empty() and Game.level:
+		var tbs: Array = Game.level.get("turbines")
+		for pl in powerlines:
+			if not pl.on and pl.turbine < tbs.size() and tbs[pl.turbine].spin > 1.0:
+				pl.on = true; pl.mat.emission = Color(0.3, 0.95, 1.0)
+			pl.mat.emission_energy_multiplier = (3.0 + 2.0 * sin(t * 4.0 + pl.turbine)) if pl.on else 0.6
 	for tg in triggers:
 		if not tg.done and (tg.box as AABB).has_point(pp):
 			tg.done = true; tg.fn.call()

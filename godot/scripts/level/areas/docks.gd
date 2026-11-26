@@ -13,8 +13,9 @@ static func build(L) -> void:
 	var A: Node3D = Anim.new()
 	A.name = "DocksAnim"
 	L.add_child(A)
-	Depot.build(L, A)
-	SkyWorld.build(L, A)
+	var args := OS.get_cmdline_user_args()
+	if not args.has("--no-depot"): Depot.build(L, A)
+	if not args.has("--no-skyworld"): SkyWorld.build(L, A)
 	# my debug spots (level._build re-assigns debug_spots after the area files run, so apply --at here too)
 	var spots := { canyon = [Vector3(58, 0.1, 30), PI / 2], depot = [Vector3(87, 0.1, 39.5), PI / 2],
 		berth = [Vector3(115, 0.1, 30), PI / 2], depot_in = [Vector3(88.5, 0.1, 27), PI * 0.6],

@@ -251,7 +251,7 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	]
 	for s in stacks: container(L, s[0], s[1], s[2], s[3], s[4])
 	# a couple of doors-open containers in the north yard, and one knocked askew
-	container(L, 80.5, 21.5, 0, false, 5, 0.0, 0.12)
+	container(L, 61.0, 19.2, 0, false, 5, 0.0, 0.12)
 	container(L, 58.6, 46.5, 0, true, 3, 0.0, -0.05)
 	# crate steps up onto the container tops
 	step_crates(L, Vector3(67.3, 0, 29.0), 1.3, 0.3)
@@ -275,7 +275,7 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	# dock bots trundling the corridors, a forklift doing laps of the north yard
 	looper(L, A, "dock_bot", 1.3, [Vector3(62, 0, 28.6), Vector3(66, 0, 28.6), Vector3(71.5, 0, 31.5), Vector3(71.5, 0, 40.5),
 		Vector3(70.5, 0, 31.5), Vector3(66, 0, 28.9)], 1.6, 0.0, Vector3(0.9, 1.2, 0.9))
-	var fk1 := looper(L, A, "forklift", 2.3, [Vector3(63, 0, 16.5), Vector3(78, 0, 16.5), Vector3(78.5, 0, 20.5), Vector3(63, 0, 20.5)], 2.6, -PI / 2, Vector3(1.4, 2.0, 1.4))
+	var fk1 := looper(L, A, "forklift", 2.3, [Vector3(64.5, 0, 16.5), Vector3(77, 0, 16.5), Vector3(77.5, 0, 20.5), Vector3(64.5, 0, 20.5)], 2.6, -PI / 2, Vector3(1.4, 2.0, 1.4))
 	looper(L, A, "dock_bot", 1.2, [Vector3(76, 0, 47.5), Vector3(60, 0, 47.5)], 1.3, 0.0, Vector3(0.9, 1.1, 0.9))
 	A.horns.append({ node = fk1, every = 11.0, t = 3.0, sound = "docks_forklift_beep", db = -8.0, near = 22.0 })
 	# jib cranes swinging loads over the canyon and the north yard
@@ -290,7 +290,7 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	DocksDressing.place(L, "cable_spool", Vector3(68.6, 0, 22.4), 0.8, 1.3, true)
 	DocksDressing.place(L, "barrels", Vector3(62.4, 0, 22.6), 0.5, 1.3, true)
 	DocksDressing.place(L, "hazard_barrier", Vector3(74, 0, 15.6), 0.0, 1.1, false)
-	for b in [Vector3(57, 0, 11), Vector3(83, 0, 49), Vector3(57, 0, 49), Vector3(64.5, 0, 49.2), Vector3(73.5, 0, 49.2)]:
+	for b in [Vector3(57, 0, 11), Vector3(57, 0, 49), Vector3(64.5, 0, 49.2), Vector3(73.5, 0, 49.2)]:
 		DocksDressing.place(L, "bollard", b, randf() * TAU, 0.7, true)
 	DocksDressing.place(L, "floodlight", Vector3(57.0, 0, 37.0), PI * 0.5, 7.0, true, 0.3)
 	DocksDressing.place(L, "floodlight", Vector3(83.0, 0, 24.5), -PI * 0.5, 7.0, true, 0.3)
@@ -556,6 +556,19 @@ static func _piers_abc(L: Node3D, A: Node3D) -> void:
 	# a tall crane pylon east of Pier C swinging a load over the deck (well above head height)
 	jib_crane(L, A, Vector3(82, -11, -38), 20.0, 12.0, PI, 0.5, 34.0, 0)
 	L.box(Vector3(82, -11.5, -38), Vector3(5, 1.0, 5), L.mat_dark, false)
+	# power lines strung from turbine to turbine to the lift; each span lights up when its turbine restarts
+	var poles := [Vector3(47.6, 0, 40.6), Vector3(64.6, 4, -4.6), Vector3(74.6, 6, -44.6), Vector3(62.0, 6, -45.2)]
+	var tops: Array = []
+	for p in poles:
+		var h := 14.0 if p != poles[3] else 9.0
+		L.cyl(p + Vector3(0, h / 2, 0), 0.12, 0.2, h, L.mat_dark, 8)
+		L.box(p + Vector3(0, h - 0.3, 0), Vector3(1.6, 0.18, 0.18), L.mat_brass, false)
+		for sx in [-0.7, 0.7]: L.cyl(p + Vector3(sx, h - 0.1, 0), 0.08, 0.08, 0.3, M.glass(Color(0.6, 0.9, 1.0)), 8)
+		tops.append(p + Vector3(0, h - 0.05, 0))
+	for i in 3:
+		var mat := M.glow(Color(1.0, 0.3, 0.2), 0.6)
+		_cable(L, tops[i], tops[i + 1], 3.0, mat)
+		A.powerlines.append({ mat = mat, turbine = i, on = false })
 	# sprocket trails along the grind rails (collect them on the ride)
 	for ri in [L.R_DOCKS_1, L.R_DOCKS_2, L.get_meta("rail_depot", -1)]:
 		if ri < 0 or ri >= L.rails.size(): continue
@@ -566,7 +579,7 @@ static func _piers_abc(L: Node3D, A: Node3D) -> void:
 			sprocket(A, cv.sample_baked(u) + Vector3(0, 0.9, 0))
 			u += 2.2
 	# cargo drones ferrying crates between the piers, the depot and the berth
-	_drone(L, A, [Vector3(39, 14, 30), Vector3(70, 15, 19), Vector3(98, 15, 12), Vector3(126, 17, 26), Vector3(98, 16, 8), Vector3(70, 15, 15)], 6.0)
+	_drone(L, A, [Vector3(39, 19, 30), Vector3(70, 19, 19), Vector3(98, 18, 12), Vector3(126, 17, 26), Vector3(98, 18, 8), Vector3(70, 19, 15)], 6.0)
 	_drone(L, A, [Vector3(58, 15, -8), Vector3(70, 16, -38), Vector3(92, 18, -22), Vector3(100, 16, 4)], 5.0)
 	_drone(L, A, [Vector3(60, 13, 46), Vector3(100, 14, 50), Vector3(126, 15, 44), Vector3(90, 13, 40)], 5.5)
 	_drone(L, A, [Vector3(34, 12, 12), Vector3(44, 13, -12), Vector3(76, 14, -14), Vector3(62, 12, 8)], 4.5)
@@ -592,3 +605,18 @@ static func _drone(L: Node3D, A: Node3D, pts: Array, speed: float) -> void:
 	var pv := PackedVector3Array(pts)
 	n.position = pv[0]
 	A.loopers.append({ node = n, pts = pv, len = Anim.loop_len(pv), speed = speed, d = randf() * 20.0, yaw_off = 0.0 })
+
+## a sagging cable between two points (12 straight pieces along a parabola)
+static func _cable(L: Node3D, a: Vector3, b: Vector3, sag: float, mat: Material) -> void:
+	var n := 12
+	var prev := a
+	for i in range(1, n + 1):
+		var u := float(i) / n
+		var p := a.lerp(b, u) - Vector3(0, sag * 4.0 * u * (1.0 - u), 0)
+		var mid := (prev + p) / 2; var len := prev.distance_to(p)
+		var c := CylinderMesh.new(); c.top_radius = 0.06; c.bottom_radius = 0.06; c.height = len; c.radial_segments = 6; c.rings = 1
+		var mi: MeshInstance3D = L.mesh_at(c, mat, mid)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.look_at_from_position(mid, p, Vector3.UP)
+		mi.rotate_object_local(Vector3.RIGHT, PI / 2)
+		prev = p
