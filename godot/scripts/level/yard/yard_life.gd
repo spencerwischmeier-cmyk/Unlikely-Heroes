@@ -18,6 +18,8 @@ var fans: Array = []         # { node, base: float, phase: float }
 var doors: Array = []        # { gate: Node3D, id: String, open: float }
 var alarms: Array = []       # work-light Node3D (head lights turn red and flash)
 var searchlights: Array = [] # { node, target }
+var swayers: Array = []      # { node, phase }
+var patrols: Array = []      # { node, pts: Array, speed, d, total }
 var loops: Array = []        # AudioStreamPlayer3D
 var pen_cages: Array = []
 var pen_bots: Array = []
@@ -60,6 +62,19 @@ func _ready() -> void:
 		g.boss_started.connect(func(n): if n == "CRANE BOT": _boss_start())
 		g.boss_defeated.connect(func(n): if n == "CRANE BOT": _boss_end())
 		g.bot_killed.connect(func(_b, p, _k): _bot_killed(p))
+	if OS.get_cmdline_user_args().has("--yard-selftest"): _selftest()
+
+## Debug: `-- --yard-selftest` releases the pen, opens the arena doors and runs the boss-time crate drops.
+func _selftest() -> void:
+	await get_tree().create_timer(1.0).timeout
+	release_pen(); print("[yard] pen released, bots ", pen_bots.size())
+	if level: level.open_gate("arena_gate")
+	_boss_start(); drop_t = 0.1
+	await get_tree().create_timer(6.0).timeout
+	print("[yard] doors ", doors.map(func(d): return snappedf(d.open, 0.01)), " drops ", drops.size(), " pa ", pa_player.playing)
+	boss_on = false
+	await get_tree().create_timer(1.0).timeout
+	print("[yard] selftest done, drops left ", drops.size())
 
 # ---------------------------------------------------------------- registration (called by areas/yard.gd)
 func belt_material() -> StandardMaterial3D:
@@ -128,6 +143,16 @@ func add_doors(g: Node3D, id: String) -> void:
 	doors.append({ gate = g, id = id, l = dl, r = dr, l0 = dl.position, r0 = dr.position, open = 0.0 })
 	var lock_ := Kit.find_part(g, "lock_light")
 	if lock_: doors[-1].lock = lock_
+
+func add_sway(n: Node3D) -> void:
+	swayers.append({ node = n, phase = randf() * TAU, rot = n.rotation })
+
+## A prop that drives back and forth along a list of points (background work crews).
+func add_patrol(n: Node3D, pts: Array, speed := 1.6) -> void:
+	if n == null: return
+	var total := 0.0
+	for i in pts.size() - 1: total += (pts[i + 1] - pts[i]).length()
+	patrols.append({ node = n, pts = pts, speed = speed, d = randf() * total, total = total })
 
 func add_alarm(wl: Node3D) -> void:
 	alarms.append(wl)
@@ -289,6 +314,21 @@ func _process(dt: float) -> void:
 		var u := 0.5 - 0.5 * cos(t / s.period * TAU)
 		s.node.position = s.a.lerp(s.b, u)
 	for b in beacons: b.rotation.y += dt * 4.0
+	for sw in swayers:
+		sw.node.rotation = sw.rot + Vector3(sin(t * 1.1 + sw.phase) * 0.06, 0, sin(t * 0.7 + sw.phase) * 0.03)
+	for pa in patrols:
+		pa.d = fmod(pa.d + dt * pa.speed, pa.total * 2.0)
+		var back: bool = pa.d >= pa.total
+		var dd: float = pa.total * 2.0 - pa.d if back else pa.d
+		var pts: Array = pa.pts
+		for i in pts.size() - 1:
+			var seg: float = (pts[i + 1] - pts[i]).length()
+			if dd <= seg or i == pts.size() - 2:
+				var dir: Vector3 = (pts[i + 1] - pts[i]) * (-1.0 if back else 1.0)
+				pa.node.position = pts[i].lerp(pts[i + 1], clampf(dd / seg, 0.0, 1.0))
+				pa.node.rotation.y = atan2(dir.x, dir.z)
+				break
+			dd -= seg
 	for w in welders:
 		w.t -= dt
 		if w.t <= 0.0:

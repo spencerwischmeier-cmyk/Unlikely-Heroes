@@ -289,3 +289,15 @@ static func sparks(parent: Node3D, pos: Vector3, color := Color(1, 0.7, 0.25), a
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(p); p.position = pos
 	return p
+
+## A hanging cloth banner (double sided). Returns the pivot at its top edge (sway it about x).
+static func banner(parent: Node, top: Vector3, yaw: float, size := Vector2(2.0, 5.0), tex := "res://textures/yard/banner_g.png") -> Node3D:
+	var n := node(parent, top, yaw)
+	var q := QuadMesh.new(); q.size = size
+	var mi := MeshInstance3D.new(); mi.mesh = q; mi.position = Vector3(0, -size.y * 0.5, 0)
+	var m := M.cloth(Color.WHITE)
+	if ResourceLoader.exists(tex): m.albedo_texture = load(tex)
+	m.uv1_triplanar = false; m.uv1_scale = Vector3.ONE
+	mi.material_override = m; n.add_child(mi)
+	bx(n, Vector3(0, 0.05, 0), Vector3(size.x + 0.3, 0.12, 0.12), "dark")
+	return n

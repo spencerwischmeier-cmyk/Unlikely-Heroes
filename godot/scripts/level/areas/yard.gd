@@ -228,6 +228,11 @@ static func _row(L, life) -> void:
 	K.poster(L, Vector3(-30.6, 0, -82.0), -PI / 2, "TODAY'S QUOTA: EVERYTHING", POSTER2, Vector2(3.2, 2.2), "TOMORROW'S QUOTA: MORE")
 	K.poster(L, Vector3(-46.0, 0, -62.6), PI, "IF YOU CAN READ THIS\nYOU ARE NOT WORKING", "", Vector2(3.2, 2.0))
 	life.add_speaker(K.loudspeaker(L, Vector3(-31.0, 0, -95.0), -PI * 0.25))
+	for z in [-72.0, -91.0]:
+		life.add_sway(K.banner(L, Vector3(-57.7, 10.3, z), PI / 2, Vector2(1.8, 4.4)))
+	for p in [Vector3(-54.2, 0, -80.6), Vector3(-31.6, 0, -73.0)]:
+		L.prop("vent_stack", p, 0.0, 1.0, true)
+		DocksDressing.steam(L, p + Vector3(0, 3.1, 0))
 	life.add_speaker(K.loudspeaker(L, Vector3(-57.4, 0, -63.0), PI * 0.75))
 	K.work_light(L, Vector3(-30.8, 0, -62.8), -PI * 0.75)
 	K.work_light(L, Vector3(-57.2, 0, -99.2), PI * 0.25)
@@ -376,6 +381,10 @@ static func _arena(L, life) -> void:
 	K.poster(L, Vector3(12.0, 0, -113.6), 0.0, "EMPLOYEE OF THE MONTH", POSTER, Vector2(3.4, 2.4), "THE CRANE BOT (AGAIN)")
 	K.poster(L, Vector3(-12.0, 0, -113.6), 0.0, "OVERTIME IS ITS\nOWN REWARD", POSTER2, Vector2(3.2, 2.2))
 	life.arena_center = c
+	# Grudd banners hanging from the crane runways, facing the stage
+	for x in [-24.5, 24.5]:
+		for z in [-110.0, -85.0]:
+			life.add_sway(K.banner(L, Vector3(x + (0.6 if x < 0 else -0.6), 13.1, z), PI / 2 if x < 0 else -PI / 2, Vector2(2.2, 5.5)))
 
 # ---------------------------------------------------------------- the foundry behind the arena (z -150..-118)
 static func _foundry(L, life) -> void:
@@ -425,6 +434,10 @@ static func _foundry(L, life) -> void:
 		var t := _text("FOREMAN'S BOX", 0.012, Color(1, 0.8, 0.35), 0.0, Vector3(s * 3.2, 7.6, 1.75))
 		bal.add_child(t)
 	life.add_speaker(K.loudspeaker(L, Vector3(-5.6, 7.25, -120.6), 0.0, 3.0))
+	# little work crews shuttling across the foundry floor
+	life.add_patrol(K.model(L, "docks/forklift", Vector3.ZERO, 0.0, 2.0), [Vector3(-20, y0, -126), Vector3(-4, y0, -126), Vector3(-4, y0, -139)], 2.2)
+	life.add_patrol(K.model(L, "docks/dock_bot", Vector3.ZERO, 0.0, 1.2), [Vector3(22, y0, -138), Vector3(22, y0, -122), Vector3(4, y0, -121)], 1.5)
+	life.add_patrol(K.model(L, "docks/dock_bot", Vector3.ZERO, 0.0, 1.2), [Vector3(-24, y0, -122), Vector3(-12, y0, -122)], 1.2)
 
 # ---------------------------------------------------------------- background: cargo stacks and cranes out in the sky
 static func _vista(L, life) -> void:
