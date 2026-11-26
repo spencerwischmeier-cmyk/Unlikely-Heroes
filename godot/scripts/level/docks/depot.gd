@@ -484,6 +484,22 @@ static func _warehouse(L: Node3D, A: Node3D) -> void:
 	var fk2 := looper(L, A, "forklift", 2.3, [Vector3(88, 0, 36.5), Vector3(108, 0, 36.5), Vector3(108, 0, 40), Vector3(88, 0, 40)], 2.2, -PI / 2, Vector3(1.4, 2.0, 1.4))
 	A.horns.append({ node = fk2, every = 12.0, t = 6.0, sound = "docks_forklift_beep", db = -8.0, near = 22.0 })
 	looper(L, A, "dock_bot", 1.3, [Vector3(95, 0, 24.5), Vector3(102, 0, 24.5), Vector3(102, 0, 27), Vector3(95, 0, 27)], 1.2, 0.0, Vector3(0.9, 1.2, 0.9))
+	# painted floor lanes, pallets of stock along the walls and slogan banners off the trusses
+	var lane := _m("lane", func(): return M.paint(Color(0.98, 0.78, 0.15)))
+	for zl in [26.5, 34.6]: L.box(Vector3(98, 0.02, zl), Vector3(26, 0.04, 0.25), lane, false)
+	for xl in [86.5, 109.5]: L.box(Vector3(xl, 0.02, 30.5), Vector3(0.25, 0.04, 8.0), lane, false)
+	L.box(Vector3(98, 0.02, 22.8), Vector3(10, 0.04, 2.4), M.hazard(), false)
+	for c in [Vector3(86.4, 0, 15.8), Vector3(90.5, 0, 44.6), Vector3(103.5, 0, 38.8), Vector3(100.5, 0, 15.8), Vector3(97.0, 0, 15.6)]:
+		DocksDressing.place(L, "crates", c, randf() * TAU, randf_range(1.2, 1.8), true)
+	DocksDressing.place(L, "barrels", Vector3(92, 0, 41.2), 0.3, 1.2, true)
+	var slogans := ["SMILE. YOU'RE ON SHIFT.", "BREAKS ARE FOR GEARS", "GRUDDCO: WE NEVER STOP", "MOVE IT OR BOX IT"]
+	var cols := [Color(0.85, 0.3, 0.18), Color(0.18, 0.45, 0.75), Color(0.9, 0.65, 0.15), Color(0.25, 0.6, 0.45)]
+	for i in 4:
+		var bx := 89.0 + i * 6.0
+		var ban: MeshInstance3D = L.box(Vector3(bx, 7.2, 45.2), Vector3(4.2, 1.6, 0.06), M.cloth(cols[i]), false)
+		var tl := Label3D.new(); tl.text = slogans[i]; tl.font_size = 56; tl.pixel_size = 0.006; tl.width = 640
+		tl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; tl.modulate = Color(1, 0.95, 0.85); tl.outline_size = 8
+		tl.position = Vector3(0, 0, -0.05); tl.rotation.y = PI; ban.add_child(tl)
 	# overhead gantry trolley on a beam (purely visual)
 	L.box(Vector3(98, 7.6, 34.5), Vector3(27, 0.4, 0.5), M.paint(Color(0.95, 0.72, 0.15)), false)
 	var trolley := Node3D.new(); L.add_child(trolley)
