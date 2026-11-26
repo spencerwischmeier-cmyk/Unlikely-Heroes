@@ -77,6 +77,18 @@ static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
 		JK.pile(B, rng, h[0], h[1], h[2], 46)
 		JK.cyl_collider(L, h[0], h[1] * 0.6, h[2] * 0.55)
 		life.creaks.append(h[0] + Vector3(0, 1, 0))
+	# dress Dodger's scrap pile (the blocks stay the real footing; pieces stay below their tops)
+	JK.pile(B, rng, Vector3(-12.5, 0, 74.5), 2.9, 2.1, 60)
+	JK.pile(B, rng, Vector3(-9.0, 0, 78.5), 2.6, 1.0, 34)
+	JK.pile(B, rng, Vector3(-16.2, 0, 70.6), 1.6, 2.8, 30)
+	life.creaks.append(Vector3(-12.5, 2.0, 74.5))
+	# oil stains on the deck
+	var stain := M.std(Color(0.08, 0.07, 0.06, 0.55), 0.3, 0.2); stain.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	for p in [Vector2(8.5, 93.0), Vector2(-9.5, 89.0), Vector2(3.0, 79.0), Vector2(12.0, 98.5), Vector2(-12.0, 99.5), Vector2(6.0, 72.0), Vector2(-2.0, 104.0)]:
+		var sm := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = 0.5; cm.bottom_radius = 0.5; cm.height = 0.01; cm.radial_segments = 14
+		sm.mesh = cm; sm.material_override = stain; sm.position = Vector3(p.x, 0.012, p.y)
+		sm.scale = Vector3(rng.randf_range(1.0, 2.4), 1, rng.randf_range(0.8, 1.8)); sm.rotation.y = rng.randf() * TAU
+		sm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; L.add_child(sm)
 	# wrench practice: a few crates by the start, and a sign that says what F does
 	L.crate_spots.append(Vector3(10.6, 0, 89.6)); L.crate_spots.append(Vector3(11.4, 0, 88.4))
 	L.hint_sign("F: WRENCH IT. CRATES COUGH UP SPROCKETS", Vector3(12.6, 0, 90.2), PI * 0.85)
@@ -284,6 +296,15 @@ static func _heap(L, B, rng: RandomNumberGenerator, life) -> void:
 	L.prop("junk_pile", Vector3(-38.0, 0, 97.5), 2.2, 1.0, true)
 	JK.litter(B, rng, HEAP.grow(-0.6), 0.0, 60, [Rect2(-29, 76.5, 5, 5), Rect2(-37, 82, 14, 10)])
 	L.label("SCRAP HEAP", Vector3(-30, 0, 78.5), 4, Color(1, 0.8, 0.55))
+	# long-jump teaser: a junk raft off the heap's south edge (dash, then jump), a stash on it
+	var raft := Rect2(-37, 106, 6, 7)
+	JK.slab(L, "junk_raft", raft, 0.0, Color(0.8, 0.7, 0.58), "nsew", 0.8)
+	L.hint_sign("LONG JUMP: DASH (SHIFT), THEN JUMP", Vector3(-31.2, 0, 98.6), PI * 0.15)
+	L.crate_spots.append(Vector3(-35.4, 0, 110.2))
+	L.prop("barrel", Vector3(-32.4, 0, 110.8), 0.4)
+	JK.pile(B, rng, Vector3(-32.6, 0, 107.4), 1.0, 1.0, 14)
+	JK.bulbs(B, L, Vector3(-37, 1.6, 106), Vector3(-31, 1.6, 106), 0.3, 6)
+	for x in [-37.0, -31.0]: L.cyl(Vector3(x, 0.8, 106), 0.05, 0.06, 1.6, JK.mat("dark"), 6)
 
 static func _car(L, B, pos: Vector3, yaw: float, col: Color) -> void:
 	var n := Node3D.new(); n.position = pos; n.rotation = Vector3(0.05, yaw, 0.08); L.add_child(n)
@@ -445,6 +466,19 @@ static func _lookout(L, B, rng: RandomNumberGenerator, life) -> void:
 
 # ---------------------------------------------------------------- floating junk around the rock
 static func _vista(L, B, rng: RandomNumberGenerator, life) -> void:
+	# scrap gulls circling over the heap and the hull dock
+	var wing_m := JK.paint(Color(0.92, 0.9, 0.85))
+	for g in [[Vector3(-34, 15, 86), 9.0, 0.45], [Vector3(-30, 18, 90), 13.0, -0.32], [Vector3(36, 16, 82), 10.0, 0.4]]:
+		var piv := Node3D.new(); piv.position = g[0]; L.add_child(piv)
+		var bird := Node3D.new(); bird.position = Vector3(g[1], 0, 0); bird.rotation.y = 0.0 if g[2] > 0 else PI; piv.add_child(bird)
+		L.box(Vector3.ZERO, Vector3(0.22, 0.2, 0.7), wing_m, false, bird)
+		L.box(Vector3(0, 0.02, -0.42), Vector3(0.1, 0.08, 0.16), JK.paint(JK.YELLOW), false, bird)
+		for sd in [-1, 1]:
+			var w := Node3D.new(); w.position = Vector3(sd * 0.1, 0.05, 0); bird.add_child(w)
+			L.box(Vector3(sd * 0.55, 0, 0.05), Vector3(1.1, 0.04, 0.38), wing_m, false, w)
+			life.swing(w, Vector3(0, 0, 0.5 * sd), 5.0 + rng.randf(), 0.0)
+		life.spin(piv, Vector3.UP, g[2])
+		life.bob(bird, 0.6, 0.8, g[1])
 	for c in [Vector3(-36, -6, 118), Vector3(34, -9, 122), Vector3(-22, 4, 150), Vector3(26, 1, 146), Vector3(46, -4, 108), Vector3(-48, -3, 110)]:
 		var r := rng.randf_range(2.2, 3.8)
 		var rock := MeshInstance3D.new(); var cm := CylinderMesh.new(); cm.top_radius = r; cm.bottom_radius = r * 0.2; cm.height = r * 1.6; cm.radial_segments = 7
@@ -460,12 +494,15 @@ static func traversal_cases(moves: Dictionary) -> Dictionary:
 	var sj: Array = moves.sj
 	var dj: Array = moves.dj
 	var dj_short: Array = moves.dj_short
+	var lj := [[0.0, "move_forward", true], [0.1, "dash", true], [0.15, "dash", false], [0.2, "jump", true], [0.5, "jump", false], [0.75, "move_forward", false]]
 	return {
+		junk_raft = [Vector3(-34.0, 0.1, 97.8), 0.0, lj, 0.0, Rect2(-37, 106, 6, 7)],
+		junk_raft_back = [Vector3(-34.0, 0.1, 108.4), PI, lj, 0.0, Rect2(-40, 88, 12, 12)],
 		junk_heap_1 = [Vector3(-27.5, 0.1, 80.0), 0.0, sj, 1.2, Rect2(-29, 82.5, 3, 3)],
 		junk_heap_2 = [Vector3(-28.0, 1.3, 83.6), atan2(-3.0, 3.0), sj, 2.4, Rect2(-32.5, 85.1, 3, 3)],
 		junk_heap_3 = [Vector3(-30.6, 2.5, 86.2), atan2(-4.0, 3.0), sj, 3.6, Rect2(-36.1, 87.7, 3, 3)],
 		junk_heap_summit = [Vector3(-34.0, 3.7, 89.6), atan2(-5.6, -3.6), dj, 6.0, Rect2(-42.1, 83.5, 5, 5)],
-		junk_heap_ledge = [Vector3(-41.7, 6.1, 84.0), PI, dj_short, 7.2, Rect2(-44.0, 77.9, 3.0, 3.0)],
+		junk_heap_ledge = [Vector3(-41.7, 6.1, 85.2), PI, dj_short, 7.2, Rect2(-44.0, 77.9, 3.0, 3.0)],
 		junk_hull_step = [Vector3(38.0, 0.1, 98.4), PI, sj, 1.2, Rect2(37.4, 92.4, 2.0, 2.4)],
 		junk_hull_scaffold = [Vector3(38.0, 1.3, 94.4), PI, sj, 2.4, Rect2(36.7, 84, 2.4, 8)],
 		junk_hull_deck = [Vector3(37.2, 2.5, 88.0), -PI / 2, sj, 2.3, Rect2(31.8, 84.3, 3.2, 7.4)],
