@@ -401,10 +401,10 @@ func _draw_objective() -> void:
 	var fs := 21
 	var tw := body.get_string_size(obj_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var two := tw > 540.0          # long objectives wrap onto a second line instead of being cut off
-	if two: fs = 19
+	if two: fs = 18
 	var wrap := 540.0
 	var w := clampf((wrap if two else tw) + 92.0, 260.0, 640.0)
-	var h := 76.0 if two else 54.0
+	var h := 82.0 if two else 54.0
 	var r := Rect2(30 + slide, 14, w, h)
 	HD.panel(ci, r, OBJ_COL.lerp(Color.WHITE, fresh * 0.5 * (0.5 + 0.5 * sin(t * 10.0))), 12, -0.12, a)
 	HD.badge(ci, Vector2(32 + slide, 14 + h * 0.5), 24, OBJ_COL, a)
@@ -413,7 +413,7 @@ func _draw_objective() -> void:
 	if fresh > 0.0:
 		HD.text(ci, head, Vector2(150 + slide, 34), "NEW", 15, Color(1, 1, 1, fresh), 0, 4, a)
 	if two:
-		var pos := Vector2(66 + slide, 57)
+		var pos := Vector2(66 + slide, 56)
 		ci.draw_multiline_string_outline(body, pos, obj_text, HORIZONTAL_ALIGNMENT_LEFT, wrap, fs, 2, 5, Color(HD.INK, a))
 		ci.draw_multiline_string(body, pos, obj_text, HORIZONTAL_ALIGNMENT_LEFT, wrap, fs, 2, Color(1, 1, 1, a))
 	else:
