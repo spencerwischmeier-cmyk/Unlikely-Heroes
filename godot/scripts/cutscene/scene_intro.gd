@@ -119,8 +119,8 @@ func run() -> void:
 	vesk.act("content_sigh")
 	C.fx(func(): C.foley("chair_creak", chair_pos, -10))
 	await C.say("intro_04", 0.5)
-	# the sip: cut wider, from the side away from the mug arm, so the mug doesn't wipe across his face
-	_cu(40.0, 2.3, 50.0, -0.08)
+	# the sip: cut wider, front three-quarter from his body so the face stays in view
+	_cub(-30.0, 2.3, 50.0, -0.08)
 	C.focus_on(vh, Vector3.ZERO, 0.0, 0.7)
 	if seated: C.fx(func(): C.foley("mug_sip", seat + Vector3(0, 1.0, 0), -6)); vesk.sip(1.4)
 	await C.wait(0.6)
@@ -184,7 +184,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cu(-78.0, 2.6, 45.0, -0.12)    # medium, well off his eyeline: Dodger stays out, the slurp reads in full
+	_cub(-50.0, 1.8, 55.0, 0.05)    # front three-quarter, camera tucked under Dodger so his face reads
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
@@ -561,6 +561,13 @@ func _clear(target: Vector3, cands: Array) -> Vector3:
 		if hit.is_empty() or (hit.position as Vector3).distance_to(target) < 1.0:
 			return p
 	return cands[0]
+
+## Like _cu, but the angle is taken from the way his body faces, not his gaze (for shots where he looks at Dodger).
+func _cub(az: float, dist: float, mm: float, dy := 0.0) -> void:
+	var e: Vector3 = C.head_of(_vesk).global_position
+	var r: float = _vesk.rotation.y
+	var d := Vector3(sin(r), 0, cos(r)).rotated(Vector3.UP, deg_to_rad(az))
+	C.cut(e + d * dist + Vector3(0, dy, 0), e + Vector3(0, -0.08, 0)); C.lens(mm)
 
 func _gaze_dir(az: float) -> Vector3:
 	var e: Vector3 = C.head_of(_vesk).global_position
