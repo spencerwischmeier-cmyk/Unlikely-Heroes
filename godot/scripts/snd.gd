@@ -240,6 +240,7 @@ func bus_fx(bus: String, cls: String) -> AudioEffect:
 ## ducking: music and ambience dip under dialogue
 var duck := 0.0
 var extra_voices: Array = []   # other systems' 2D voice players (the director routes them to Voice); duck for them too
+var duck_depth := 4.0
 var menu_duck := false     # set by the director while the pause menu is up (ambience dips, music muffles)
 var menu_amt := 0.0
 func _duck_process(dt: float) -> void:
@@ -248,7 +249,9 @@ func _duck_process(dt: float) -> void:
 		for v in extra_voices:
 			if is_instance_valid(v) and v.playing: talking = true; break
 	duck = move_toward(duck, 1.0 if talking else 0.0, dt * (4.0 if talking else 1.2))
-	var m := bus_fx("Music", "AudioEffectAmplify"); if m: m.volume_db = -6.5 * duck
+	# cutscene dialogue gets the full dip; quick in-game barks a lighter one (less pumping)
+	duck_depth = move_toward(duck_depth, 6.5 if Game.input_locked else 4.0, dt * 4.0)
+	var m := bus_fx("Music", "AudioEffectAmplify"); if m: m.volume_db = -duck_depth * duck
 	menu_amt = move_toward(menu_amt, 1.0 if menu_duck else 0.0, dt * 3.0)
 	# SFX (and Amb / World, which feed it) dip a little; ambience a little more
 	var sf := bus_fx("SFX", "AudioEffectAmplify"); if sf: sf.volume_db = -2.5 * duck
