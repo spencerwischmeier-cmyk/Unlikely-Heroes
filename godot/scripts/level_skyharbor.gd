@@ -112,7 +112,8 @@ func cyl(pos: Vector3, r_top: float, r_bot: float, h: float, mat: Material, side
 func island(name_: String, r: Rect2, y := 0.0, tint := Color(1, 1, 1), thick := 1.2) -> void:
 	islands[name_] = r; heights[name_] = y
 	var c := r.get_center()
-	box(Vector3(c.x, y - thick / 2, c.y), Vector3(r.size.x, thick, r.size.y), M.deck(tint))
+	var deck_mat: Material = M.worn("deck", tint * 0.92, 0.14, 0.45, 0.6, 0.55) if name_.begins_with("pier") else M.deck(tint)
+	box(Vector3(c.x, y - thick / 2, c.y), Vector3(r.size.x, thick, r.size.y), deck_mat)
 	var rad: float = min(r.size.x, r.size.y) * 0.48
 	var top := y - thick
 	var under := cyl(Vector3(c.x, top - rad * 0.85, c.y), rad, rad * 0.22, rad * 1.7, mat_dark, 8)
@@ -545,7 +546,8 @@ func _build_docks() -> void:
 	var cm := [M.std(Color(0.82, 0.27, 0.18), 0.5, 0.45), M.std(Color(0.18, 0.5, 0.82), 0.5, 0.45), M.std(Color(0.91, 0.7, 0.16), 0.5, 0.45), M.std(Color(0.23, 0.65, 0.48), 0.5, 0.45)]
 	for c in [[33, 38, 0, 0, 0], [33, 38, 0, 2.5, 2], [45, 26, 1, 0, 1], [34, 24, 1, 0, 3]]:
 		var sz := Vector3(2.4, 2.5, 5) if c[2] else Vector3(5, 2.5, 2.4)
-		box(Vector3(c[0], c[3] + 1.25, c[1]), sz, cm[c[4]])
+		var cb := box(Vector3(c[0], c[3] + 1.25, c[1]), sz, cm[c[4]])
+		DocksDressing.skin_box(cb, "container", (cm[c[4]] as StandardMaterial3D).albedo_color.lightened(0.15))
 	lamp(29, 43, Color(0.4, 0.95, 1)); lamp(49, 43, Color(0.4, 0.95, 1)); lamp(29, 17); lamp(49, 17)
 	label("CARGO DOCKS", Vector3(39, 0, 33), 8, Color(0.75, 0.98, 1))
 	checkpoints.append({ pos = Vector3(39, 0.1, 22), r = 3.0 })
@@ -576,10 +578,12 @@ func _build_docks() -> void:
 	hint_sign("CARGO LIFT TO THE PLAZA (NEEDS TURBINE POWER)", Vector3(61, 6, -33), -PI / 2)
 	hook(Vector3(55, 12.5, -36)); hook(Vector3(45, 12.5, -36))
 	lamp(74.5, -31.5, Color(0.4, 0.95, 1), 6.0)
+	DocksDressing.dress(self)
 
 func _hanging(pos: Vector3, rot_y: float, mat: Material) -> void:
 	var c := box(pos + Vector3(0, 1.25, 0), Vector3(5, 2.5, 2.4), mat)
 	c.rotation.y = rot_y
+	if mat is StandardMaterial3D: DocksDressing.skin_box(c, "container", (mat as StandardMaterial3D).albedo_color.lightened(0.15))
 	for s in [-1, 1]:
 		var off: Vector3 = Vector3(cos(rot_y), 0, -sin(rot_y)) * 1.8 * s
 		cyl(pos + off + Vector3(0, 2.5 + 6, 0), 0.04, 0.04, 12, mat_dark, 6)
