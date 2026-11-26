@@ -315,7 +315,7 @@ static func _arena(L, life) -> void:
 	var c := Vector3(0, 0, -97)
 	# the stage mark under the boss drop point and hazard edging
 	var ring := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 4.6; tm.outer_radius = 5.4; tm.rings = 48
-	ring.mesh = tm; ring.material_override = K.mat("hazard"); ring.scale = Vector3(1, 0.03, 1); ring.position = Vector3(0, 0.01, -102)
+	ring.mesh = tm; ring.material_override = K.mat("hazard"); ring.scale = Vector3(1, 0.03, 1); ring.position = Vector3(0, 0.03, -102)
 	L.add_child(ring)
 	for z in [-81.2, -112.8]: K.stripe(L, Vector3(0, 0, z), Vector2(42, 0.8))
 	# floor grates with a hot glow under them, and oil stains: the stage is a working deck
@@ -438,9 +438,7 @@ static func _foundry(L, life) -> void:
 	logo.add_child(_text("G", 0.03, Color(0.15, 0.1, 0.08), 0.0, Vector3(0, -0.05, 0.08)))
 	K.bx(logo, Vector3(0, 0.85, 0.05), Vector3(2.4, 0.35, 0.14), "yellow_obj")
 	K.omni(bal, Vector3(0, 9.0, 1.0), Color(1, 0.6, 0.25), 2.0, 8.0)
-	for s in [-1, 1]:
-		var t := _text("FOREMAN'S BOX", 0.012, Color(1, 0.8, 0.35), 0.0, Vector3(s * 3.2, 7.6, 1.75))
-		bal.add_child(t)
+	bal.add_child(_text("FOREMAN'S BOX", 0.009, Color(1, 0.8, 0.35), 0.0, Vector3(0, 7.55, 1.76)))
 	life.add_speaker(K.loudspeaker(L, Vector3(-5.6, 7.25, -120.6), 0.0, 3.0))
 	# little work crews shuttling across the foundry floor
 	life.add_patrol(K.model(L, "docks/forklift", Vector3.ZERO, 0.0, 2.0), [Vector3(-20, y0, -126), Vector3(-4, y0, -126), Vector3(-4, y0, -139)], 2.2)
