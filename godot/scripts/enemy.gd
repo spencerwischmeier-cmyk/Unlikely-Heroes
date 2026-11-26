@@ -40,6 +40,8 @@ var variant := 0                  # 0 = standard paint, 1 = second paint job + a
 var cable: Node3D                 # drop-in hook and cable while the bot is lowered in
 var cable_on := false             # subclasses set this in _ready to arrive on a crane cable
 var ticks := 0
+var idle_look := 0.0              # while bots are held still (cutscenes) they glance around instead of freezing
+var look_phase := randf() * TAU
 
 ## True for roughly `chance` of spawns. Previews force it with Engine meta "bot_variant" (0 or 1).
 func roll_variant(chance := 0.4) -> bool:
@@ -159,7 +161,10 @@ func tick_common(dt: float) -> void:
 	for m in flash_mats: m.emission_energy_multiplier = flash * 2.0
 	if model:
 		model.scale = Vector3(1.0 + pop * 0.28, 1.0 - pop * 0.18, 1.0 + pop * 0.28) * model_scale
-		model.rotation = lean
+		var held := paused() and not dead
+		var want := (sin(t * 0.9 + look_phase) * 0.45 + sin(t * 2.3 + look_phase * 2.0) * 0.12) if held else 0.0
+		idle_look = lerpf(idle_look, want, 1.0 - exp(-3.0 * dt))
+		model.rotation = lean + Vector3(0, idle_look, 0)
 	_tick_eyes(dt)
 
 ## Eyes: blink now and then, squint shut while staggered, flash white when hit.
