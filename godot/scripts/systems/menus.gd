@@ -115,7 +115,9 @@ func _input(e: InputEvent) -> void:
 	if e.is_echo(): return
 	if e.is_action_pressed("pause"):
 		match state:
-			"": if _can_pause(): open_pause(); get_viewport().set_input_as_handled()
+			"":
+				if _can_pause(): open_pause(); get_viewport().set_input_as_handled()
+				else: Input.mouse_mode = Input.MOUSE_MODE_VISIBLE   # never trap the mouse (cutscenes etc.); a click recaptures it
 			"pause": close_pause(); get_viewport().set_input_as_handled()
 			"settings": _close_settings(); get_viewport().set_input_as_handled()
 	elif e.is_action_pressed("ui_cancel") and not (e is InputEventKey):
@@ -123,6 +125,10 @@ func _input(e: InputEvent) -> void:
 		match state:
 			"pause": close_pause(); get_viewport().set_input_as_handled()
 			"settings": _close_settings(); get_viewport().set_input_as_handled()
+
+func _notification(what: int) -> void:
+	# alt-tab / clicking another window always frees the mouse
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT: Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _can_pause() -> bool:
 	return not Game.input_locked and not get_tree().paused and Game.player != null
@@ -348,6 +354,7 @@ func _build_ui() -> void:
 	pause_buttons.add_child(_button("SETTINGS", _open_settings))
 	pause_buttons.add_child(_button("RESTART FROM CHECKPOINT", _restart_checkpoint))
 	pause_buttons.add_child(_button("QUIT TO TITLE", _quit_to_title))
+	pause_buttons.add_child(_button("QUIT GAME", func(): Game.save(); get_tree().quit()))
 	for b in pause_buttons.get_children(): (b as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	# ---- settings ----
 	settings_root = Control.new(); _full(settings_root); settings_root.visible = false; layer.add_child(settings_root)
