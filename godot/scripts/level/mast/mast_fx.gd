@@ -39,6 +39,7 @@ var crank_count := 0
 # ---- sound
 var birds: Array = []         # { node, wings: [Node3D, Node3D], r, y, speed, phase, flap }
 var ping_t := 0.0
+var broadcast_t := 1.0
 var players: Array = []        # AudioStreamPlayer3D pool for one-shots
 var hum: AudioStreamPlayer3D
 var streams := {}
@@ -231,6 +232,12 @@ func _ambient(dt: float) -> void:
 		n.rotation.z = -0.35 * signf(b.speed)
 		var fl := sin(t * 9.0 + b.flap) * 0.6 if fmod(t * 0.3 + b.flap, 2.0) < 1.2 else 0.1
 		b.wings[0].rotation.z = fl; b.wings[1].rotation.z = -fl
+	# until it is aligned the dish pushes out Grudd's broadcast: slow orange pulses you can see from afar
+	if not powered and level and level.dish_pivot and p and p.global_position.distance_to(level.dish_pivot.global_position) < 140.0:
+		broadcast_t -= dt
+		if broadcast_t <= 0.0:
+			broadcast_t = 3.2
+			FX.ring(level.dish_pivot.global_position, Color(1.0, 0.45, 0.1), 3.5)
 	# the top beacon pings softly when you are near it
 	if p and p.global_position.distance_to(Vector3(20.6, 40, -40.6)) < 34.0:
 		ping_t -= dt
