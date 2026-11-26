@@ -8,6 +8,7 @@ const DIR := "res://models/docks/"
 const M := preload("res://scripts/mats.gd")
 
 static var _aabbs := {}
+static var _tinted := {}   # shared tinted copies so containers of one colour batch
 
 static func _load(name: String) -> Node3D:
 	var p := DIR + name + ".glb"
@@ -69,8 +70,11 @@ static func skin_box(box_mi: MeshInstance3D, name: String, tint: Color) -> void:
 		for i in mi.get_surface_override_material_count():
 			var m := mi.mesh.surface_get_material(i)
 			if m is StandardMaterial3D:
-				var c: StandardMaterial3D = m.duplicate(); c.albedo_color = tint
-				mi.set_surface_override_material(i, c)
+				var key := "%s|%d|%d|%s" % [name, m.get_instance_id(), i, tint.to_html()]
+				if not _tinted.has(key):
+					var c: StandardMaterial3D = m.duplicate(); c.albedo_color = tint
+					_tinted[key] = c
+				mi.set_surface_override_material(i, _tinted[key])
 
 static func steam(parent: Node3D, pos: Vector3, scale := 1.0) -> void:
 	var p := CPUParticles3D.new()
@@ -130,7 +134,7 @@ static func dress(L: Node3D) -> void:
 	place(L, "floodlight", Vector3(49.2, 0, 43.2), PI * 1.25, 7.0, true, 0.3)
 	# ---- Pier B
 	place(L, "fuel_tanks", Vector3(64.2, 4, -9.5), PI * 0.5, 2.8, true)
-	place(L, "barrels", Vector3(64.6, 4, -1.6), 1.0, 1.3, true)
+	place(L, "barrels", Vector3(65.0, 4, -13.0), 1.0, 1.3, true)   # clear of the depot rail's landing
 	place(L, "dock_bot", Vector3(55, 4, -12.5), 0.6, 1.3, true)
 	place(L, "floodlight", Vector3(51, 4, -15.2), PI * 0.25, 6.0, true, 0.3)
 	place(L, "bollard", Vector3(65.4, 4, -14.5), 0.0, 0.7, true)
@@ -149,8 +153,8 @@ static func dress(L: Node3D) -> void:
 			[Vector3(52, 2.0, -14), 32.0], [Vector3(64, 2.0, -2), 34.0], [Vector3(62, 4.0, -44), 36.0], [Vector3(74, 4.0, -32), 32.0]]:
 		place(L, "truss", t[0] - Vector3(0, t[1], 0), randf() * 0.3, t[1], false)
 	# ---- vista: floating islands, airships
-	for v in [[Vector3(115, -14, 25), 26.0, 0.3], [Vector3(98, 6, -78), 18.0, 2.0], [Vector3(135, 18, -32), 34.0, 4.0],
-			[Vector3(88, -30, 70), 16.0, 1.0], [Vector3(150, -6, 40), 22.0, 5.2], [Vector3(80, 30, -120), 30.0, 3.0]]:
+	for v in [[Vector3(185, -14, 30), 26.0, 0.3], [Vector3(150, 6, -95), 18.0, 2.0], [Vector3(195, 18, -40), 34.0, 4.0],
+			[Vector3(120, -30, 105), 16.0, 1.0], [Vector3(215, -6, 95), 22.0, 5.2], [Vector3(80, 30, -135), 30.0, 3.0]]:
 		place(L, "island", v[0], v[2], v[1], false)
 	drift(place(L, "airship", Vector3.ZERO, 0.0, 6.0, false), Vector3(70, 22, 30), Vector3(105, 26, -40), 70.0)
 	drift(place(L, "airship", Vector3.ZERO, 0.0, 4.5, false), Vector3(30, 30, -70), Vector3(95, 24, -95), 60.0)
