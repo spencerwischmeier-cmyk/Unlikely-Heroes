@@ -181,9 +181,35 @@ func _locate(pos: Vector3) -> String:
 	return ""
 
 ## footstep surface under the hero
+## node-name keywords of what the hero stands on -> surface (props, walkways, area pieces)
+const NAME_SURFACE := [["grass", "grass"], ["lawn", "grass"], ["hedge", "grass"], ["planter", "grass"], ["garden", "grass"],
+	["moss", "grass"], ["soil", "grass"], ["plank", "wood"], ["wood", "wood"], ["crate", "wood"], ["bench", "wood"],
+	["barrel", "wood"], ["pier", "wood"], ["boardwalk", "wood"], ["scrap", "gravel"], ["junk", "gravel"], ["gravel", "gravel"],
+	["sand", "gravel"], ["stone", "stone"], ["brick", "stone"], ["tile", "stone"], ["rock", "stone"], ["fountain", "stone"],
+	["stair", "stone"], ["metal", "metal"], ["steel", "metal"], ["grate", "metal"], ["catwalk", "metal"], ["walkway", "metal"],
+	["container", "metal"], ["pipe", "metal"], ["crane", "metal"], ["girder", "metal"], ["platform", "metal"]]
+
+func _surface_by_ray() -> String:
+	var pl := Game.player
+	var from: Vector3 = pl.global_position + Vector3(0, 0.4, 0)
+	var q := PhysicsRayQueryParameters3D.create(from, from - Vector3(0, 1.6, 0), 1, [pl.get_rid()])
+	var hit := pl.get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty() or hit.collider == null: return ""
+	var n: Node = hit.collider
+	for i in 4:
+		if n == null or n == Game.level: break
+		var nm := String(n.name).to_lower()
+		if not nm.begins_with("@"):
+			for k in NAME_SURFACE:
+				if nm.contains(k[0]): return k[1]
+		n = n.get_parent()
+	return ""
+
 func surface() -> String:
 	if not _level_ok(): return "metal"
 	if Game.player.get("riding"): return "metal"
+	var by_ray := _surface_by_ray()
+	if by_ray != "": return by_ray
 	if cur_island == "": return "metal"
 	var h: float = Game.level.heights.get(cur_island, 0.0) if "heights" in Game.level else 0.0
 	if absf(Game.player.global_position.y - h) > 2.5: return "metal"
