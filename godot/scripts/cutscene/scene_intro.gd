@@ -184,7 +184,7 @@ func run() -> void:
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
 	await C.say("cs_intro_gate_3", 0.3)
-	_cu(-60.0, 1.3, 70.0, -0.02)    # well off his eyeline, so Dodger stays out of frame
+	_cu(-60.0, 2.6, 45.0, -0.12)    # medium, well off his eyeline: Dodger stays out, the slurp reads in full
 	C.focus_on(vh, Vector3.ZERO, 0.0, 1.0)
 	C.light(vh, "golden", -1.0)
 	var sp4 := 0.0
@@ -438,6 +438,7 @@ func run() -> void:
 	var fwd := Vector3(sin(vesk.rotation.y), 0, cos(vesk.rotation.y))
 	var side := fwd.cross(Vector3.UP)
 	vesk.look_target = null; vesk.look_point = chair_pos
+	C.tw(dodger, "global_position", dodger.global_position + Vector3(0, 1.1, 0), 0.8)   # he backs off, out of the shot
 	_cu(-50.0, 2.4, 50.0, 0.0)          # off to the side, so the roller isn't between us and him
 	_push(-50.0, 1.5, 4.0)
 	C.lens(35.0, 4.0)
