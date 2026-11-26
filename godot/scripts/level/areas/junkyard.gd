@@ -86,7 +86,7 @@ static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
 	JK.pile(B, rng, Vector3(-16.2, 0, 70.6), 1.6, 2.8, 30)
 	life.creaks.append(Vector3(-12.5, 2.0, 74.5))
 	# oil stains and patched floor plates
-	_grime(L, B, rng, [Vector2(8.5, 93.0), Vector2(-9.5, 89.0), Vector2(3.0, 79.0), Vector2(12.0, 98.5), Vector2(-12.0, 99.5), Vector2(6.0, 72.0), Vector2(-2.0, 104.0)])
+	_grime(L, B, rng, [Vector2(8.5, 93.0), Vector2(-9.5, 89.0), Vector2(3.0, 79.0), Vector2(12.0, 98.5), Vector2(-12.0, 99.5), Vector2(6.0, 72.0), Vector2(-2.0, 104.0), Vector2(7.0, 106.5), Vector2(-5.5, 111.0), Vector2(9.5, 110.8), Vector2(-14.0, 72.5)])
 	# wrench practice: a few crates by the start, and a sign that says what F does
 	L.crate_spots.append(Vector3(10.6, 0, 89.6)); L.crate_spots.append(Vector3(11.4, 0, 88.4))
 	L.hint_sign("F: WRENCH IT. CRATES COUGH UP SPROCKETS", Vector3(12.6, 0, 90.2), PI * 0.85)

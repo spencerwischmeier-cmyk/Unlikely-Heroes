@@ -225,7 +225,7 @@ static func chain(B: Batch, top: Vector3, length: float) -> Vector3:
 ## A tarp thrown over a lump of junk: a box of junk with a cloth skin that sags at the sides, tied down.
 static func tarp(L: Node3D, pos: Vector3, size: Vector3, yaw: float, c: Color) -> void:
 	var n := Node3D.new(); n.position = pos; n.rotation.y = yaw; L.add_child(n)
-	var body := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = size * Vector3(0.92, 0.9, 0.92); body.mesh = bm
+	var body := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = size * Vector3(0.68, 0.9, 0.68); body.mesh = bm
 	body.material_override = mat("dark"); body.position.y = size.y * 0.45; n.add_child(body)
 	var top := MeshInstance3D.new(); var tm := SphereMesh.new(); tm.radius = 0.5; tm.height = 1.0; tm.is_hemisphere = true
 	top.mesh = tm; top.material_override = cloth(c); top.scale = Vector3(size.x * 1.08, size.y * 0.5, size.z * 1.08)
@@ -233,10 +233,11 @@ static func tarp(L: Node3D, pos: Vector3, size: Vector3, yaw: float, c: Color) -
 	var skirt := MeshInstance3D.new(); var sm := CylinderMesh.new(); sm.top_radius = 0.5; sm.bottom_radius = 0.56; sm.height = 1.0; sm.radial_segments = 12
 	skirt.mesh = sm; skirt.material_override = cloth(c); skirt.scale = Vector3(size.x * 1.06, size.y * 0.84, size.z * 1.06)
 	skirt.position.y = size.y * 0.42; n.add_child(skirt)
-	for s in [-0.3, 0.3]:
-		var tie := MeshInstance3D.new(); var tb := TorusMesh.new(); tb.inner_radius = 0.49; tb.outer_radius = 0.52; tie.mesh = tb
-		tie.material_override = mat("rope"); tie.rotation.z = PI / 2; tie.scale = Vector3(size.y * 1.6, 1, size.z * 1.12)
-		tie.position = Vector3(s * size.x, size.y * 0.55, 0); n.add_child(tie)
+	# a couple of lumps poking up under the cloth
+	for k in 2:
+		var lump := MeshInstance3D.new(); lump.mesh = sm; lump.material_override = cloth(c)
+		lump.scale = Vector3(size.x * 0.3, size.y * 0.35, size.z * 0.3); lump.position = Vector3((k - 0.5) * size.x * 0.4, size.y * 1.05, (0.5 - k) * size.z * 0.2)
+		n.add_child(lump)
 	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var sh := BoxShape3D.new(); sh.size = size * Vector3(0.95, 1.0, 0.95)
 	cs.shape = sh; cs.position.y = size.y / 2; sb.add_child(cs); n.add_child(sb)
 
