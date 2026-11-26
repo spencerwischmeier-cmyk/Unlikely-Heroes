@@ -107,7 +107,7 @@ func _physics_process(dt: float) -> void:
 		ball.rotate(Vector3(flat.z, 0, -flat.x).normalized(), sp * dt / 0.5)
 	if cap:
 		cap.rotation.x = lerpf(cap.rotation.x, clampf(sp * 0.05, 0.0, 0.22) - (0.12 if shoot_t >= 0.0 else 0.0), 1.0 - exp(-6.0 * dt))
-		cap.position.y = 0.5 + absf(sin(t * maxf(sp, 1.0) * 2.2)) * 0.03 + (absf(sin(t * 12.0)) * 0.04 if build_t > 0.0 else 0.0)
+		cap.position.y = 0.5 + absf(sin(t * maxf(sp, 1.0) * 2.2)) * 0.03 + sin(t * 3.0) * 0.012 + (absf(sin(t * 12.0)) * 0.04 if build_t > 0.0 else 0.0)
 	var face := face_dir
 	if shoot_t >= 0.0 or face.length() < 0.1:
 		face = player.global_position - global_position; face.y = 0

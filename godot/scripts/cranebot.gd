@@ -237,6 +237,8 @@ func _damage_fx(dt: float) -> void:
 		cab_squash = lerpf(cab_squash, 1.0 if (state == "spray" and st_t > 0.0 and st_t < 0.8) else 0.0, 1.0 - exp(-10.0 * dt))
 		var k := cab_squash * (0.5 + 0.5 * sin(t * 30.0))
 		cab_model.scale = Vector3.ONE * 1.25 * Vector3(1.0 + k * 0.05, 1.0 - k * 0.04, 1.0 + k * 0.05)
+		# engine idle: the cab chugs on its turret
+		cab_model.position.y = -0.02 + absf(sin(t * 9.0)) * 0.025
 	if state in ["off", "intro"] or stacks.is_empty(): return
 	# slam tell: the magnet crackles and its coil arcs while it charges over Vesk
 	if state == "slam" and randf() < dt * (14.0 if st_t < 0.6 else 6.0):
@@ -244,7 +246,10 @@ func _damage_fx(dt: float) -> void:
 		FX.sparks(magnet.global_position + Vector3(cos(a) * 1.2, -0.3, sin(a) * 1.2), Color(1, 0.45, 0.3), 5, 3.5)
 	var f := hp / BOSS_HP
 	smoke_t -= dt
-	if f < 0.66 and smoke_t <= 0.0:
+	if f >= 0.66 and smoke_t <= 0.0:
+		smoke_t = randf_range(1.2, 2.0)     # healthy: a diesel puff now and then
+		FX.smoke_trail((stacks.pick_random() as Node3D).global_position, 0.5)
+	elif f < 0.66 and smoke_t <= 0.0:
 		smoke_t = 0.35 if f > 0.33 else 0.16
 		var st: Node3D = stacks[0] if f > 0.33 else stacks.pick_random()
 		FX.smoke_trail(st.global_position, 1.0 if f > 0.33 else 1.5)
