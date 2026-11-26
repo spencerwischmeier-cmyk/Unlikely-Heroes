@@ -7,6 +7,7 @@ var level: Node3D
 var t := 0.0
 var traversing := false
 var helix_testing := false
+var gust_testing := false
 
 # ---- beacons: { mat: StandardMaterial3D, light: OmniLight3D or null, phase: float, base: float }
 var beacons: Array = []
@@ -45,6 +46,7 @@ var streams := {}
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args(): if a.begins_with("--traverse"): traversing = true
 	helix_testing = OS.get_cmdline_user_args().has("--mast-helix-test")
+	gust_testing = OS.get_cmdline_user_args().has("--mast-gust-test")
 	for i in 4:
 		var p := AudioStreamPlayer3D.new(); p.unit_size = 10.0; p.max_distance = 110.0; p.bus = "SFX"
 		add_child(p); players.append(p)
@@ -281,8 +283,20 @@ func _helix_test(dt: float) -> void:
 	if helix_t > 16.0:
 		print("[helix] done pos=%s" % p.global_position); get_tree().quit()
 
+## debug: --mast-gust-test stands Vesk in the open on the east catwalk and prints where the wind puts him
+var gust_test_t := -1.0
+func _gust_test(dt: float) -> void:
+	var p: CharacterBody3D = Game.player
+	if p == null: return
+	if gust_test_t < 0.0:
+		gust_test_t = 0.0; p.global_position = Vector3(26.0, 12.9, -29.9); p.respawn_pos = p.global_position
+	gust_test_t += dt
+	if fmod(gust_test_t, 0.5) < dt: print("[gust] t=%.1f amount=%.2f pos=%s" % [gust_test_t, gust_named("c1").get("amount", 0.0), p.global_position])
+	if gust_test_t > 9.0: get_tree().quit()
+
 func _physics_process(dt: float) -> void:
 	t += dt
+	if gust_testing: _gust_test(dt)
 	if helix_testing: _helix_test(dt)
 	_wind(dt)
 	_sprockets(dt)
