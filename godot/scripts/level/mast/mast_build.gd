@@ -678,7 +678,7 @@ static func _pylon(L: Node3D, fx: Node3D) -> void:
 	L.prop("generator", Vector3(39.6, P1_Y, -55.2), PI * 0.5)
 	L.prop("barrel", Vector3(46.8, P1_Y, -56.0), 0.0)
 	L.prop("barrel", Vector3(46.0, P1_Y, -56.2), 0.7)
-	L.lamp(38.2, -47.3, Color(0.4, 0.95, 1.0), P1_Y)
+	L.lamp(37.9, -56.6, Color(0.4, 0.95, 1.0), P1_Y)
 	fx.spark_spots.append(Vector3(39.6, P1_Y + 1.6, -55.2))
 	L.hint_sign("LIFT TO THE TOP, THEN HOOKS TO THE DISH", Vector3(46.4, P1_Y, -48.0), -PI * 0.5)
 	# P2 on four legs, lift shaft beside it
@@ -728,7 +728,7 @@ static func _pylon(L: Node3D, fx: Node3D) -> void:
 	var sd := Kit.place(root, "dish_small", cr + Vector3(0, P2_Y + 4.0, 0.3), 0.6, 1.0, false)
 	if sd: sd.rotation.x = -0.4
 	var fm := flag_mat(fx)
-	windsock(root, fx, Vector3(P2.position.x + 0.3, P2_Y, -52.6), 2.8, Vector3(1, 0, 0), "p2")
+	windsock(root, fx, Vector3(45.0, P2_Y, P2.position.y + 0.3), 2.8, Vector3(1, 0, 0), "p2")
 	flag_pole(root, fx, Vector3(P2.end.x - 0.3, P2_Y, P2.end.y - 0.3), 3.2, Vector3(1, 0, 0), Color(0.85, 0.25, 0.22), fm)
 	flag_pole(root, fx, Vector3(P1.position.x + 0.3, P1_Y, P1.position.y + 0.3), 4.0, Vector3(0.6, 0, 0.8).normalized(), Color(0.25, 0.7, 0.75), fm)
 	# the hook chain from the launch corner to the dish deck
