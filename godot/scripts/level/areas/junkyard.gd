@@ -400,6 +400,10 @@ static func _hull_dock(L, B, rng: RandomNumberGenerator, life) -> void:
 			if x > 0 and z < 0: continue
 			L.cyl(Vector3(40.2 + x, 2.2, 79.2 + z), 0.08, 0.08, 4.4, JK.mat("dark"), 6)
 	L.crate_spots.append(Vector3(39.7, 4.8, 79.6))
+	JK.pile(B, rng, Vector3(41.0, 4.8, 78.4), 0.7, 0.5, 10)
+	for z in [78.0, 80.4]: JK.chain(B, Vector3(38.75, 4.35, z), 1.6)
+	L.box(Vector3(40.2, 4.9, 80.65), Vector3(3.0, 0.2, 0.1), L.glow_warm, false)
+	JK.pile(B, rng, Vector3(40.2, 0, 79.2), 1.6, 1.4, 26)
 	# engine on a stand, tarps, workbench, the floodlight and piles
 	var eng := Vector3(28.6, 0, 92.6)
 	L.box(eng + Vector3(0, 0.45, 0), Vector3(1.4, 0.9, 1.0), JK.mat("dark"))
@@ -503,6 +507,9 @@ static func _lookout(L, B, rng: RandomNumberGenerator, life) -> void:
 	L.crate_spots.append(lg + Vector3(0.3, 0, 0.3))
 	JK.pile(B, rng, Vector3(-6.0, 0, 136.8), 1.4, 1.6, 30)
 	JK.cyl_collider(L, Vector3(-6.0, 0, 136.8), 0.9, 0.9)
+	_grime(L, B, rng, [Vector2(-3.0, 138.5), Vector2(4.0, 140.0), Vector2(-6.0, 134.0), Vector2(2.0, 132.0)])
+	JK.bulbs(B, L, Vector3(-6.6, 3.2, 132.6), Vector3(7.6, 1.2, 131.4), 0.5, 12)
+	L.cyl(Vector3(7.6, 0.6, 131.4), 0.05, 0.06, 1.2, JK.mat("dark"), 6)
 	JK.litter(B, rng, LOOKOUT.grow(-0.6), 0.0, 22, [Rect2(-3, 131, 6, 12), Rect2(2.5, 132, 3, 3)])
 
 # ---------------------------------------------------------------- floating junk around the rock
