@@ -60,6 +60,10 @@ P = {
  'barricade': ("Work-crew road barricade: a sturdy portable construction roadblock, two thick horizontal planks painted with bold "
                "diagonal hazard stripes, mounted on chunky A-frame steel legs with flat feet, big bolts, a small round amber warning "
                "lamp on top of one end, front view, wide and low, no text." + LIV, None),
+ 'dodger': ("Dodger: a small round hover drone sidekick, egg-shaped glossy off-white shell with a burnt-orange stripe band around "
+            "the middle, ONE big round empty dark eye socket on the front (no eye inside, just a deep dark round hole with a thick "
+            "dark grey rim), two small rotor pods on short side arms with little orange fins, a short bent antenna with a glowing "
+            "orange tip on top, a few panel lines and tiny rivets, scuffed and chipped like a well-used gadget. Cute, sassy.", None),
  'crew_head': ("Work-crew robot head: a dome-shaped robot head unit that sits on top of a rolling ball, wearing a chunky yellow hard hat "
                "with a lamp, one big round glowing amber eye lens with a grumpy brow, a rim around the base, a small radio antenna." + LIV, None),
 }

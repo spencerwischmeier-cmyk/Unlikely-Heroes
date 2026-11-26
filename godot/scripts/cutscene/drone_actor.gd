@@ -9,6 +9,7 @@ extends Node3D
 const M := preload("res://scripts/mats.gd")
 const EYE := Color(0.35, 0.95, 1.0)
 const ORANGE := Color(1.0, 0.42, 0.06)
+const BODY_OFFSET := Vector3(0, 0.015, -0.04)
 
 var model: Node3D
 var eye_mat: StandardMaterial3D
@@ -64,8 +65,20 @@ func _ready() -> void:
 		var mi := MeshInstance3D.new(); mi.mesh = s
 		var jm := M.glow(Color(0.4, 0.9, 1.0), 3.0); mi.material_override = jm; jet_mats.append(jm)
 		mi.position = Vector3(0, -0.05, 0); jn.add_child(mi)
+	_reskin()
 	_shadows(model)
 	_build_lids()
+
+## The Meshy shell (models/chars/dodger_body.glb) replaces the primitive body; the eye parts stay and sit
+## in its socket.
+func _reskin() -> void:
+	if not ResourceLoader.exists("res://models/chars/dodger_body.glb"): return
+	const KEEP := ["drone_eye_glass", "drone_eye_ring", "drone_pupil", "drone_pupil_ring"]
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		if not (String(mi.name) in KEEP) and not jet_mats.has((mi as MeshInstance3D).material_override): (mi as MeshInstance3D).visible = false
+	var body: Node3D = load("res://models/chars/dodger_body.glb").instantiate()
+	body.name = "DodgerBody"; body.position = BODY_OFFSET
+	model.add_child(body)
 
 func _build_lids() -> void:
 	var shell := StandardMaterial3D.new(); shell.albedo_color = Color(0.86, 0.88, 0.9); shell.metallic = 0.2; shell.roughness = 0.35

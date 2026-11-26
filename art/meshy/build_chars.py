@@ -148,6 +148,7 @@ JOBS = {
     'crane_cab': lambda: static('crane_cab', f'{MODELS}/chars/crane_cab.glb', width=3.0, yaw=math.pi / 2),
     'crane_base': lambda: static('crane_base', f'{MODELS}/chars/crane_base.glb', width=5.2, yaw=math.pi / 2),
     'barricade': lambda: static('barricade', f'{MODELS}/chars/crew_barricade.glb', width=2.5),
+    'dodger': lambda: static('dodger', f'{MODELS}/chars/dodger_body.glb', width=1.1, ground=False),
     'gizmart': lambda: static('gizmart', f'{MODELS}/chars/gizmart.glb', height=3.0),
 }
 if __name__ == '__main__':
