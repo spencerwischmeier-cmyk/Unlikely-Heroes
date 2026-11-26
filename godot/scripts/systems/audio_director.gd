@@ -77,6 +77,7 @@ func _ready() -> void:
 	Game.collectible_found.connect(func(_k, _id): Snd.sting("sting_secret", -3.0))
 	Game.bot_killed.connect(_on_bot_killed)
 	Game.zone_entered.connect(_on_zone_entered)
+	Game.player_respawned.connect(func(_p): Snd.play("area_whoosh", -12.0, 0.05, 0.5))
 	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0; boss_phase2 = false)
 	Game.boss_health.connect(_on_boss_health)
 	get_tree().node_added.connect(_on_node_added)
@@ -111,6 +112,9 @@ func _route(n: Node) -> void:
 		if p.bus != &"Master": return
 		var path := p.stream.resource_path if p.stream else ""
 		p.bus = &"Voice" if path.contains("/voice/") else &"Amb"
+	if n is AudioStreamPlayer and (n as AudioStreamPlayer).bus == &"Voice" and not Snd.extra_voices.has(n):
+		Snd.extra_voices = Snd.extra_voices.filter(func(v): return is_instance_valid(v))
+		Snd.extra_voices.append(n)
 
 func _level_ok() -> bool:
 	return Game.level != null and is_instance_valid(Game.level) and "islands" in Game.level \
@@ -186,7 +190,12 @@ func landed(db: float) -> void:
 	if db > -2.0: Snd.play("debris", db - 12.0, 0.1, 0.3)
 
 # ------------------------------------------------------------------ music
+func _shop_open() -> bool:
+	var g: Node = Game.main.get_node_or_null("Gizmart") if Game.main else null
+	return g != null and g.get("open_i") != null and int(g.open_i) >= 0
+
 func _music_for() -> String:
+	if _shop_open() and Snd.has_music("shop"): return "shop"
 	var a := area if AREAS.has(area) else "plaza"
 	if combat: return AREAS[a].combat
 	return "area_" + a
@@ -203,7 +212,8 @@ func _update_music() -> void:
 	var t := _music_for()
 	if t == Snd.track: return
 	var fade := 2.5
-	if combat: fade = 0.6
+	if t == "shop" or Snd.track == "shop": fade = 0.8
+	elif combat: fade = 0.6
 	elif Snd.track.begins_with("combat_"): fade = 3.5
 	Snd.set_track(t, fade, 1.0 if combat else 0.0)
 
@@ -499,6 +509,15 @@ func _self_test() -> void:
 	print("[audio-test] %s boss phase two: track=%s" % ["PASS" if b_ok else "FAIL", Snd.track])
 	ok = ok and b_ok
 	Snd.music("skyharbor", 0.5)
+	var gz: Node = Game.main.get_node_or_null("Gizmart")
+	if gz and gz.get("kiosks") != null and gz.kiosks.size() > 0 and gz.has_method("_open"):
+		gz._open(0, false)
+		await get_tree().create_timer(0.6).timeout
+		var s_ok := Snd.track == "shop"
+		print("[audio-test] %s shop music: track=%s" % ["PASS" if s_ok else "FAIL", Snd.track])
+		ok = ok and s_ok
+		if gz.has_method("_close"): gz._close()
+		get_tree().paused = false
 	var emitters := 0
 	for p in get_tree().root.find_children("SndLoop", "AudioStreamPlayer3D", true, false): emitters += 1
 	print("[audio-test] emitters=%d" % emitters)

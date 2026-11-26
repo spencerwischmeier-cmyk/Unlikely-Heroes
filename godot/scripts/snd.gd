@@ -225,10 +225,14 @@ func bus_fx(bus: String, cls: String) -> AudioEffect:
 
 ## ducking: music and ambience dip under dialogue
 var duck := 0.0
+var extra_voices: Array = []   # other systems' 2D voice players (the director routes them to Voice); duck for them too
 var menu_duck := false     # set by the director while the pause menu is up (ambience dips, music muffles)
 var menu_amt := 0.0
 func _duck_process(dt: float) -> void:
 	var talking := voice_player != null and voice_player.playing
+	if not talking:
+		for v in extra_voices:
+			if is_instance_valid(v) and v.playing: talking = true; break
 	duck = move_toward(duck, 1.0 if talking else 0.0, dt * (4.0 if talking else 1.2))
 	var m := bus_fx("Music", "AudioEffectAmplify"); if m: m.volume_db = -6.5 * duck
 	menu_amt = move_toward(menu_amt, 1.0 if menu_duck else 0.0, dt * 3.0)
@@ -283,7 +287,7 @@ func set_track(t: String, fade := 1.5, db := 0.0) -> void:
 		tracks[t] = tr
 	tr.rate = 1.0 / maxf(fade, 0.05); tr.db = db
 	if not tr.p.playing:
-		var resume: bool = t.begins_with("area_") or t.begins_with("combat_")
+		var resume: bool = t.begins_with("area_") or t.begins_with("combat_") or t == "shop"
 		tr.p.play(tr.pos if resume else 0.0)
 
 func _music_process(dt: float) -> void:
