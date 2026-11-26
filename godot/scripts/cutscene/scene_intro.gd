@@ -195,6 +195,16 @@ func run() -> void:
 	C.fx(func(): Snd.at("cell_pickup", mp, -6))
 	await C.say("cs_intro_mail", 0.2)
 	C.look_node = null
+	# ...and one bot that does NOT clock in: Gizmart, at his plaza kiosk
+	var giz := _gizmart_spot()
+	if giz.size() > 0:
+		var gp: Vector3 = giz[0]; var gf: Vector3 = giz[1]
+		var gside := gf.cross(Vector3.UP)
+		C.cut(gp + gf * 3.6 + gside * 1.2 + Vector3(0, 1.5, 0), gp + Vector3(0, 1.5, 0), 40.0)
+		C.move(gp + gf * 2.8 + gside * 0.8 + Vector3(0, 1.5, 0), gp + Vector3(0, 1.6, 0), 9.0, 36.0)
+		C.fx(func(): Snd.at("gizmart_chime", gp, -2))
+		await C.say("cs_intro_gizmart", 0.2)
+		await C.say("cs_intro_gizmart_2", 0.4)
 	# 13. every bot goes haywire: rollers in the yard, a hornet over the wall, sparks from the generator
 	C.cut(Vector3(3, 5.5, 98.5), Vector3(-3, 0.5, 79), 52.0)
 	C.move(Vector3(1, 6.5, 99.5), Vector3(-4, 0.5, 77), 7.0)
@@ -300,3 +310,19 @@ func run() -> void:
 	await C.wait(0.4)
 	if chair:  # the chewed chair stays knocked over
 		chair.rotation.z = 1.45; chair.scale = Vector3(1, 0.75, 1)
+
+## The first Gizmart kiosk (position, front direction), from the Gizmart system or the level's shop spots.
+func _gizmart_spot() -> Array:
+	var g: Node = Game.main.get_node_or_null("Gizmart")
+	if g and "kiosks" in g and g.kiosks.size() > 0 and is_instance_valid(g.kiosks[0].node):
+		var k: Dictionary = g.kiosks[0]
+		var pos: Vector3 = (k.node as Node3D).global_position
+		var f: Vector3 = k.get("front", pos) - pos   # "front" is a point 1.5 m in front of the kiosk
+		f.y = 0.0
+		if f.length() > 0.01: return [pos, f.normalized()]
+	var spots = Game.level.get("shop_spots") if Game.level else null
+	if spots is Array and spots.size() > 0:
+		var s: Dictionary = spots[0]
+		var yaw: float = s.get("yaw", 0.0)
+		return [s.pos, Vector3(sin(yaw), 0, cos(yaw))]
+	return []
