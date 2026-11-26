@@ -22,6 +22,7 @@ for f in files:
     if spin:
         for o in new:
             if o.name.startswith('ball'): o.rotation_mode = 'XYZ'; o.rotation_euler = (1.4, 0.6, 0)
+            if o.name.startswith('wing_'): o.rotation_mode = 'XYZ'; o.rotation_euler = (0, 0.5 if o.name.endswith('L') else -0.5, 0)
     bpy.context.view_layer.update()
     pts = [o.matrix_world @ Vector(c) for o in new if o.type == 'MESH' for c in o.bound_box]
     if not pts: continue

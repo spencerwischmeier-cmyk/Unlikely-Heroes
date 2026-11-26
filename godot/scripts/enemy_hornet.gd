@@ -23,6 +23,7 @@ var wobble := 0.0
 var fall_t := 0.0
 var spin_v := 0.0
 var buzz_t := 0.0
+var wings: Array = []
 
 func _ready() -> void:
 	hp = 4.0; max_hp = 4.0; nuts = 8
@@ -33,6 +34,8 @@ func _ready() -> void:
 	collision_mask = 0
 	setup_model("res://models/hornet.glb")
 	inner = model.find_child("inner", true, false)
+	wings = [model.find_child("wing_L", true, false), model.find_child("wing_R", true, false)]
+	wings = wings.filter(func(w): return w != null)
 	for x in [-0.14, 0.14]: add_eye(inner if inner else model, Vector3(x, 0.2, 0.56), 0.065, Color(1, 0.15, 0.08), 5.0)
 	scrap_count = 11
 	fire_t = randf_range(1.8, 3.0); orbit_a = randf() * TAU; orbit_r = randf_range(8, 12); height = randf_range(3, 5.5)
@@ -79,6 +82,7 @@ func _physics_process(dt: float) -> void:
 	if inner:
 		inner.rotation.z = clampf(-velocity.x * 0.05, -0.5, 0.5) + sin(t * 2.0) * 0.08 + sin(t * 30.0) * wobble * 0.5
 		inner.rotation.x = sin(t * 23.0) * wobble * 0.3 + sin(t * 3.1) * 0.06
+		_flap(1.0 + wobble)
 		inner.position = Vector3(sin(t * 61.0) * 0.012, sin(t * 2.4) * 0.08 + sin(t * 53.0) * 0.012, 0)
 	buzz_t -= dt
 	if buzz_t <= 0.0: buzz_t = randf_range(2.5, 4.5); Snd.at("hornet_buzz", global_position, -10, 0.12, 0.3)
@@ -105,6 +109,13 @@ func _physics_process(dt: float) -> void:
 		combat.enemy_shot(from, aim_at)
 		FX.sparks(from, Color(1, 0.35, 0.2), 6, 3.0)
 		velocity -= (aim_at - global_position).normalized() * 2.0   # recoil
+
+## Buzzing wings: a fast flap that the frame rate turns into a blur, flaring when it is knocked about.
+func _flap(k: float) -> void:
+	for i in wings.size():
+		var w: Node3D = wings[i]
+		var sx := 1.0 if i == 0 else -1.0
+		w.rotation.z = sx * (0.15 + sin(t * 57.0 + i * 0.6) * 0.42 * k)
 
 func _aim_line(charge: float, locked: bool) -> void:
 	var from := global_position
@@ -133,6 +144,7 @@ func _fall(dt: float) -> void:
 	global_position += velocity * dt
 	rotate_y(spin_v * dt)
 	if model: model.rotation.z += dt * 4.0
+	_flap(0.5)
 	for m in flash_mats: m.emission = Color(1, 0.4, 0.1); m.emission_energy_multiplier = 0.8 + sin(t * 30.0) * 0.6
 	if randf() < 0.7: FX.smoke_trail(global_position, 0.8)
 	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3(0, -0.9, 0) + velocity * dt); q.collision_mask = 1

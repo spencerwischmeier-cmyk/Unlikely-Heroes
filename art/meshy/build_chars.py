@@ -140,10 +140,31 @@ def static(src, out, height=None, width=None, ground=True, yaw=0.0, name=None, w
     shrink_textures()
     export(out)
 
+def hornet(out):
+    """Hornet/inner/{hornet_body, wing_L, wing_R}: the wings are cut off the back (above the shoulders, behind the
+    head) onto pivots at their roots so the game can buzz them."""
+    clear(); o = load('hornet')
+    fit(o, 1.6, None, False)
+    r = empty('Hornet'); inner = empty('inner', r)
+    groups = {'L': [], 'R': [], 'body': []}
+    for f in o.data.polygons:
+        c = f.center
+        if c.y > 0.3 and c.z > 0.12 and abs(c.x) > 0.06: groups['L' if c.x > 0 else 'R'].append(f.index)
+        else: groups['body'].append(f.index)
+    print('hornet wing faces', len(groups['L']), len(groups['R']))
+    body = mesh_from_faces(o, groups['body'], 'hornet_body'); body.parent = inner
+    for k, sx in (('L', 1), ('R', -1)):
+        piv = empty(f'wing_{k}', inner, (0.12 * sx, 0.32, 0.25))
+        w = mesh_from_faces(o, groups[k], f'hornet_wing_{k}')
+        bpy.context.view_layer.update(); reparent(w, piv)
+    bpy.data.objects.remove(o)
+    shrink_textures()
+    export(out)
+
 JOBS = {
     'roller': lambda: roller('roller_head', f'{MODELS}/roller.glb', 0.55, 'Roller'),
     'crew_roller': lambda: roller('crew_head', f'{MODELS}/crew_roller.glb', 0.5, 'CrewRoller'),
-    'hornet': lambda: static('hornet', f'{MODELS}/hornet.glb', height=1.6, ground=False, name='hornet_body', wrap=('Hornet', 'inner')),
+    'hornet': lambda: hornet(f'{MODELS}/hornet.glb'),
     'magnet': lambda: static('magnet', f'{MODELS}/chars/crane_magnet.glb', width=2.5, ground=False),
     'crane_cab': lambda: static('crane_cab', f'{MODELS}/chars/crane_cab.glb', width=3.0, yaw=math.pi / 2),
     'crane_base': lambda: static('crane_base', f'{MODELS}/chars/crane_base.glb', width=5.2, yaw=math.pi / 2),
