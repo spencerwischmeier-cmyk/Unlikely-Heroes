@@ -283,6 +283,24 @@ static func _loft(L: Node3D) -> void:
 		TK.lantern_string(Vector3(-96.4, y + 4.1, 10.4 + i * 1.3), Vector3(-85.3, y + 4.1, 10.4 + i * 1.3), 0.4 + 0.15 * (i % 2), 1.3)
 	for p in [Vector3(-93.5, y + 3.9, 11.5), Vector3(-87.5, y + 3.9, 13.3), Vector3(-90.5, y + 3.9, 13.3), Vector3(-86.2, y + 3.9, 11.5)]:
 		life.add_swinger(TK.chimes(p, 0.9), 0.16, 1.4)
+	# more of the loft: blossom trees, lantern racks, paper stock, a folding table
+	TK.tree(Vector3(-97.0, y, 19.0), 2.4, "blossom")
+	TK.tree(Vector3(-83.4, y, 19.0), 2.0)
+	TK.tree(Vector3(-94.5, y, 6.9), 2.2)
+	for rp in [Vector3(-88.0, y, 17.6), Vector3(-87.5, y, 6.6)]:
+		TK.post(rp + Vector3(-0.8, 0, 0), 2.4, 0.06, "wood_dark"); TK.post(rp + Vector3(0.8, 0, 0), 2.4, 0.06, "wood_dark")
+		TK.add(TK.box_mesh(), TK.mat("wood"), TK.tf(rp + Vector3(0, 2.35, 0), Vector3(1.9, 0.1, 0.1)))
+		for i in 4: TK.lantern(rp + Vector3(-0.6 + i * 0.4, 1.95, 0), 0.75, ["lantern", "lantern_teal", "lantern_red", "lantern"][i])
+		TK.solid(rp + Vector3(0, 1.2, 0), Vector3(1.8, 2.4, 0.3))
+	TK.add(TK.box_mesh(), TK.mat("wood"), TK.tf(Vector3(-90.8, y + 0.8, 12.4), Vector3(2.6, 0.1, 1.3)))
+	for lp in [Vector2(-91.9, 11.9), Vector2(-89.7, 11.9), Vector2(-91.9, 12.9), Vector2(-89.7, 12.9)]:
+		TK.post(Vector3(lp.x, y, lp.y), 0.78, 0.05, "wood_dark")
+	for i in 6:
+		var cl: String = ["saffron", "teal", "crimson", "cream", "plum", "sky"][i]
+		TK.add(TK.box_mesh(), TK.mat("cloth_" + cl), TK.tf(Vector3(-91.8 + i * 0.4, y + 0.87 + (i % 2) * 0.02, 12.3 + (i % 3) * 0.12), Vector3(0.45, 0.02, 0.55), Vector3(0, i * 0.3, 0)), false)
+	TK.lantern(Vector3(-90.0, y + 1.05, 12.6), 0.9, "lantern_teal")
+	TK.solid(Vector3(-90.8, y + 0.45, 12.4), Vector3(2.6, 0.9, 1.3))
+	TK.goods_heap(Vector3(-85.9, y, 19.2), 0.5, 0.7)
 	# the lantern maker's bench and stock
 	TK.add(TK.box_mesh(), TK.mat("wood"), TK.tf(Vector3(-96.6, y + 0.9, 13), Vector3(1.0, 0.1, 4.0)))
 	for z in [11.3, 14.7]: TK.add(TK.box_mesh(), TK.mat("wood_dark"), TK.tf(Vector3(-96.6, y + 0.45, z), Vector3(0.9, 0.9, 0.12)))
@@ -457,7 +475,7 @@ static func _sky_lanterns() -> void:
 
 # ------------------------------------------------------------------ gameplay spots
 static func _spots(L: Node3D) -> void:
-	for p in [Vector3(-79.0, 0, 31.4), Vector3(-52.4, 0, 40.0), Vector3(-94.0, 7.8, 7.4), Vector3(-63.4, 3.6, 22.6), Vector3(-42.0, 4.0, -21.0)]:
+	for p in [Vector3(-79.0, 0, 31.4), Vector3(-52.4, 0, 40.0), Vector3(-91.5, 7.8, 7.2), Vector3(-63.4, 3.6, 22.6), Vector3(-42.0, 4.0, -21.0)]:
 		L.crate_spots.append(p)
 	var sp: Array = []
 	for i in 6: sp.append(Vector3(-93 + cos(i * TAU / 6) * 1.3, 13.5, 23.5 + sin(i * TAU / 6) * 1.2))   # chime perch

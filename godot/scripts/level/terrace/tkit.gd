@@ -584,7 +584,8 @@ static func tea_table(pos: Vector3, yaw := 0.0) -> void:
 	add(cyl_mesh(8), mat("teal"), T * tf(Vector3(0.28, 0.98, 0), Vector3(0.05, 0.18, 0.05), Vector3(0, 0, -0.9)), false)
 	for s in [-1, 1]:
 		add(cyl_mesh(8), mat("plaster"), T * tf(Vector3(-0.25 * s, 0.86, 0.3 * s), Vector3(0.12, 0.1, 0.12)), false)
-		add(cyl_mesh(12), mat("cloth_crimson" if s > 0 else "cloth_saffron"), T * tf(Vector3(1.05 * s, 0.25, 0), Vector3(0.62, 0.5, 0.62)))
+		add(cyl_mesh(8), mat("wood_dark"), T * tf(Vector3(1.0 * s, 0.2, 0), Vector3(0.36, 0.4, 0.36)))
+		add(sphere_mesh(), mat("cloth_crimson" if s > 0 else "cloth_saffron"), T * tf(Vector3(1.0 * s, 0.45, 0), Vector3(0.55, 0.2, 0.55)), false)
 	solid(T * Vector3(0, 0.45, 0), Vector3(1.1, 0.9, 1.1))
 
 ## crates, sacks and pots in a little heap (decor with one collider)
