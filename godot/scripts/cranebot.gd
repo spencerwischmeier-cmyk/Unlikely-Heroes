@@ -47,6 +47,8 @@ var state := "off"
 var st_t := 0.0
 var t := 0.0
 var flash := 0.0
+var jolt := 0.0           # cab recoil on hits (a damped spring, visual only)
+var jolt_v := 0.0
 var yaw := PI
 var turn_yaw := 0.0
 var pitch := 0.6
@@ -247,6 +249,10 @@ func _damage_fx(dt: float) -> void:
 		cab_model.scale = Vector3.ONE * 1.25 * Vector3(1.0 + k * 0.05, 1.0 - k * 0.04, 1.0 + k * 0.05)
 		# engine idle: the cab chugs on its turret
 		cab_model.position.y = -0.02 + absf(sin(t * 9.0)) * 0.025
+		# hits rock the cab back on its turret and it wobbles upright again
+		jolt_v += (-jolt * 140.0 - jolt_v * 9.0) * dt
+		jolt += jolt_v * dt
+		cab_model.rotation.x = jolt * 0.12
 	if lamp_mat:
 		var alarm := phase == 2 or state in ["slam", "spray", "sweep_wind", "sweep", "crew", "stunned", "dying", "rip"]
 		lamp_mat.emission_energy_multiplier = (9.0 if fmod(t, 0.36) < 0.18 else 1.0) if alarm else 0.6
@@ -362,6 +368,7 @@ func damage(amount: float, _point: Vector3, _dir: Vector3) -> bool:
 
 func _hurt(amount: float) -> bool:
 	hp -= amount; flash = 1.0
+	jolt_v -= minf(2.2, 0.6 + amount * 0.25)
 	if amount >= 3.0: Snd.at("chars_crane_hurt", center(), 0, 0.1, 0.8)
 	if phase == 1 and hp <= BOSS_HP * 0.5:
 		hp = BOSS_HP * 0.5; pending_rip = true     # phase 2 always plays
