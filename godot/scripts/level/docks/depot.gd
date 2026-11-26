@@ -305,6 +305,12 @@ static func _canyon(L: Node3D, A: Node3D) -> void:
 	for p in [Vector3(62, 4.2, 30), Vector3(70.5, 4.2, 36), Vector3(78, 4.2, 39.5), Vector3(70, 4.5, 18)]:
 		var l := OmniLight3D.new(); l.light_color = Color(1, 0.8, 0.55); l.light_energy = 1.6; l.omni_range = 10.0
 		l.position = p; L.add_child(l)
+	# pennant strings across the corridors
+	_bunting(L, Vector3(57, 5.6, 27.4), Vector3(63, 5.6, 32.6), 1.2)
+	_bunting(L, Vector3(66, 5.6, 37.2), Vector3(73.2, 5.6, 30.5), 1.0)
+	_bunting(L, Vector3(68, 5.6, 42), Vector3(77, 7.8, 37), 1.2)
+	_bunting(L, Vector3(51, 3.0, 28.2), Vector3(56, 3.0, 28.2), 0.5)
+	_bunting(L, Vector3(51, 3.0, 31.8), Vector3(56, 3.0, 31.8), 0.5)
 	# the south gangway out to the moored cargo blimp's gondola
 	_moored_blimp(L, A)
 	Anim.Snd3.loop(A, "docks_harbor_amb", Vector3(70, 3, 30), -8.0, 20.0, 80.0)
@@ -620,3 +626,28 @@ static func _cable(L: Node3D, a: Vector3, b: Vector3, sag: float, mat: Material)
 		mi.look_at_from_position(mid, p, Vector3.UP)
 		mi.rotate_object_local(Vector3.RIGHT, PI / 2)
 		prev = p
+
+## a string of little triangular pennants sagging between two points
+static func _bunting(L: Node3D, a: Vector3, b: Vector3, sag: float) -> void:
+	var cols := [Color(0.95, 0.3, 0.2), Color(1.0, 0.78, 0.2), Color(0.2, 0.6, 0.9), Color(0.3, 0.75, 0.45), Color(0.95, 0.92, 0.85)]
+	var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var len := a.distance_to(b)
+	var n := int(len / 0.6)
+	var side := (b - a).normalized()
+	var prev := a
+	for i in n + 1:
+		var u := float(i) / n
+		var p := a.lerp(b, u) - Vector3(0, sag * 4.0 * u * (1.0 - u), 0)
+		if i > 0:
+			st.set_color(Color(0.15, 0.15, 0.17))
+			for q in [prev, p, p + Vector3(0, 0.03, 0)]: st.set_normal(Vector3.UP); st.add_vertex(q)
+		if i < n:
+			st.set_color(cols[i % cols.size()])
+			var nrm := side.cross(Vector3.UP).normalized()
+			for q in [p + side * 0.05, p + side * 0.4, p + side * 0.22 + Vector3(0, -0.45, 0)]: st.set_normal(nrm); st.add_vertex(q)
+		prev = p
+	var mi := MeshInstance3D.new(); mi.mesh = st.commit()
+	mi.material_override = _m("bunting", func():
+		var m := M.std(Color.WHITE, 0.0, 0.8); m.vertex_color_use_as_albedo = true; m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		return m)
+	L.add_child(mi)
