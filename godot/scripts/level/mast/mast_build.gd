@@ -46,6 +46,7 @@ static func build(L: Node3D) -> void:
 	_cables(L, fx)
 	_perches(L, fx)
 	_dish_beam(L, fx)
+	flush(L)
 	_story(L)
 	_debug(L)
 
@@ -70,16 +71,29 @@ static func unit_box() -> BoxMesh:
 		_unit = BoxMesh.new(); _unit.size = Vector3.ONE
 	return _unit
 
-## a beam from a to b, t thick (square section)
-static func strut(parent: Node3D, a: Vector3, b: Vector3, t: float, mat: Material) -> MeshInstance3D:
-	var mi := MeshInstance3D.new(); mi.mesh = unit_box(); mi.material_override = mat
+## a beam from a to b, t thick (square section). Struts are static, so they are batched per material into
+## MultiMeshes (flush() at the end of build) to keep the draw calls down.
+static var _batches := {}
+
+static func strut(parent: Node3D, a: Vector3, b: Vector3, t: float, mat: Material) -> void:
 	var d := b - a; var len := d.length()
+	if len < 0.001: return
 	var y := d / len
 	var x := y.cross(Vector3.UP if absf(y.y) < 0.99 else Vector3.RIGHT).normalized()
 	var z := x.cross(y)
-	parent.add_child(mi)
-	mi.transform = Transform3D(Basis(x * t, y * len, z * t), (a + b) * 0.5)
-	return mi
+	var tr := parent.global_transform * Transform3D(Basis(x * t, y * len, z * t), (a + b) * 0.5) if parent.is_inside_tree() else Transform3D(Basis(x * t, y * len, z * t), (a + b) * 0.5)
+	if not _batches.has(mat): _batches[mat] = []
+	_batches[mat].append(tr)
+
+static func flush(L: Node3D) -> void:
+	for mat in _batches:
+		var list: Array = _batches[mat]
+		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.mesh = unit_box()
+		mm.instance_count = list.size()
+		for i in list.size(): mm.set_instance_transform(i, list[i])
+		var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mm; mmi.material_override = mat; mmi.name = "MastStruts"
+		L.add_child(mmi)
+	_batches.clear()
 
 static func boxm(parent: Node3D, pos: Vector3, size: Vector3, mat: Material, collide := false) -> MeshInstance3D:
 	var mi := MeshInstance3D.new(); mi.mesh = unit_box(); mi.material_override = mat
@@ -311,6 +325,26 @@ static func _tower(L: Node3D, fx: Node3D) -> void:
 		for b in [Vector3(0.3, 0.3, 0.3), Vector3(-0.3, 0.3, 0.3), Vector3(0.3, 0.3, -0.3), Vector3(-0.3, 0.3, -0.3)]:
 			sphere(root, p + b * Vector3(1, 0.85, 1), 0.06, mats.brass)
 		fx.spark_spots.append(p + Vector3(0, 6.0, 0))
+	# panel antennas and microwave drums bolted to the faces (above head height on the gallery)
+	for f: Vector3 in [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0)]:
+		var side := Vector3(-f.z, 0, f.x)
+		for k in [-0.75, 0.75]:
+			var p: Vector3 = Vector3(C.x, 11.4, C.z) + f * 2.15 + side * k
+			var pn := boxm(root, p, Vector3(0.36, 1.5, 0.14), mats.white)
+			pn.rotation.y = atan2(f.x, f.z)
+			strut(root, p - f * 0.07 + Vector3(0, 0.5, 0), p - f * 0.4 + Vector3(0, 0.5, 0), 0.06, mats.steel)
+			strut(root, p - f * 0.07 - Vector3(0, 0.5, 0), p - f * 0.4 - Vector3(0, 0.5, 0), 0.06, mats.steel)
+		if f.z != 0:
+			var dp: Vector3 = Vector3(C.x, 13.6, C.z) + f * 2.3 + side * 0.4
+			var drum := cylm(root, dp, 0.5, 0.5, 0.35, mats.white, 16)
+			drum.rotation = Vector3(PI / 2, atan2(f.x, f.z), 0)
+			cylm(root, dp + f * 0.19, 0.42, 0.42, 0.04, mats.steel, 16).rotation = Vector3(PI / 2, atan2(f.x, f.z), 0)
+	# the service ladder up the west face, cut off halfway (Grudd's crews took the top half)
+	for z in [-0.35, 0.35]:
+		strut(root, Vector3(C.x - 2.05, 8.0, C.z + z), Vector3(C.x - 2.05, 13.4, C.z + z), 0.06, mats.brass)
+	for k in 17: strut(root, Vector3(C.x - 2.05, 8.3 + k * 0.3, C.z - 0.35), Vector3(C.x - 2.05, 8.3 + k * 0.3, C.z + 0.35), 0.04, mats.brass)
+	strut(root, Vector3(C.x - 2.05, 13.4, C.z + 0.35), Vector3(C.x - 2.6, 13.9, C.z + 0.6), 0.06, mats.brass)
+	fx.spark_spots.append(Vector3(C.x - 2.1, 13.4, C.z))
 	# the maintenance ring (16.2): a square balcony round the tower, solid railings, a gap toward the old
 	# fourth ledge (south-west) so you can climb back to the deck
 	var y := RING_Y
