@@ -47,6 +47,7 @@ static func build(level: Node3D) -> void:
 	_cafe()
 	_props()
 	_cables()
+	_banners()
 	_sky_life()
 	_merge_static()
 	# hidden sprocket crates up on the ring
@@ -726,6 +727,25 @@ static func _cables() -> void:
 	# a few of the lanterns actually light the floor
 	for p in [Vector3(-2.5, 3.6, 22.5), Vector3(-14.5, 4.6, 40.2), Vector3(15.2, 4.6, 32.0)]:
 		light(p, Color(1.0, 0.65, 0.3), 1.4, 7.0)
+
+# ---------------------------------------------------------------- hanging banners
+static func banner(pos: Vector3, yaw: float, c: String, h := 2.6) -> void:
+	var f := frame(pos, yaw)
+	bx(Vector3(0, 0, 0.08), Vector3(1.2, 0.08, 0.08), "brass", false, f)
+	bx(Vector3(0, -h / 2, 0.1), Vector3(1.0, h, 0.03), "cloth_" + c, false, f)
+	bx(Vector3(0, -h + 0.05, 0.11), Vector3(1.0, 0.14, 0.03), "cloth_f2c94c", false, f)
+	var e := cy(Vector3(0, -h * 0.4, 0.13), 0.3, 0.3, 0.02, "gold", 10, f); e.rotation.x = PI / 2
+	var e2 := cy(Vector3(0, -h * 0.4, 0.14), 0.14, 0.14, 0.02, "cloth_" + c, 10, f); e2.rotation.x = PI / 2
+
+static func _banners() -> void:
+	# clock tower west face, flanking the window, and the arch pillars (both faces)
+	for z in [21.0, 24.0]: banner(Vector3(TOWER.x - 2.22, 10.2, z), -PI / 2, "c0392b", 3.0)
+	for x in [-9.25, 9.25]:
+		banner(Vector3(x, 4.0, 46.22), 0.0, "1f6f8b", 2.4)
+		banner(Vector3(x, 4.0, 44.78), PI, "1f6f8b", 2.4)
+	# shop gable banners
+	banner(Vector3(-18.95, 4.4, 30.0), PI / 2, "2a8c8a", 1.6)
+	banner(Vector3(-18.95, 4.4, 36.0), PI / 2, "e0533a", 1.6)
 
 # ---------------------------------------------------------------- airship and birds
 static func _sky_life() -> void:
