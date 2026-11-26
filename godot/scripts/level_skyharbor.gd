@@ -537,7 +537,7 @@ func _build_docks() -> void:
 	# Pier A (0), Pier B (4), Pier C (6): grind rails between hanging containers, three turbines
 	var pa := rect(39, 30, 22, 28)
 	island("pier_a", pa, 0.0, Color(0.92, 0.95, 0.97))
-	fence(pa, 0.0, [["w", 26, 34], ["w", 12, 21], ["n", 40, 48]], "nsew")
+	fence(pa, 0.0, [["w", 26, 34], ["w", 12, 21], ["n", 40, 48], ["e", 27.5, 32.5]], "nsew")
 	var cm := [M.std(Color(0.82, 0.27, 0.18), 0.5, 0.45), M.std(Color(0.18, 0.5, 0.82), 0.5, 0.45), M.std(Color(0.91, 0.7, 0.16), 0.5, 0.45), M.std(Color(0.23, 0.65, 0.48), 0.5, 0.45)]
 	for c in [[33, 38, 0, 0, 0], [33, 38, 0, 2.5, 2], [45, 26, 1, 0, 1], [34, 24, 1, 0, 3]]:
 		var sz := Vector3(2.4, 2.5, 5) if c[2] else Vector3(5, 2.5, 2.4)
@@ -552,6 +552,9 @@ func _build_docks() -> void:
 	_hanging(Vector3(40.5, 6.0, 7.5), 0.5, cm[1])
 	_hanging(Vector3(52.5, 7.0, 6.5), -0.4, cm[2])
 	_hanging(Vector3(46, 7.5, 3), 0.9, cm[0])
+	# rail from Pier D's north yard (scripts/level/docks/depot.gd) up to Pier B; unlocks with rail 1
+	set_meta("rail_depot", rail([Vector3(74, 0.45, 13.5), Vector3(73.8, 1.4, 9), Vector3(72.5, 2.9, 4.5), Vector3(70, 4.1, 1.0),
+		Vector3(67, 4.5, -0.8), Vector3(64.5, 4.5, -1.2)], true))
 	# Pier B
 	island("pier_b", rect(58, -8, 16, 16), 4.0, Color(0.9, 0.93, 0.96), 2.0)
 	turbine(Vector3(63, 4, -3), PI)
@@ -579,9 +582,15 @@ func _hanging(pos: Vector3, rot_y: float, mat: Material) -> void:
 	var c := box(pos + Vector3(0, 1.25, 0), Vector3(5, 2.5, 2.4), mat)
 	c.rotation.y = rot_y
 	if mat is StandardMaterial3D: DocksDressing.skin_box(c, "container", (mat as StandardMaterial3D).albedo_color.lightened(0.15))
+	# held up by a striped cargo balloon: two cables from the container's ends to a ring under it
+	var ring := pos + Vector3(0, 10.0, 0)
 	for s in [-1, 1]:
 		var off: Vector3 = Vector3(cos(rot_y), 0, -sin(rot_y)) * 1.8 * s
-		cyl(pos + off + Vector3(0, 2.5 + 6, 0), 0.04, 0.04, 12, mat_dark, 6)
+		var a := pos + off + Vector3(0, 2.5, 0)
+		var cab := cyl((a + ring) / 2, 0.04, 0.04, a.distance_to(ring), mat_dark, 6)
+		cab.look_at_from_position(cab.position, ring, Vector3.UP if absf(off.x) > 0.01 else Vector3.RIGHT)
+		cab.rotate_object_local(Vector3.RIGHT, PI / 2)
+	DocksDressing.balloon(self, ring, rot_y, mat)
 
 func _build_mast() -> void:
 	# the Signal Mast at the center: east landing (3) -> gallery (8) -> ledges -> catwalk, cable rail, relay
@@ -694,12 +703,13 @@ func _define_zones() -> void:
 			waves = [{ roller = 3 }, { roller = 2, hornet = 1 }, { roller = 3, hornet = 1 }] },
 		{ id = "docks", name = "CARGO DOCKS", rect = islands.pier_a, objective = "Cross east to the Cargo Docks",
 			enter_lines = ["cargo_intro"], clear_lines = ["sky_docks_clear_1", "sky_docks_clear_2"],
-			waves = [{ roller = 4 }, { roller = 2, hornet = 2 }], unlock_rails = [R_DOCKS_1] },
+			waves = [{ roller = 4 }, { roller = 2, hornet = 2 }], unlock_rails = [R_DOCKS_1, get_meta("rail_depot", -1)] },
 		{ id = "turbines", kind = "activate", rect = islands.pier_a, banner = "TURBINES ONLINE", name = "WIND TURBINES",
 			objective = "Restart the dock wind turbines", progress_text = "Restart the dock wind turbines (%d/%d)",
 			switches = [{ pos = Vector3(43.5, 0, 39.5), yaw = PI, label = "TURBINE 1" }, { pos = Vector3(60.5, 4, -3.5), yaw = PI, label = "TURBINE 2" },
 				{ pos = Vector3(70.5, 6, -43.5), yaw = PI, label = "TURBINE 3" }],
-			guards = [{ rect = islands.pier_b, y = 4.0, roller = 2, hornet = 1 }, { rect = islands.pier_c, y = 6.0, roller = 2, hornet = 1 }],
+			guards = [{ rect = islands.pier_b, y = 4.0, roller = 2, hornet = 1 }, { rect = islands.pier_c, y = 6.0, roller = 2, hornet = 1 },
+				{ rect = Rect2(68.5, 28, 4, 12), y = 0.0, roller = 2, hornet = 1 }, { rect = Rect2(114, 20, 8, 20), y = 0.0, roller = 2 }],
 			enter_lines = ["sky_turbines_1"], clear_lines = ["sky_turbines_done_1", "sky_turbines_done_2", "sky_turbines_done_3"],
 			power = ["cargo_lift"] },
 		{ id = "terrace", name = "MARKET TERRACE", rect = islands.terrace, skippable = true,
@@ -756,23 +766,10 @@ func _debug_start() -> void:
 			var s: Array = debug_spots[a.substr(5)]
 			start_pos = s[0]; start_yaw = s[1]
 
-## the sky city far below and around: towers poking through the haze
+## the sky city far below and around: built by scripts/level/areas/docks.gd (scripts/level/docks/sky.gd:
+## tiered towers, floating districts, cloud layers, sun shafts, airship lanes and birds)
 func _build_city() -> void:
-	var rng := RandomNumberGenerator.new(); rng.seed = 7
-	var tower_mats := [M.std(Color(0.72, 0.81, 0.88), 0.6, 0.35), M.std(Color(0.62, 0.77, 0.85), 0.6, 0.35), M.std(Color(0.84, 0.89, 0.92), 0.6, 0.3)]
-	var win := M.glow(Color(1.0, 0.85, 0.55), 1.2)
-	for i in 140:
-		var ang := rng.randf() * TAU
-		var dist := 180.0 + pow(rng.randf(), 0.8) * 600.0
-		var p := Vector3(sin(ang) * dist, 0, -cos(ang) * dist + -10)
-		var r := rng.randf_range(5, 12) * (0.8 + dist / 400.0)
-		var top := rng.randf_range(-30, 40) + dist * 0.04
-		var bottom := -260.0
-		cyl(Vector3(p.x, (top + bottom) / 2, p.z), r, r * 1.15, top - bottom, tower_mats[i % 3], 24)
-		var dome := SphereMesh.new(); dome.radius = r; dome.height = r * 1.2; dome.is_hemisphere = true
-		mesh_at(dome, M.std(Color(0.6, 0.85, 1.0), 0.3, 0.1), Vector3(p.x, top, p.z))
-		var band := TorusMesh.new(); band.inner_radius = r * 1.15; band.outer_radius = r * 1.3
-		mesh_at(band, win, Vector3(p.x, top - rng.randf_range(3, 12), p.z))
+	pass
 
 func _physics_process(dt: float) -> void:
 	t += dt

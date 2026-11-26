@@ -8,6 +8,7 @@ const DIR := "res://models/docks/"
 const M := preload("res://scripts/mats.gd")
 
 static var _aabbs := {}
+static var _tinted := {}   # shared tinted copies so containers of one colour batch
 
 static func _load(name: String) -> Node3D:
 	var p := DIR + name + ".glb"
@@ -49,6 +50,19 @@ static func place(parent: Node3D, name: String, pos: Vector3, rot_y := 0.0, heig
 		sb.add_child(cs); holder.add_child(sb)
 	return holder
 
+## Place a model with its base centre at pos, stretched to exactly `size` (x along the model's own x).
+static func place_fit(parent: Node3D, name: String, pos: Vector3, rot_y: float, size: Vector3) -> Node3D:
+	var n := _load(name)
+	if n == null: return null
+	var ab := _aabb(name, n)
+	var holder := Node3D.new(); holder.name = "D_" + name
+	parent.add_child(holder)
+	holder.position = pos; holder.rotation.y = rot_y
+	holder.add_child(n)
+	n.scale = Vector3(size.x / ab.size.x, size.y / ab.size.y, size.z / ab.size.z)
+	n.position = -Vector3(ab.get_center().x, ab.position.y, ab.get_center().z) * n.scale
+	return holder
+
 ## Fit a model exactly into a box (used to skin the gameplay containers, which keep their own colliders).
 static func skin_box(box_mi: MeshInstance3D, name: String, tint: Color) -> void:
 	var n := _load(name)
@@ -69,8 +83,35 @@ static func skin_box(box_mi: MeshInstance3D, name: String, tint: Color) -> void:
 		for i in mi.get_surface_override_material_count():
 			var m := mi.mesh.surface_get_material(i)
 			if m is StandardMaterial3D:
-				var c: StandardMaterial3D = m.duplicate(); c.albedo_color = tint
-				mi.set_surface_override_material(i, c)
+				var key := "%s|%d|%d|%s" % [name, m.get_instance_id(), i, tint.to_html()]
+				if not _tinted.has(key):
+					var c: StandardMaterial3D = m.duplicate(); c.albedo_color = tint
+					_tinted[key] = c
+				mi.set_surface_override_material(i, _tinted[key])
+
+## A striped cargo balloon whose ring sits at `ring` (it floats the hanging containers over the rails).
+static func balloon(L: Node3D, ring: Vector3, rot_y: float, tint_mat: Material) -> void:
+	var n := Node3D.new(); n.position = ring; n.rotation.y = rot_y; L.add_child(n)
+	var c: Color = (tint_mat as StandardMaterial3D).albedo_color if tint_mat is StandardMaterial3D else Color(0.9, 0.4, 0.2)
+	var key := "balloon_" + c.to_html()
+	if not _tinted.has(key): _tinted[key] = M.cloth(c.lightened(0.1))
+	if not _tinted.has("balloon_cream"): _tinted["balloon_cream"] = M.cloth(Color(0.95, 0.9, 0.8))
+	var tor := TorusMesh.new(); tor.inner_radius = 0.3; tor.outer_radius = 0.42; tor.ring_segments = 8; tor.rings = 16
+	var rm := MeshInstance3D.new(); rm.mesh = tor; rm.material_override = M.brass(); n.add_child(rm)
+	var env := SphereMesh.new(); env.radius = 2.6; env.height = 5.2; env.radial_segments = 24; env.rings = 12
+	var em := MeshInstance3D.new(); em.mesh = env; em.material_override = _tinted[key]; em.position.y = 3.6
+	em.scale = Vector3(1.25, 0.95, 1.0); n.add_child(em)
+	for k in [-1, 0, 1]:   # cream bands round the envelope
+		var b := TorusMesh.new(); b.inner_radius = 2.45 - absf(k) * 0.5; b.outer_radius = 2.68 - absf(k) * 0.5; b.rings = 24; b.ring_segments = 6
+		var bm := MeshInstance3D.new(); bm.mesh = b; bm.material_override = _tinted["balloon_cream"]
+		bm.position = Vector3(k * 1.5, 3.6, 0); bm.rotation.z = PI / 2; bm.scale = Vector3(1, 1.0, 0.98)
+		n.add_child(bm)
+	for s in [-1, 1]:   # rigging lines from the ring to the envelope
+		var l := CylinderMesh.new(); l.top_radius = 0.025; l.bottom_radius = 0.025; l.height = 1.9; l.radial_segments = 4
+		var lm := MeshInstance3D.new(); lm.mesh = l; lm.material_override = M.std(Color(0.2, 0.2, 0.22), 0.3, 0.7)
+		lm.position = Vector3(s * 0.7, 0.9, 0); lm.rotation.z = -s * 0.65; n.add_child(lm)
+	var fin := BoxMesh.new(); fin.size = Vector3(1.2, 1.4, 0.08)
+	var fm := MeshInstance3D.new(); fm.mesh = fin; fm.material_override = _tinted["balloon_cream"]; fm.position = Vector3(-3.3, 3.8, 0); n.add_child(fm)
 
 static func steam(parent: Node3D, pos: Vector3, scale := 1.0) -> void:
 	var p := CPUParticles3D.new()
@@ -130,7 +171,7 @@ static func dress(L: Node3D) -> void:
 	place(L, "floodlight", Vector3(49.2, 0, 43.2), PI * 1.25, 7.0, true, 0.3)
 	# ---- Pier B
 	place(L, "fuel_tanks", Vector3(64.2, 4, -9.5), PI * 0.5, 2.8, true)
-	place(L, "barrels", Vector3(64.6, 4, -1.6), 1.0, 1.3, true)
+	place(L, "barrels", Vector3(65.0, 4, -13.0), 1.0, 1.3, true)   # clear of the depot rail's landing
 	place(L, "dock_bot", Vector3(55, 4, -12.5), 0.6, 1.3, true)
 	place(L, "floodlight", Vector3(51, 4, -15.2), PI * 0.25, 6.0, true, 0.3)
 	place(L, "bollard", Vector3(65.4, 4, -14.5), 0.0, 0.7, true)
@@ -149,8 +190,8 @@ static func dress(L: Node3D) -> void:
 			[Vector3(52, 2.0, -14), 32.0], [Vector3(64, 2.0, -2), 34.0], [Vector3(62, 4.0, -44), 36.0], [Vector3(74, 4.0, -32), 32.0]]:
 		place(L, "truss", t[0] - Vector3(0, t[1], 0), randf() * 0.3, t[1], false)
 	# ---- vista: floating islands, airships
-	for v in [[Vector3(115, -14, 25), 26.0, 0.3], [Vector3(98, 6, -78), 18.0, 2.0], [Vector3(135, 18, -32), 34.0, 4.0],
-			[Vector3(88, -30, 70), 16.0, 1.0], [Vector3(150, -6, 40), 22.0, 5.2], [Vector3(80, 30, -120), 30.0, 3.0]]:
+	for v in [[Vector3(185, -14, 30), 26.0, 0.3], [Vector3(150, 6, -95), 18.0, 2.0], [Vector3(195, 18, -40), 34.0, 4.0],
+			[Vector3(120, -30, 105), 16.0, 1.0], [Vector3(215, -6, 95), 22.0, 5.2], [Vector3(80, 30, -135), 30.0, 3.0]]:
 		place(L, "island", v[0], v[2], v[1], false)
 	drift(place(L, "airship", Vector3.ZERO, 0.0, 6.0, false), Vector3(70, 22, 30), Vector3(105, 26, -40), 70.0)
 	drift(place(L, "airship", Vector3.ZERO, 0.0, 4.5, false), Vector3(30, 30, -70), Vector3(95, 24, -95), 60.0)
