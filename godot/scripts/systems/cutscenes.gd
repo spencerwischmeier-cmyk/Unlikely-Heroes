@@ -321,6 +321,7 @@ func _skip() -> void:
 func _run(id: String) -> void:
 	playing = id; ct = 0.0; skipping = false; tracks.clear(); skip_hold = 0.0; hint_a = 0.0
 	seek = float(start_args.get("cut-t", 0.0)) if start_args.get("cut", "") == id else 0.0
+	if start_args.has("cut-fast"): seek = 1e6   # flow tests: run every scene instantly
 	Game.input_locked = true
 	await get_tree().process_frame   # story is still between emitting cutscene_started and awaiting the finish
 	if id != "intro" and seek <= 0.0:
@@ -385,26 +386,30 @@ func _finish(id: String) -> void:
 	Game.cutscene_finished.emit(id)
 	# ease from the cutscene camera into the gameplay camera, open the letterbox, fade in
 	var game_cam: Camera3D = Game.cam.camera if Game.cam and "camera" in Game.cam else null
-	var from := cam.global_transform
-	var from_fov := cam.fov
+	var oc := cam
+	var oa := attrs
+	var from := oc.global_transform
+	var from_fov := oc.fov
 	var from_dof := dof
 	var t := 0.0
 	var dur := 0.4 if was_skip else 1.3
-	while t < dur:
+	while t < dur and playing == "":
 		await get_tree().process_frame
 		var dt := get_process_delta_time()
 		t += dt
 		var u := smoothstep(0.0, 1.0, t / dur)
 		if game_cam:
-			cam.global_transform = from.interpolate_with(game_cam.global_transform, u)
-			cam.fov = lerpf(from_fov, game_cam.fov, u)
-		if attrs: attrs.dof_blur_amount = 0.11 * from_dof * (1.0 - u)
+			oc.global_transform = from.interpolate_with(game_cam.global_transform, u)
+			oc.fov = lerpf(from_fov, game_cam.fov, u)
+		if oa: oa.dof_blur_amount = 0.11 * from_dof * (1.0 - u)
 		fade = move_toward(fade, 0.0, dt * 2.5)
 		bars = 1.0 - u
 		_overlays_only()
-	bars = 0.0; fade = 0.0; _overlays_only()
-	if game_cam: game_cam.current = true
-	cam.queue_free(); cam = null; attrs = null
+	if playing == "":
+		bars = 0.0; fade = 0.0; _overlays_only()
+		if game_cam: game_cam.current = true
+	oc.queue_free()
+	if cam == oc: cam = null; attrs = null
 
 func _overlays_only() -> void:
 	black.color.a = fade

@@ -58,6 +58,9 @@ func _cuts_on() -> bool:
 ## Play a cutscene and wait for it to finish.
 func play_cutscene(id: String) -> void:
 	if not _cuts_on(): return
+	var cs: Node = Game.main.get_node_or_null("Cutscenes")
+	while cs and cs.get("playing") != "":
+		await Game.cutscene_finished
 	Game.cutscene_started.emit(id)
 	while true:
 		var done: String = await Game.cutscene_finished
