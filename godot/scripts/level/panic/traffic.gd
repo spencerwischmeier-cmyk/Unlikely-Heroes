@@ -15,8 +15,8 @@ const TOWER_SEED := 7
 const DISTRICTS := [[Vector3(205, -6, 10), 26.0], [Vector3(170, 4, -120), 20.0], [Vector3(60, -12, 175), 22.0],
 	[Vector3(-150, 0, -150), 24.0], [Vector3(-190, -10, 60), 20.0], [Vector3(110, 14, -210), 28.0],
 	[Vector3(260, -24, 120), 30.0], [Vector3(-60, 8, -230), 22.0]]
-const CAR_LEN := 3.6
-const MAX_PUFFS := 700
+const CAR_LEN := 5.2
+const MAX_PUFFS := 1400
 
 const CAR_SHADER := """
 shader_type spatial;
@@ -50,7 +50,7 @@ void fragment() {
 
 const PUFF_SHADER := """
 shader_type spatial;
-render_mode unshaded, depth_draw_never, cull_disabled, blend_mix;
+render_mode unshaded, depth_draw_never, cull_disabled, blend_mix, fog_disabled;
 varying vec4 col;
 void vertex() {
 	col = COLOR;
@@ -151,7 +151,7 @@ func _curve(pts: Array) -> Curve3D:
 func _build_lanes() -> void:
 	var hub := Vector3(30, 0, -15)
 	# rings through the tower city: [radius, height, wobble]
-	for ring in [[215.0, 24.0, 18.0], [255.0, 42.0, 22.0], [300.0, 16.0, 26.0], [345.0, 58.0, 30.0], [185.0, 64.0, 10.0]]:
+	for ring in [[168.0, 34.0, 6.0], [178.0, 52.0, 8.0], [225.0, 26.0, 18.0], [265.0, 44.0, 22.0], [320.0, 62.0, 26.0]]:
 		var pts := []
 		var n := 40
 		var ph := rng.randf() * TAU
@@ -167,7 +167,7 @@ func _build_lanes() -> void:
 		for i in 32:
 			var a := TAU * i / 32
 			var v := Vector3(cos(a) * 230.0, 0, sin(a) * 70.0).rotated(Vector3.UP, rot)
-			pts.append(hub + v + Vector3(0, 78.0 + k * 14.0 + sin(a * 2.0) * 8.0, 0))
+			pts.append(hub + v + Vector3(0, 52.0 + k * 12.0 + sin(a * 2.0) * 5.0, 0))
 		_add_lane(_avoid(pts))
 	var low := []
 	for i in 36:
@@ -217,7 +217,7 @@ func _build_cars() -> void:
 	car_mm.transform_format = MultiMesh.TRANSFORM_3D
 	car_mm.use_custom_data = true
 	car_mm.mesh = mesh
-	var per_lane := [16, 14, 14, 12, 8, 9, 9, 10]
+	var per_lane := [18, 16, 14, 12, 10, 12, 12, 10]
 	var total := 0
 	for i in lanes.size(): total += per_lane[i % per_lane.size()]
 	car_mm.instance_count = total
@@ -372,8 +372,8 @@ func _ship_model(kind: String) -> Node3D:
 
 func _build_ships() -> void:
 	var glow := M.glow(Color(1.0, 0.6, 0.25), 9.0)
-	for k in 9:
-		var kind := "shuttle" if k < 6 else ("airship" if k < 8 else "freighter")
+	for k in 14:
+		var kind := "shuttle" if k < 9 else ("airship" if k < 12 else "freighter")
 		var holder := Node3D.new(); add_child(holder)
 		var m := _ship_model(kind)
 		var length: float = {"shuttle": 13.0, "airship": 16.0, "freighter": 34.0}[kind]
@@ -394,7 +394,7 @@ func _build_ships() -> void:
 			dur = 1.0, u = 2.0, puff_t = 0.0, last = Vector3.ZERO, wait = rng.randf_range(0.0, 20.0) })
 	# some start already on the way up, so the sky is busy from the first second
 	for s in ships:
-		if rng.randf() < 0.6: _launch(s, rng.randf_range(0.1, 0.7))
+		if rng.randf() < 0.8: _launch(s, rng.randf_range(0.1, 0.7))
 
 func _aabb(n: Node) -> AABB:
 	var out := AABB(); var first := true
@@ -425,7 +425,7 @@ func _launch(s: Dictionary, u0 := 0.0) -> void:
 	s.p0 = from
 	s.p1 = from + Vector3(0, rng.randf_range(50, 80), 0)
 	s.p2 = from + out * rng.randf_range(400, 700) + Vector3(0, rng.randf_range(550, 800), 0)
-	s.dur = rng.randf_range(26.0, 38.0) * (1.6 if s.kind == "freighter" else 1.0)
+	s.dur = rng.randf_range(22.0, 32.0) * (1.6 if s.kind == "freighter" else 1.0)
 	s.u = u0; s.last = _bez(s, u0)
 	s.node.visible = true
 
@@ -441,8 +441,8 @@ func _ships(dt: float, pp: Vector3) -> void:
 			s.node.visible = false
 			s.wait -= dt
 			if s.wait <= 0.0 and ship_t <= 0.0:
-				ship_t = rng.randf_range(2.5, 5.0)
-				s.wait = rng.randf_range(4.0, 14.0)
+				ship_t = rng.randf_range(1.5, 3.5)
+				s.wait = rng.randf_range(2.0, 8.0)
 				_launch(s)
 				if s.p0.distance_to(pp) < 420.0: _sound(far_sfx, "panic_ship_takeoff", s.p0, 2.0 if s.kind == "freighter" else -2.0)
 			continue
@@ -464,10 +464,10 @@ func _ships(dt: float, pp: Vector3) -> void:
 		# contrail
 		s.puff_t -= dt
 		if s.puff_t <= 0.0:
-			s.puff_t = 0.07 if s.kind != "freighter" else 0.05
+			s.puff_t = 0.12 if s.kind != "freighter" else 0.09
 			var tail: Vector3 = n.global_transform * Vector3(0, 0, s.len * 0.55)
-			var size: float = s.len * 0.32
-			_puff(tail, Vector3(rng.randf_range(-0.5, 0.5), 0.6, rng.randf_range(-0.5, 0.5)), Color(1, 1, 1, 0.55), size, 7.0)
+			var size: float = s.len * 0.6
+			_puff(tail, Vector3(rng.randf_range(-0.5, 0.5), 0.6, rng.randf_range(-0.5, 0.5)), Color(1, 1, 1, 0.7), size, 10.0)
 			if rng.randf() < 0.35: _puff(tail, Vector3.ZERO, Color(1.0, 0.7, 0.35, 0.8), size * 0.5, 0.4)
 
 func _process(dt: float) -> void:
