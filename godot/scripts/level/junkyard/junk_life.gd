@@ -12,11 +12,43 @@ var cranes: Array = []     # { jib: Node3D, base, amp, speed, hook: Node3D, hook
 var welders: Array = []    # { pos, t }
 var creaks: Array = []     # Vector3 spots a creak may come from
 var bobbers: Array = []    # { node, base_y, amp, speed, phase }
+var talks: Array = []      # { rect: Rect2, y0, y1, ids: Array, done: bool }
+var dodger_up := false     # Dodger only chats once he's been dug out of the scrap pile
+var talk_t := 0.0
 var center := Vector3(0, 0, 95)
 var t := 0.0
 var creak_t := 4.0
 var _streams := {}
 var _one_shots: Array[AudioStreamPlayer3D] = []
+
+func _ready() -> void:
+	var g := get_node_or_null("/root/Game")
+	if g and g.has_signal("zone_cleared"):
+		g.zone_cleared.connect(func(id: String): if id == "junk_crash" or id == "dodger_launch": dodger_up = true)
+
+## Lines that play the first time Vesk walks into `rect` (between heights y0 and y1).
+func talk(rect: Rect2, y0: float, y1: float, ids: Array) -> void:
+	talks.append({ rect = rect, y0 = y0, y1 = y1, ids = ids, done = false })
+
+func _talks(pp: Vector3, dt: float) -> void:
+	talk_t -= dt
+	if talk_t > 0.0: return
+	talk_t = 0.25
+	if not dodger_up:
+		var g := get_node_or_null("/root/Game")
+		var st: Node = g.story if g and g.get("story") else null
+		if st and st.has_method("current_id") and not (st.current_id() in ["", "junk_crash"]): dodger_up = true
+		else: return
+	var snd := get_node_or_null("/root/Snd")
+	if snd == null: return
+	if snd.get("voice_player") and snd.voice_player.playing: return
+	for tk in talks:
+		if tk.done: continue
+		if tk.rect.has_point(Vector2(pp.x, pp.z)) and pp.y > tk.y0 and pp.y < tk.y1:
+			tk.done = true
+			for id in tk.ids: snd.voice(id)
+			talk_t = 6.0
+			return
 
 func swing(n: Node3D, amp: Vector3, speed: float, phase := 0.0) -> void:
 	swingers.append({ node = n, base = n.rotation, amp = amp, speed = speed, phase = phase })
@@ -73,6 +105,7 @@ func _process(dt: float) -> void:
 	var pp := _player_pos()
 	if pp.distance_to(center) > 120.0: return
 	t += dt
+	_talks(pp, dt)
 	for s in swingers:
 		var n: Node3D = s.node
 		var w: float = t * s.speed + s.phase

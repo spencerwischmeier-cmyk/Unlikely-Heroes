@@ -432,7 +432,7 @@ func _build_junkyard() -> void:
 	# tutorial run: low junk walls to hop
 	block(0, 86, 9, 0.8, 0.8, 0, mat_rust)
 	block(-3, 80.5, 0.8, 7, 1.0, 0, mat_rust)
-	hint_sign("HOP OVER", Vector3(4.8, 0, 87), PI)
+	hint_sign("SPACE: JUMP. HOLD IT TO GO HIGHER", Vector3(4.8, 0, 87), PI)
 	# the scrap pile where Dodger crashed (two jumps up), and a hidden shelf above it
 	block(-9, 78.5, 4, 4, 1.2, 0, mat_rust)
 	block(-12.5, 74.5, 4, 3.4, 2.4, 0, mat_rust)

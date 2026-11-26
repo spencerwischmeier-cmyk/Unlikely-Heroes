@@ -189,21 +189,23 @@ static func plank_bridge(L: Node3D, a: Vector3, b: Vector3, width: float, rng: R
 		# rope rail colliders so nobody walks off the side by accident
 		box_collider(L, (a + b) / 2 + side * s * (width / 2) + Vector3(0, 0.55, 0), Vector3(0.2, 1.1, len), yaw)
 
-## A sagging rope (or cable) from a to b.
+## A sagging rope (or cable) from a to b, as a few straight segments (cheap, no CSG).
 static func rope(L: Node3D, a: Vector3, b: Vector3, sag: float, thick := 0.03, m: Material = null) -> void:
-	var path := Path3D.new(); var cu := Curve3D.new()
-	var n := 8
+	var n := 6
+	var pts := []
 	for i in n + 1:
 		var u := float(i) / n
-		cu.add_point(a.lerp(b, u) + Vector3(0, -sag * 4.0 * u * (1.0 - u), 0))
-	path.curve = cu; L.add_child(path)
-	var tube := CSGPolygon3D.new(); tube.mode = CSGPolygon3D.MODE_PATH; tube.path_node = NodePath("..")
-	var poly := PackedVector2Array()
-	for k in 5: poly.append(Vector2(cos(k * TAU / 5), sin(k * TAU / 5)) * thick)
-	tube.polygon = poly; tube.path_interval_type = CSGPolygon3D.PATH_INTERVAL_DISTANCE; tube.path_interval = 0.4
-	tube.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
-	tube.material = m if m else mat("rope")
-	path.add_child(tube)
+		pts.append(a.lerp(b, u) + Vector3(0, -sag * 4.0 * u * (1.0 - u), 0))
+	var cm := CylinderMesh.new(); cm.top_radius = thick; cm.bottom_radius = thick; cm.height = 1.0; cm.radial_segments = 5; cm.rings = 1
+	for i in n:
+		var p0: Vector3 = pts[i]; var p1: Vector3 = pts[i + 1]
+		var seg := MeshInstance3D.new(); seg.mesh = cm; seg.material_override = m if m else mat("rope")
+		seg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		L.add_child(seg)
+		var d := p1 - p0
+		var up := d.normalized()
+		var side := up.cross(Vector3.FORWARD if absf(up.z) < 0.9 else Vector3.RIGHT).normalized()
+		seg.global_transform = Transform3D(Basis(side, up, side.cross(up)).scaled_local(Vector3(1, d.length() + 0.02, 1)), (p0 + p1) / 2)
 
 ## String of warm bulbs hanging between two points (glowing spheres, no lights).
 static func bulbs(B: Batch, L: Node3D, a: Vector3, b: Vector3, sag: float, n: int) -> void:

@@ -20,6 +20,20 @@ const Life := preload("res://scripts/level/junkyard/junk_life.gd")
 const HEAP := Rect2(-46, 68, 22, 32)
 const HULL := Rect2(24, 68, 22, 32)
 const LOOKOUT := Rect2(-8, 131, 16, 12)
+## Discovery chatter (audio/voice/<id>.ogg); subtitles are registered with Snd at build time so the shared
+## script.json stays untouched.
+const LINES := [
+	["junkyard_heap_1", "dodger", "The Scrap Heap! I'm ninety percent sure there's a whole other toaster buried in there."],
+	["junkyard_heap_2", "vesk", "Then it stays buried."],
+	["junkyard_summit_1", "vesk", "Huh. Nice view. Still a dump. My dump."],
+	["junkyard_hull_1", "dodger", "Ooh, Project Someday! Are we finishing the ship? Is today Someday?"],
+	["junkyard_hull_2", "vesk", "No."],
+	["junkyard_crane_1", "dodger", "Is the crane supposed to be swinging a car around by itself?"],
+	["junkyard_crane_2", "vesk", "It gets bored."],
+	["junkyard_lookout_1", "vesk", "My thinking spot. No talking."],
+	["junkyard_lookout_2", "dodger", "Got it. ...Is whispering talking?"],
+	["junkyard_garden_1", "dodger", "Your bolt garden looks great, Vesk. The washers are really blooming this year."],
+]
 
 static func build(L) -> void:
 	var rng := RandomNumberGenerator.new(); rng.seed = 4417
@@ -32,12 +46,25 @@ static func build(L) -> void:
 	_lookout(L, B, rng, life)
 	_vista(L, B, rng, life)
 	B.flush(L, JK)
+	_chatter(L, life)
 	L.debug_spots["junk_home"] = [Vector3(0, 0.1, 104), PI]
 	L.debug_spots["junk_heap"] = [Vector3(-25, 0.1, 82), -PI * 0.6]
 	L.debug_spots["junk_hull"] = [Vector3(25, 0.1, 80), PI * 0.6]
 	L.debug_spots["junk_lookout"] = [Vector3(0, 0.1, 133), PI]
 	L.debug_spots["junk_summit"] = [Vector3(-38.4, 6.1, 86.6), PI / 2]
 	L.debug_spots["junk_shack"] = [Vector3(-1, 0.1, 86.5), 0.0]
+
+static func _chatter(L, life) -> void:
+	var snd: Node = L.get_node_or_null("/root/Snd")
+	if snd and snd.has_method("_load_script"):
+		snd._load_script()
+		for ln in LINES: snd.script_lines[ln[0]] = [ln[1], ln[2]]
+	life.talk(Rect2(-36, 70, 12, 18), -1.0, 3.0, ["junkyard_heap_1", "junkyard_heap_2"])
+	life.talk(Rect2(-42.2, 83.4, 5.2, 5.2), 5.5, 7.0, ["junkyard_summit_1"])
+	life.talk(Rect2(24, 74, 10, 12), -1.0, 3.0, ["junkyard_hull_1", "junkyard_hull_2"])
+	life.talk(Rect2(36, 68, 10, 14), -1.0, 6.0, ["junkyard_crane_1", "junkyard_crane_2"])
+	life.talk(Rect2(-8, 131, 16, 12), -1.0, 2.0, ["junkyard_lookout_1", "junkyard_lookout_2"])
+	life.talk(Rect2(-17, 102, 10, 9), -1.0, 2.0, ["junkyard_garden_1"])
 
 # ---------------------------------------------------------------- the tutorial yard (dressing only)
 static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
@@ -65,6 +92,14 @@ static func _yard(L, B, rng: RandomNumberGenerator, life) -> void:
 			var s: float = signf(w[0])
 			B.add("plate", "scrap", JK.xform(Vector3(w[0] - s * 0.05, rng.randf_range(1.0, 1.5), z), Vector3(rng.randf_range(-0.08, 0.08), 0, PI / 2 + rng.randf_range(-0.06, 0.06)), Vector3(rng.randf_range(1.8, 2.6), 1, rng.randf_range(1.6, 2.2))), col)
 			if i % 2 == 0: B.add("beam", "scrap", JK.xform(Vector3(w[0] - s * 0.12, 1.5, z0 + i * w[2] / n), Vector3(PI / 2, 0, 0), Vector3(1.1, 1.1, 3.2)), JK.GUN)
+	# the gate arch: scrap pillars and a big rusty name board (kept above the intro's view of the mast)
+	for x in [-5.0, 5.0]:
+		L.box(Vector3(x, 2.9, 68.3), Vector3(1.0, 5.8, 1.0), JK.mat("rust"))
+		for i in 4: B.add("drum", "scrap", JK.xform(Vector3(x + rng.randf_range(-0.2, 0.2), 0.5 + i * 1.35, 68.3), Vector3(0, rng.randf() * TAU, rng.randf_range(-0.1, 0.1)), Vector3(1.6, 1.3, 1.6)), JK.PALETTE[rng.randi() % JK.PALETTE.size()])
+		B.add("tire", "rubber", JK.xform(Vector3(x, 6.0, 68.3), Vector3(PI / 2, 0, 0), Vector3.ONE * 1.1))
+	var arch := JK.sign(L, "VESK'S JUNKYARD", Vector3(0, 0, 68.3), 0.0, 10.6, 1.3, 5.1, Color(1.0, 0.8, 0.4), Color(0.45, 0.26, 0.14))
+	for c in arch.get_children(): if c is MeshInstance3D and (c.mesh as BoxMesh).size.y > 5.0: c.visible = false   # pillars do the holding
+	for x in [-4.2, -1.4, 1.4, 4.2]: B.add("ball", "bulb", JK.xform(Vector3(x, 6.6, 68.25), Vector3.ZERO, Vector3.ONE * 0.2))
 	# hanging chains and a hook off the porch roofline beam, and tools on the wall
 	var beam: MeshInstance3D = L.box(Vector3(0, 3.35, 90.8), Vector3(12.6, 0.22, 0.22), JK.mat("dark"), false)
 	beam.name = "PorchBeam"
@@ -141,9 +176,9 @@ static func _home(L, B, rng: RandomNumberGenerator, life) -> void:
 	for i in 10:  # ladder rungs on the west side (decor; the crates are the real way up)
 		L.box(tank_c + Vector3(-2.2, 0.35 + i * 0.33, 0), Vector3(0.06, 0.05, 0.7), JK.mat("dark"), false)
 	for s in [-0.35, 0.35]: L.box(tank_c + Vector3(-2.22, 1.7, s), Vector3(0.06, 3.4, 0.06), JK.mat("dark"), false)
-	L.block(15.3, 103.8, 1.6, 1.6, 1.2, 0, JK.mat("rust"), false)
-	L.block(15.5, 106.6, 1.6, 1.6, 2.4, 0, JK.mat("rust"), false)
-	L.prop("crate_small", Vector3(15.3, 1.2, 103.8), 0.3, 1.0, false)
+	L.block(15.3, 103.6, 2.0, 2.0, 1.2, 0, JK.mat("rust"), false)
+	L.block(15.5, 106.6, 2.0, 2.6, 2.4, 0, JK.mat("rust"), false)
+	L.prop("crate_small", Vector3(16.0, 1.2, 103.0), 0.3, 0.6, false)
 	DocksDressing.place(L, "pipes", tank_c + Vector3(0.6, 0, -2.6), PI, 2.0, true, 0.6)
 	DocksDressing.steam(L, tank_c + Vector3(0.6, 2.1, -2.6), 0.5)
 	L.crate_spots.append(tank_c + Vector3(0.4, 3.6, 0.3))
@@ -219,9 +254,9 @@ static func _heap(L, B, rng: RandomNumberGenerator, life) -> void:
 	L.crate_spots.append(top + Vector3(0.9, 0, -1.0))
 	# hidden ledge off the summit's north side (double jump), a tyre nest with a stash
 	var lg := Vector3(-42.5, 7.2, 79.4)
-	L.ledge(lg.x, lg.z, 2.4, 2.4, lg.y, JK.mat("rust"))
-	for i in 3: B.add("tire", "rubber", JK.xform(lg + Vector3(0.7, 0.12 + i * 0.2, 0.6), Vector3(0, i * 0.7, 0), Vector3.ONE * 0.8))
-	L.crate_spots.append(lg + Vector3(-0.3, 0, -0.2))
+	L.ledge(lg.x, lg.z, 3.0, 3.0, lg.y, JK.mat("rust"))
+	for i in 3: B.add("tire", "rubber", JK.xform(lg + Vector3(0.9, 0.12 + i * 0.2, -0.9), Vector3(0, i * 0.7, 0), Vector3.ONE * 0.8))
+	L.crate_spots.append(lg + Vector3(-1.0, 0, -1.0))
 	# the big mound at the back with a scrap windmill on top
 	var mound := Vector3(-41.0, 0, 95.0)
 	JK.pile(B, rng, mound, 5.2, 8.5, 150)
@@ -284,8 +319,8 @@ static func _hull_dock(L, B, rng: RandomNumberGenerator, life) -> void:
 			L.cyl(Vector3(sc.x + x, 2.95, sc.z + z), 0.05, 0.05, 1.1, JK.mat("wood"), 6)
 		B.add("beam", "scrap", JK.xform(Vector3(sc.x, 1.2, sc.z + z), Vector3(0.0, PI / 2, 0.9), Vector3(0.5, 0.5, 2.9)), Color(0.6, 0.45, 0.3))
 	L.railing(sc.x + 1.15, sc.z - 4, sc.x + 1.15, sc.z + 4, 2.4)
-	L.block(40.6, 93.0, 1.6, 1.6, 1.2, 0, JK.mat("rust"), false)
-	L.prop("crate_small", Vector3(39.0, 2.4, 91.2), 0.5, 1.0, true)
+	L.block(38.4, 93.6, 2.0, 2.4, 1.2, 0, JK.mat("rust"), false)
+	L.prop("crate_small", Vector3(37.3, 2.4, 85.0), 0.5, 1.0, true)
 	# hanging tools off the scaffold rail
 	for i in 4:
 		var hp := Node3D.new(); hp.position = Vector3(sc.x + 1.18, 3.3, sc.z - 2.6 + i * 1.6); L.add_child(hp)
@@ -317,7 +352,7 @@ static func _hull_dock(L, B, rng: RandomNumberGenerator, life) -> void:
 	DocksDressing.place(L, "crates", Vector3(25.6, 0, 96.2), 0.3, 1.8, true)
 	DocksDressing.place(L, "cable_spool", Vector3(30.0, 0, 97.2), 1.2, 1.3, true)
 	DocksDressing.place(L, "hazard_barrier", Vector3(30.0, 0, 82.2), 0.1, 1.0, true)
-	for h in [[Vector3(44.2, 0, 70.4), 1.8, 2.6], [Vector3(37.0, 0, 97.6), 1.6, 2.0], [Vector3(25.6, 0, 69.8), 1.5, 1.8]]:
+	for h in [[Vector3(44.2, 0, 70.4), 1.8, 2.6], [Vector3(34.4, 0, 98.0), 1.6, 2.0], [Vector3(25.6, 0, 69.8), 1.5, 1.8]]:
 		JK.pile(B, rng, h[0], h[1], h[2], 44)
 		JK.cyl_collider(L, h[0], h[1] * 0.6, h[2] * 0.55)
 		life.creaks.append(h[0] + Vector3(0, 1, 0))
@@ -381,7 +416,7 @@ static func _lookout(L, B, rng: RandomNumberGenerator, life) -> void:
 	L.fence(LOOKOUT, 0.0, [["n", -3, 3], ["s", 1.5, 6.5]], "nsew")
 	# the thinking spot: a bench facing the city, a telescope, the toaster graveyard
 	L.prop("bench", Vector3(-1.2, 0, 134.6), PI)
-	var tel := Node3D.new(); tel.position = Vector3(3.6, 0, 133.4); L.add_child(tel)
+	var tel := Node3D.new(); tel.position = Vector3(2.4, 0, 133.0); L.add_child(tel)
 	for i in 3:
 		var a := i * TAU / 3
 		var leg := MeshInstance3D.new(); var lm := CylinderMesh.new(); lm.top_radius = 0.03; lm.bottom_radius = 0.04; lm.height = 1.5
@@ -396,16 +431,16 @@ static func _lookout(L, B, rng: RandomNumberGenerator, life) -> void:
 		var l := Label3D.new(); l.text = "R.I.P.\n" + names[i]; l.font_size = 40; l.pixel_size = 0.004; l.modulate = Color(1, 0.9, 0.7)
 		l.outline_size = 8; l.position = gp + Vector3(0, 0.45, -0.09); l.rotation.y = PI; L.add_child(l)
 		B.add("gear", "scrap", JK.xform(gp + Vector3(0, 0.05, -0.5), Vector3(0, i, 0), Vector3.ONE * 0.4), JK.YELLOW)
-	JK.sign(L, "VESK'S THINKING SPOT. NO TALKING. NO DRONES.", Vector3(-4.2, 0, 132.2), PI, 2.8, 0.8, 1.0)
-	DocksDressing.place(L, "fuel_tanks", Vector3(5.0, 0, 140.4), PI / 2, 2.4, true)
+	JK.sign(L, "VESK'S THINKING SPOT. NO TALKING. NO DRONES.", Vector3(-5.0, 0, 132.4), PI, 2.8, 0.8, 1.0)
+	DocksDressing.place(L, "fuel_tanks", Vector3(5.4, 0, 136.4), 0.0, 2.4, true)
 	L.lamp(-6.6, 132.6, Color(1, 0.72, 0.42))
-	L.crate_spots.append(Vector3(6.4, 0, 136.0))
+	L.crate_spots.append(Vector3(-1.0, 0, 141.4))
 	# the hidden ledge south of the fence gap (double jump), a stash under a little tarp roof
 	var lg := Vector3(4.0, 2.4, 147.6)
 	L.ledge(lg.x, lg.z, 2.6, 2.6, lg.y, JK.mat("rust"))
 	L.crate_spots.append(lg + Vector3(0.3, 0, 0.3))
-	JK.pile(B, rng, Vector3(-4.5, 0, 137.5), 1.4, 1.6, 30)
-	JK.cyl_collider(L, Vector3(-4.5, 0, 137.5), 0.9, 0.9)
+	JK.pile(B, rng, Vector3(-6.0, 0, 136.8), 1.4, 1.6, 30)
+	JK.cyl_collider(L, Vector3(-6.0, 0, 136.8), 0.9, 0.9)
 	JK.litter(B, rng, LOOKOUT.grow(-0.6), 0.0, 22, [Rect2(-3, 131, 6, 12), Rect2(2.5, 132, 3, 3)])
 
 # ---------------------------------------------------------------- floating junk around the rock
@@ -419,3 +454,25 @@ static func _vista(L, B, rng: RandomNumberGenerator, life) -> void:
 		JK.pile(B, rng, c + Vector3(0, 0.4, 0), r * 0.8, r * 0.9, 26)
 		var glow := MeshInstance3D.new(); var gm := SphereMesh.new(); gm.radius = 0.3; gm.height = 0.6
 		glow.mesh = gm; glow.material_override = L.glow_cyan; glow.position = c + Vector3(0, -r * 1.65, 0); L.add_child(glow)
+
+# ---------------------------------------------------------------- traversal cases
+static func traversal_cases(moves: Dictionary) -> Dictionary:
+	var sj: Array = moves.sj
+	var dj: Array = moves.dj
+	var dj_short: Array = moves.dj_short
+	return {
+		junk_heap_1 = [Vector3(-27.5, 0.1, 80.0), 0.0, sj, 1.2, Rect2(-29, 82.5, 3, 3)],
+		junk_heap_2 = [Vector3(-28.0, 1.3, 83.6), atan2(-3.0, 3.0), sj, 2.4, Rect2(-32.5, 85.1, 3, 3)],
+		junk_heap_3 = [Vector3(-30.6, 2.5, 86.2), atan2(-4.0, 3.0), sj, 3.6, Rect2(-36.1, 87.7, 3, 3)],
+		junk_heap_summit = [Vector3(-34.0, 3.7, 89.6), atan2(-5.6, -3.6), dj, 6.0, Rect2(-42.1, 83.5, 5, 5)],
+		junk_heap_ledge = [Vector3(-41.7, 6.1, 84.0), PI, dj_short, 7.2, Rect2(-44.0, 77.9, 3.0, 3.0)],
+		junk_hull_step = [Vector3(38.0, 0.1, 98.4), PI, sj, 1.2, Rect2(37.4, 92.4, 2.0, 2.4)],
+		junk_hull_scaffold = [Vector3(38.0, 1.3, 94.4), PI, sj, 2.4, Rect2(36.7, 84, 2.4, 8)],
+		junk_hull_deck = [Vector3(37.2, 2.5, 88.0), -PI / 2, sj, 2.3, Rect2(31.8, 84.3, 3.2, 7.4)],
+		junk_hull_crane = [Vector3(38.0, 2.5, 85.0), atan2(2.2, -5.8), dj, 4.8, Rect2(38.7, 77.7, 3, 3)],
+		junk_tank_1 = [Vector3(15.3, 0.1, 99.4), 0.0, sj, 1.2, Rect2(14.3, 102.6, 2, 2)],
+		junk_tank_2 = [Vector3(15.3, 1.3, 102.9), 0.0, sj, 2.4, Rect2(14.5, 105.3, 2, 2.6)],
+		junk_tank_top = [Vector3(15.6, 2.5, 106.8), -PI / 2, sj, 3.6, Rect2(9.6, 105.2, 4, 4)],
+		junk_south_pad = [Vector3(0, 0.1, 111.0), 0.0, sj, 0.0, Rect2(-2.5, 114.5, 5, 5)],
+		junk_lookout_ledge = [Vector3(4.0, 0.1, 141.0), 0.0, dj, 2.4, Rect2(2.7, 146.3, 2.6, 2.6)],
+	}
