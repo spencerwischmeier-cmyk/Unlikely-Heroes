@@ -337,7 +337,12 @@ static func _fan(pos: Vector3, r: float, top: float, vmax: float, accel: float, 
 	var hub := MeshInstance3D.new(); hub.mesh = TK.sphere_mesh(); hub.material_override = TK.mat("brass"); hub.scale = Vector3(0.5, 0.3, 0.5)
 	rotor.add_child(hub)
 	if standable: TK.solid(pos + Vector3(0, 0.2, 0), Vector3(r * 2 + 0.3, 0.4, r * 2 + 0.3))
-	# wind streaks
+	# a column of rising air and wind streaks
+	var col := CylinderMesh.new(); col.top_radius = r * 1.05; col.bottom_radius = r * 0.9; col.height = top - pos.y - 0.4
+	col.cap_top = false; col.cap_bottom = false; col.radial_segments = 20
+	var cm := MeshInstance3D.new(); cm.mesh = col; cm.material_override = TK.mat("wind_column")
+	cm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; cm.position = pos + Vector3(0, 0.4 + col.height / 2, 0)
+	TK.root.add_child(cm)
 	var p := CPUParticles3D.new()
 	var q := QuadMesh.new(); q.size = Vector2(0.07, 1.6); p.mesh = q
 	p.material_override = TK.mat("wind")
@@ -387,9 +392,10 @@ static func _tiers(L: Node3D) -> void:
 # ------------------------------------------------------------------ the glide gap fans
 static func _glide_gap(L: Node3D) -> void:
 	for z in [-6.6, -10.8]:
-		_fan(Vector3(-51, 1.0, z), 1.9, 6.8, 1.6, 26.0)
-		TK.add(TK.rock_mesh(3), TK.mat("rock"), TK.tf(Vector3(-51, -3.2, z), Vector3(5.2, 8.4, 5.2), Vector3(0, z, 0)))
-		TK.rock(Vector3(-51, 0.4, z), Vector3(5.0, 1.4, 5.0), z * 3.0, 1)
+		_fan(Vector3(-51, 2.0, z), 1.9, 6.8, 1.6, 26.0)
+		TK.add(TK.rock_mesh(3), TK.mat("rock"), TK.tf(Vector3(-51, -2.2, z), Vector3(5.2, 8.4, 5.2), Vector3(0, z, 0)))
+		TK.rock(Vector3(-51, 1.4, z), Vector3(5.0, 1.4, 5.0), z * 3.0, 1)
+		TK.moss(Vector3(-51, 2.0, z), 2.2)
 	life.ambience("terrace_fan", Vector3(-51, 2.0, -8.7), -8.0, 5.0, 30.0)
 
 # ------------------------------------------------------------------ Wash Nook (x -61..-51, z 55..60, y -3.2)
@@ -469,7 +475,7 @@ static func _spots(L: Node3D) -> void:
 	]
 	var spots := {
 		bazaar = [Vector3(-65, 0.1, 47), PI], tea = [Vector3(-66, 3.7, 28), -2.6], loft = [Vector3(-84.5, 7.9, 12), -PI / 2],
-		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-51, 4.9, 1.5), PI], perch = [Vector3(-93, 12.7, 23.5), PI],
+		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-49.5, 4.1, -20.5), 0.15], perch = [Vector3(-93, 12.7, 23.5), PI],
 	}
 	for k in spots: L.debug_spots["terrace_" + k] = spots[k]
 	# debug_spots is filled after the area files run, so honour --at=terrace_* here

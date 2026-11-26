@@ -164,6 +164,7 @@ static func mat(n: String) -> Material:
 		"flutter": m = _flutter_mat(0.07)
 		"flutter_soft": m = _flutter_mat(0.025)
 		"wind": m = _wind_mat()
+		"wind_column": m = _column_mat()
 		"glass_warm":
 			var g := M.std(Color(1, 0.85, 0.55, 0.5), 0.0, 0.1); g.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			g.emission_enabled = true; g.emission = Color(1, 0.7, 0.35); g.emission_energy_multiplier = 1.2; m = g
@@ -210,6 +211,22 @@ void fragment() {
 }
 """
 	var m := ShaderMaterial.new(); m.shader = sh; m.set_shader_parameter("amp", amp)
+	return m
+
+## a see-through column of rising air: bright streaks scrolling up, fading out at the top and bottom
+static func _column_mat() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never;
+void fragment() {
+	float a = UV.x * 6.2831;
+	float s = smoothstep(0.55, 1.0, sin(a * 7.0 + UV.y * 9.0 + TIME * 7.0)) * smoothstep(0.3, 1.0, sin(UV.y * 22.0 + TIME * 9.0 + a * 3.0) * 0.5 + 0.5);
+	float fade = smoothstep(0.0, 0.25, UV.y) * smoothstep(1.0, 0.7, UV.y);
+	ALBEDO = vec3(0.55, 0.95, 1.0) * (s * 0.9 + 0.12) * fade;
+}
+"""
+	var m := ShaderMaterial.new(); m.shader = sh
 	return m
 
 static func _wind_mat() -> StandardMaterial3D:
