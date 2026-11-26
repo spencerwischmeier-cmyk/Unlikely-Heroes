@@ -129,6 +129,20 @@ func _ready() -> void:
 	combat.weapon_level_up.connect(_level_up)
 	if "hull" in combat: hull = combat.hull
 	_refresh_collect.call_deferred()
+	if OS.get_cmdline_user_args().has("--hud-demo"): _demo()
+
+## Debug (--hud-demo): show every panel at once for screenshots: a toast, sprockets pouring in and a boss bar.
+func _demo() -> void:
+	await get_tree().create_timer(2.0).timeout
+	Game.add_nuts(1240)
+	toast("LUCKY WASHER  1/3", "Lucky! Trade washers for cosmetics and cheats.", GOLD)
+	await get_tree().create_timer(1.0).timeout
+	toast_small("+12 SEEKER HIVE AMMO", Color(1.0, 0.8, 0.25))
+	Game.add_nuts(25)
+	set_boss("CRANE BOT", 0.8)
+	await get_tree().create_timer(0.2).timeout
+	set_boss("CRANE BOT", 0.62)
+	show_prompt("E   SHOP AT GIZMART")
 
 func _place(c: Control, anchor: Vector2, r: Rect2, fn: Callable) -> void:
 	c.anchor_left = anchor.x; c.anchor_right = anchor.x; c.anchor_top = anchor.y; c.anchor_bottom = anchor.y
