@@ -35,7 +35,7 @@ static func build(L) -> void:
 	# debug start spots (the level rebuilds debug_spots after the area files run, so apply --at here too)
 	var spots := {
 		yard_row = [Vector3(-34, 0.1, -64), -PI / 2], yard_pen = [Vector3(30, 0.1, -66), PI / 2],
-		yard_arena = [Vector3(-26, 0.1, -96), PI / 2], yard_view = [Vector3(-14, 0.1, -60), -PI * 0.75],
+		yard_arena = [Vector3(-26, 0.1, -96), PI / 2], yard_view = [Vector3(4, 0.1, -59), -PI * 0.7],
 		yard_gate_view = [Vector3(0, 0.1, -58.5), PI], yard_causeway = [Vector3(-6, 0.1, 6), PI],
 		yard_boss = [Vector3(-12, 0.1, -86), PI * 0.8],
 	}
