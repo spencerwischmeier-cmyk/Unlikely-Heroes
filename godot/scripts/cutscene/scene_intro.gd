@@ -1,4 +1,5 @@
 extends RefCounted
+const S := preload("res://scripts/level/layout/spread.gd")   # original positions -> spread-out level
 ## INTRO: "Clocking In". The sky city from far out, the docks waking up, out to the junkyard where
 ## Vesk enjoys his coffee and ignores customers. 7:59:57... 8:00:00: a distant voice says "clock in",
 ## the coffee maker punches a time card, bots all over town put on hard hats and go haywire, a roller
@@ -10,14 +11,14 @@ const Props := preload("res://scripts/cutscene/props.gd")
 var C: Node
 
 func run() -> void:
-	var chair_pos: Vector3 = C.spot("porch_chair_pos", Vector3(-2.5, 0.4, 93.5))
+	var chair_pos: Vector3 = C.spot("porch_chair_pos", S.at(Vector3(-2.5, 0.4, 93.5)))
 	var porch_y := 0.4
-	var bench: Vector3 = C.spot("gear_pos", Vector3(3.6, 1.45, 94))
-	var crash: Vector3 = C.spot("dodger_crash_pos", Vector3(-12.5, 2.4, 74.5))
-	var mast: Vector3 = C.spot("mast_top", Vector3(14, 20, -34))
-	var start: Vector3 = Game.level.start_pos if Game.level else Vector3(0, 0.5, 91)
-	var plaza: Vector3 = C.island_center("plaza", Vector3(0, 0, 30))
-	var pier: Vector3 = C.island_center("pier_a", Vector3(38, 0, 26))
+	var bench: Vector3 = C.spot("gear_pos", S.at(Vector3(3.6, 1.45, 94)))
+	var crash: Vector3 = C.spot("dodger_crash_pos", S.at(Vector3(-12.5, 2.4, 74.5)))
+	var mast: Vector3 = C.spot("mast_top", S.at(Vector3(14, 20, -34)))
+	var start: Vector3 = Game.level.start_pos if Game.level else S.at(Vector3(0, 0.5, 91))
+	var plaza: Vector3 = C.island_center("plaza", S.at(Vector3(0, 0, 30)))
+	var pier: Vector3 = C.island_center("pier_a", S.at(Vector3(38, 0, 26)))
 	var chair: Node3D = Game.level.find_child("porch_chair", false, false) if Game.level else null
 	if chair: chair_pos = chair.global_position
 	var bench_top := bench.y - 0.05
@@ -32,12 +33,12 @@ func run() -> void:
 	vesk.hold_mug(true)
 	# camera heights for the seated shots (the real sitting clip sits him up on the chair)
 	var seat: Vector3 = chair_pos + Vector3(0, 0.5 if vesk.can_sit() else 0.0, 0)
-	var dodger: Node3D = C.make_dodger(Vector3(-30, 9, 70), PI * 0.5)
+	var dodger: Node3D = C.make_dodger(S.at(Vector3(-30, 9, 70)), PI * 0.5)
 	var coffee: Node3D = C.actor(Props.coffee_maker(), Vector3(bench.x + 0.95, bench_top, bench.z + 0.05), PI + 0.25, true)
 	var toaster: Node3D = C.actor(Props.toaster(), Vector3(bench.x - 0.75, bench_top, bench.z + 0.1), PI - 0.2, true)
-	var roller: Node3D = C.actor(C.model("res://models/roller.glb"), Vector3(-14, 0.0, 86), 0.0)
-	var roller2: Node3D = C.actor(C.model("res://models/roller.glb"), Vector3(15, 0.0, 76), 0.0)
-	var hornet: Node3D = C.actor(C.model("res://models/hornet.glb"), Vector3(-30, 7, 80), PI * 0.5)
+	var roller: Node3D = C.actor(C.model("res://models/roller.glb"), S.at(Vector3(-14, 0.0, 86)), 0.0)
+	var roller2: Node3D = C.actor(C.model("res://models/roller.glb"), S.at(Vector3(15, 0.0, 76)), 0.0)
+	var hornet: Node3D = C.actor(C.model("res://models/hornet.glb"), S.at(Vector3(-30, 7, 80)), PI * 0.5)
 	# town bots for the montage: a dock worker and a mail hornet, hats ready to pop on
 	var dock_bot: Node3D = C.actor(C.model("res://models/roller.glb"), pier + Vector3(-3, 0, 2), 1.2)
 	var mail_bot: Node3D = C.actor(C.model("res://models/hornet.glb"), plaza + Vector3(4, 3.2, 6), -0.6)
@@ -49,8 +50,8 @@ func run() -> void:
 
 	# 1. the sky city, from far out
 	Snd.loop("wind_loop", true, -12)
-	C.cut(Vector3(34, 46, 175), Vector3(4, 4, 30), 48.0)
-	C.move(Vector3(22, 30, 138), Vector3(0, 2, 40), 15.0, 44.0)
+	C.cut(S.at(Vector3(34, 46, 175)), S.at(Vector3(4, 4, 30)), 48.0)
+	C.move(S.at(Vector3(22, 30, 138)), S.at(Vector3(0, 2, 40)), 15.0, 44.0)
 	C.tw(C, "fade", 0.0, 3.0)
 	C.show_location("SKYHARBOR", "Planet 1  ·  The sky city  ·  Golden hour", 5.0)
 	await C.wait(2.6)
@@ -61,8 +62,8 @@ func run() -> void:
 	C.tw(dock_bot, "global_position", pier + Vector3(5, 0, 1), 9.0, 0.0, Tween.TRANS_LINEAR)
 	await C.say("cs_intro_city", 0.6)
 	# 3. over the gardens and out to the junkyard
-	C.cut(Vector3(-66, 24, 34), Vector3(-10, 3, 44), 50.0)
-	C.move(Vector3(-30, 12, 70), Vector3(-2, 1.5, 86), 9.5)
+	C.cut(S.at(Vector3(-66, 24, 34)), S.at(Vector3(-10, 3, 44)), 50.0)
+	C.move(S.at(Vector3(-30, 12, 70)), S.at(Vector3(-2, 1.5, 86)), 9.5)
 	await C.say("intro_02", 1.0)
 	# 4. the porch: start on the brass gear on the workbench (shallow focus), drift over to Vesk
 	C.cut(bench + Vector3(-0.35, 0.3, -1.1), bench + Vector3(0, 0.02, 0), 34.0)
@@ -119,8 +120,8 @@ func run() -> void:
 	await C.wait(1.0)
 	C.clock_label.text = "SKYHARBOR   8:00:00 AM"
 	C.fx(func(): Snd.play("cutscenes_factory_whistle", -2, 0.0); Snd.play("checkpoint", -6))
-	C.cut(Vector3(-3, 3.2, 73), mast + Vector3(0, 0.5, 0), 16.0)
-	C.move(Vector3(-2.6, 3.4, 72), mast + Vector3(0, 1.2, 0), 7.0, 11.0)
+	C.cut(S.at(Vector3(-3, 3.2, 73)), mast + Vector3(0, 0.5, 0), 16.0)
+	C.move(S.at(Vector3(-2.6, 3.4, 72)), mast + Vector3(0, 1.2, 0), 7.0, 11.0)
 	C.tw(C, "clock_a", 0.0, 1.0, 1.2)
 	for i in 4:
 		C.fx(func(): FX.ring(mast + Vector3(0, 1.5, 0), Color(1, 0.5, 0.15), 3.0 + i))
@@ -208,17 +209,17 @@ func run() -> void:
 		await C.say("cs_intro_gizmart", 0.2)
 		await C.say("cs_intro_gizmart_2", 0.4)
 	# 13. every bot goes haywire: rollers in the yard, a hornet over the wall, sparks from the generator
-	C.cut(Vector3(3, 5.5, 98.5), Vector3(-3, 0.5, 79), 52.0)
-	C.move(Vector3(1, 6.5, 99.5), Vector3(-4, 0.5, 77), 7.0)
+	C.cut(S.at(Vector3(3, 5.5, 98.5)), S.at(Vector3(-3, 0.5, 79)), 52.0)
+	C.move(S.at(Vector3(1, 6.5, 99.5)), S.at(Vector3(-4, 0.5, 77)), 7.0)
 	C.tw(hats[2], "scale", Vector3.ONE, 0.2)
-	C.tw(roller, "global_position", Vector3(-6, 0, 80), 5.0, 0.0, Tween.TRANS_LINEAR)
+	C.tw(roller, "global_position", S.at(Vector3(-6, 0, 80)), 5.0, 0.0, Tween.TRANS_LINEAR)
 	C.tw(roller, "rotation:y", 2.4, 5.0)
-	C.tw(roller2, "global_position", Vector3(4, 0, 79), 4.0, 0.3, Tween.TRANS_LINEAR)
-	C.tw(hornet, "global_position", Vector3(12, 5, 74), 6.0, 0.0, Tween.TRANS_LINEAR)
-	C.fx(func(): FX.sparks(Vector3(10, 1.4, 94.5), Color(1, 0.7, 0.3), 16, 5.0); Snd.at("bot_spawn", Vector3(-6, 0, 80), -4))
+	C.tw(roller2, "global_position", S.at(Vector3(4, 0, 79)), 4.0, 0.3, Tween.TRANS_LINEAR)
+	C.tw(hornet, "global_position", S.at(Vector3(12, 5, 74)), 6.0, 0.0, Tween.TRANS_LINEAR)
+	C.fx(func(): FX.sparks(S.at(Vector3(10, 1.4, 94.5)), Color(1, 0.7, 0.3), 16, 5.0); Snd.at("bot_spawn", S.at(Vector3(-6, 0, 80)), -4))
 	await C.wait(0.5)
 	await C.say("intro_09", 0.5)
-	C.fx(func(): FX.sparks(Vector3(10, 1.4, 94.5), Color(1, 0.7, 0.3), 10, 4.0))
+	C.fx(func(): FX.sparks(S.at(Vector3(10, 1.4, 94.5)), Color(1, 0.7, 0.3), 10, 4.0))
 	# 14. Dodger picks up the signal, looking north to the mast
 	C.cut(dodger.global_position + Vector3(0.5, 0.35, 1.4), mast, 30.0)
 	C.tw(dodger, "rotation:y", PI, 0.6)
@@ -271,7 +272,7 @@ func run() -> void:
 	C.setv(vesk, "rotation:y", C.face_to(vesk, vesk.global_position + Vector3(-1, 0, -2)))
 	vesk.look_point = Vector3.INF
 	vesk.look_target = dodger
-	C.tw(roller, "global_position", Vector3(-8, 0.0, 79), 2.4, 0.4, Tween.TRANS_QUAD, Tween.EASE_IN)
+	C.tw(roller, "global_position", S.at(Vector3(-8, 0.0, 79)), 2.4, 0.4, Tween.TRANS_QUAD, Tween.EASE_IN)
 	vesk.gesture("cs_talk2", 0.3, "idle")
 	await C.say("intro_13", 0.3)
 	vesk.hold_mug(false)
@@ -286,7 +287,7 @@ func run() -> void:
 	C.focus(0.0)
 	var fly: float = C.line_len("sky_intro_crash_1")
 	if not C.ffwd(): Snd.voice("sky_intro_crash_1", true)
-	C.cut(Vector3(1.5, 2.6, 93.5), dp, 46.0)
+	C.cut(S.at(Vector3(1.5, 2.6, 93.5)), dp, 46.0)
 	C.look_node = dodger
 	C.tw(dodger, "global_position", dp + Vector3(-1, 2.5, -3), 0.7, 0.0, Tween.TRANS_SINE, Tween.EASE_OUT)
 	C.tw(dodger, "global_position", crash + Vector3(0.4, 1.8, 2.5), fly * 0.55, 0.7, Tween.TRANS_SINE, Tween.EASE_IN_OUT)

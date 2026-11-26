@@ -97,7 +97,8 @@ func _process(dt: float) -> void:
 			for f in tour_fps: tot += f
 			print("[ground-tour] done, mean fps %.1f" % (tot / maxf(1.0, tour_fps.size())))
 			get_tree().quit(); return
-		var s: Array = TOUR[_ti]
+		var s: Array = TOUR[_ti].duplicate()
+		s[1] = preload("res://scripts/level/layout/spread.gd").at(s[1])   # tour spots are original positions
 		p.global_position = s[1]; p.velocity = Vector3.ZERO; p.face_yaw = s[2]
 		if cam: cam.yaw = s[2]; cam.pitch = s[3]; cam.global_position = s[1] + Vector3(0, 1.55, 0); cam.cam_y = s[1].y
 		return

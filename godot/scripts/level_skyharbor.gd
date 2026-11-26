@@ -14,6 +14,7 @@ extends Node3D
 ## Debug: `-- --at=<spot>` starts at a named spot (see debug_spots).
 
 const M := preload("res://scripts/mats.gd")
+const Spread := preload("res://scripts/level/layout/spread.gd")
 
 var start_pos := Vector3(0, 0.5, 91)
 var start_yaw := PI
@@ -35,6 +36,10 @@ var gripe_ids: Array = []       # skill tasks on this level, e.g. "return_to_sen
 ## Locked-for-later spots (gadgets from later planets).
 var vault_door := { pos = Vector3(11, 0, 41), yaw = -PI / 2, needs = "pulse_key" }
 var mast_top := Vector3(14, 20, -34)     # landmark: the relay dish
+## cutscene / Dodger anchors (moved with the junkyard by the Spread pass)
+var dodger_crash_pos := Vector3(-12.5, 2.4, 74.5)
+var porch_chair_pos := Vector3(-2.5, 0.4, 93.5)
+var gear_pos := Vector3(3.6, 1.45, 94)
 var debug_spots := {}
 var t := 0.0
 
@@ -384,12 +389,15 @@ func turbine(pos: Vector3, rot_y := 0.0) -> void:
 
 # ---------- the level ----------
 func _build() -> void:
-	_build_junkyard()
-	_build_plaza()
-	_build_terrace()
-	_build_docks()
-	_build_mast()
-	_build_crane_yard()
+	# each area is built at its original coordinates, tagged, and pushed out from the plaza by Spread.apply()
+	# (scripts/level/layout/spread.gd); the routes between areas are built after that (areas/w_routes.gd)
+	Spread.reset()
+	Spread.begin(self, "junk"); _build_junkyard(); Spread.end(self)
+	Spread.begin(self, "plaza"); _build_plaza(); Spread.end(self)
+	Spread.begin(self, "west"); _build_terrace(); Spread.end(self)
+	Spread.begin(self, "docks"); _build_docks(); Spread.end(self)
+	Spread.begin(self, "mast"); _build_mast(); Spread.end(self)
+	Spread.begin(self, "yard"); _build_crane_yard(); Spread.end(self)
 	_build_city()
 	_define_zones()
 	debug_spots = {
@@ -445,10 +453,7 @@ func _build_junkyard() -> void:
 	label("JUNKYARD", Vector3(0, 0, 76), 7, Color(1, 0.8, 0.55))
 	hint_sign("KEEP OUT. I MEAN IT. -V", Vector3(-6, 0, 69), PI)
 	checkpoints.append({ pos = start_pos, r = 2.4 })
-	# bridge to the plaza: two pads and a sliding platform
-	sky_pad(0, 63.5, 5, 5)
-	sky_pad(-2.5, 55.5, 5, 5)
-	moving_platform(Vector3(-5, -0.3, 49.8), Vector3(5, -0.3, 49.8), 7.0)
+	# the way to the plaza (Scrapline Halt and the tram viaduct) is built in scripts/level/areas/w_routes.gd
 
 func _build_plaza() -> void:
 	var r := rect(0, 30, 44, 32)
@@ -469,9 +474,7 @@ func _build_plaza() -> void:
 	box(Vector3(bx - 5, 3.75, bz), Vector3(0.5, 1.5, 3.0), bank_wall)
 	prop("bank_vault_door", Vector3(bx - 5.1, 0, bz), -PI / 2)
 	hint_sign("SKYHARBOR SAVINGS & LOAN. VAULT SEALED: PULSE KEY REQUIRED", Vector3(bx - 6.5, 0, bz - 3.4), -PI / 2)
-	# bridges: west to the Terrace, east to the docks, north to the causeway
-	walkway(-28, 30, -22, 36)
-	walkway(22, 27, 28, 33)
+	# north to the causeway (the long bridges west and east are built in scripts/level/areas/w_routes.gd)
 	walkway(-9, 9, -3, 14)
 	gate("causeway_gate", Vector3(-6, 0, 11.5), 7.0, 4.0)
 	hint_sign("CRANE YARD: CLOSED FOR SIGNAL MAINTENANCE", Vector3(-1, 0, 15.6), 0.0)
@@ -514,13 +517,8 @@ func _build_terrace() -> void:
 	block(-38, -12, 2, 2, 1.0, 8.8, M.deck(Color(0.7, 0.6, 0.5)))
 	ledge(-42.5, -16.5, 2.6, 2.6, 11.8)
 	prop("gull_nest", Vector3(-42.5, 11.8, -16.5), 0.0, 1.0, false)
-	# shortcuts home: bounce pad off the edge (glide down to the plaza) and a chute rail
-	bounce_pad(Vector3(-25, 8.8, 2.5), 14.0)
-	hint_sign("EXPRESS TO THE PLAZA", Vector3(-27.5, 8.8, 3), PI)
-	R_CHUTE = rail([Vector3(-21, 9.25, -1), Vector3(-20.5, 8.4, 4), Vector3(-19.5, 5.6, 8.5), Vector3(-18.5, 2.6, 13), Vector3(-17.5, 0.5, 17.5)], true)
-	# hook chain east to the Signal Mast gallery
+	# the express rail home to the plaza and the cableway east to the Signal Mast: areas/w_routes.gd
 	hint_sign("SWING: PRESS HOOK NEAR A RING", Vector3(-24.5, 8.8, -38.5), -PI / 2)
-	hook(Vector3(-14, 15.3, -40)); hook(Vector3(-4, 15.3, -40))
 
 func _build_docks() -> void:
 	# Pier A (0), Pier B (4), Pier C (6): grind rails between hanging containers, three turbines
@@ -541,9 +539,6 @@ func _build_docks() -> void:
 	_hanging(Vector3(40.5, 6.0, 7.5), 0.5, cm[1])
 	_hanging(Vector3(52.5, 7.0, 6.5), -0.4, cm[2])
 	_hanging(Vector3(46, 7.5, 3), 0.9, cm[0])
-	# rail from Pier D's north yard (scripts/level/docks/depot.gd) up to Pier B; unlocks with rail 1
-	set_meta("rail_depot", rail([Vector3(74, 0.45, 13.5), Vector3(73.8, 1.4, 9), Vector3(72.5, 2.9, 4.5), Vector3(70, 4.1, 1.0),
-		Vector3(67, 4.5, -0.8), Vector3(64.5, 4.5, -1.2)], true))
 	# Pier B
 	island("pier_b", rect(58, -8, 16, 16), 4.0, Color(0.9, 0.93, 0.96), 2.0)
 	turbine(Vector3(63, 4, -3), PI)
@@ -560,10 +555,9 @@ func _build_docks() -> void:
 	turbine(Vector3(73, 6, -43), PI)
 	prop("generator", Vector3(70, 6, -31), 0.0)
 	checkpoints.append({ pos = Vector3(66, 6.1, -38), r = 3.0 })
-	moving_platform(Vector3(57.5, 5.7, -38), Vector3(25, -0.3, 16), 22.0, Vector3(5, 0.6, 5), "cargo_lift", false)
 	prop("gantry", Vector3(60, 6, -43.5), 0.0, 1.0, false)
 	hint_sign("CARGO LIFT TO THE PLAZA (NEEDS TURBINE POWER)", Vector3(61, 6, -33), -PI / 2)
-	hook(Vector3(55, 12.5, -36)); hook(Vector3(45, 12.5, -36))
+	# the balloon line west to the Signal Mast and the cargo lift home: areas/w_routes.gd
 	lamp(74.5, -31.5, Color(0.4, 0.95, 1), 6.0)
 	DocksDressing.dress(self)
 
@@ -626,8 +620,7 @@ func _build_mast() -> void:
 	dish_light.position = Vector3(0, 0, 1.6); dish_pivot.add_child(dish_light)
 	dish_pivot.rotation = Vector3(0.5, 2.2, 0)
 	dish_target = Vector2(2.2, 0.5)
-	# rail from the dish deck down to the Crane Yard gate (opens when the dish is aligned)
-	R_YARD = rail([Vector3(14, 20.45, -36.6), Vector3(13, 19.4, -41), Vector3(11, 15.5, -47), Vector3(7, 9.5, -53), Vector3(3, 4, -58.5), Vector3(1, 1.0, -61.5)], true)
+	# the long rail from the dish deck down to the Crane Yard gate is built in areas/w_routes.gd
 
 func _build_crane_yard() -> void:
 	# causeway from the plaza: walkway, sliding platform, pads, then the gate island. From the gate island a
@@ -636,7 +629,7 @@ func _build_crane_yard() -> void:
 	island("causeway", rect(-6, 4, 8, 10), 0.0, Color(0.9, 0.9, 0.92), 0.8)
 	moving_platform(Vector3(-6, -0.3, -6), Vector3(-6, -0.3, -22), 8.0)
 	island("causeway_2", rect(-6, -30, 8, 8), 0.0, Color(0.9, 0.9, 0.92), 0.8)
-	sky_pad(-6, -40, 4, 4); sky_pad(-3, -46, 4, 4); sky_pad(0, -52, 4, 4)
+	# (the old three-pad hop to the gate island is now the lift bridge in areas/w_routes.gd)
 	var gi := rect(0, -64, 36, 14)
 	island("yard_gate", gi, 0.0, Color(0.74, 0.72, 0.7))
 	fence(gi, 0.0, [["w", -67, -61], ["e", -68.5, -63.5], ["s", -3, 3]])
@@ -761,6 +754,8 @@ func on_zone_cleared(zone_id: String) -> void:
 
 func _debug_start() -> void:
 	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--layout-map="):
+			add_child(load("res://scripts/level/layout/map_tool.gd").new())
 		if a.begins_with("--traverse"):
 			var tt: Node = load("res://scripts/level/traversal_test.gd").new()
 			tt.process_physics_priority = -100; add_child(tt)

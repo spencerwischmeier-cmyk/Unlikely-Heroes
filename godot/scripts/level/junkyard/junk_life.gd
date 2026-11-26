@@ -3,6 +3,8 @@ extends Node3D
 ## load over the hull dock, the scrap windmill, welding sparks at the half-built hull, smoke puffs, and the
 ## area's own positional sounds (audio/sfx/junkyard_*.mp3: chimes, the shack radio, creaks, crane clanks).
 ## Everything sleeps while Vesk is far away.
+## All stored positions are in this node's own space (the Junkyard's original coordinates; the Spread pass
+## moves the whole area), so the player's position is converted with to_local before comparing.
 
 const SFX := "res://audio/sfx/"
 
@@ -94,11 +96,11 @@ func one_shot(name: String, pos: Vector3, db: float, pitch := 1.0) -> void:
 	if p == null:
 		if _one_shots.size() >= 4: return
 		p = AudioStreamPlayer3D.new(); p.unit_size = 7.0; p.max_distance = 60.0; add_child(p); _one_shots.append(p)
-	p.stream = s; p.volume_db = db; p.pitch_scale = pitch; p.global_position = pos; p.play()
+	p.stream = s; p.volume_db = db; p.pitch_scale = pitch; p.global_position = to_global(pos); p.play()
 
 func _player_pos() -> Vector3:
 	var g := get_node_or_null("/root/Game")
-	if g and g.get("player") and is_instance_valid(g.player): return g.player.global_position
+	if g and g.get("player") and is_instance_valid(g.player): return to_local(g.player.global_position)
 	return center
 
 func _process(dt: float) -> void:
@@ -121,7 +123,7 @@ func _process(dt: float) -> void:
 		if dir != c.last_dir:
 			c.last_dir = dir
 			# the load settles at each end of the swing: clank, and the hook dips
-			if dir < 0.0: one_shot("junkyard_clank", (c.jib as Node3D).global_position, -10.0, randf_range(0.9, 1.05))
+			if dir < 0.0: one_shot("junkyard_clank", to_local((c.jib as Node3D).global_position), -10.0, randf_range(0.9, 1.05))
 		if c.hook:
 			(c.hook as Node3D).position.y = c.hook_y - 0.6 * pow(absf(sin(w)), 6.0) + 0.08 * sin(t * 2.1)
 	for wd in welders:
@@ -129,7 +131,7 @@ func _process(dt: float) -> void:
 		if wd.t <= 0.0:
 			wd.t = randf_range(0.15, 0.4) if randf() < 0.75 else randf_range(1.8, 3.5)
 			var fx := get_node_or_null("/root/FX")
-			if fx and pp.distance_to(wd.pos) < 45.0: fx.sparks(wd.pos, Color(1.0, 0.75, 0.35), 5, 3.5)
+			if fx and pp.distance_to(wd.pos) < 45.0: fx.sparks(to_global(wd.pos), Color(1.0, 0.75, 0.35), 5, 3.5)
 	creak_t -= dt
 	if creak_t <= 0.0 and creaks.size() > 0:
 		creak_t = randf_range(7.0, 15.0)

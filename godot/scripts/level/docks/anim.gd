@@ -25,6 +25,9 @@ func _physics_process(dt: float) -> void:
 	t += dt
 	var p: Node3D = Game.player if Game.player else null
 	var pp: Vector3 = p.global_position if p else Vector3(1e6, 1e6, 1e6)
+	# triggers, doors, buttons and sprockets are stored in this node's own space (the docks' original
+	# coordinates; the Spread pass moved the whole area)
+	var lp: Vector3 = to_local(pp) if p else pp
 	for b in belts:
 		b.scroll = fmod(b.scroll + b.speed * dt * 0.5, 1.0)
 		if b.mat: b.mat.uv1_offset.x = -b.scroll
@@ -68,13 +71,13 @@ func _physics_process(dt: float) -> void:
 				pl.on = true; pl.mat.emission = Color(0.3, 0.95, 1.0)
 			pl.mat.emission_energy_multiplier = (3.0 + 2.0 * sin(t * 4.0 + pl.turbine)) if pl.on else 0.6
 	for tg in triggers:
-		if not tg.done and (tg.box as AABB).has_point(pp):
+		if not tg.done and (tg.box as AABB).has_point(lp):
 			tg.done = true; tg.fn.call()
 	for d in doors:
-		if d.trigger != null and not d.open and (d.trigger as AABB).has_point(pp): open_door(d)
+		if d.trigger != null and not d.open and (d.trigger as AABB).has_point(lp): open_door(d)
 	for bt in buttons:
 		if bt.done and bt.once: continue
-		var hit: bool = absf(pp.y - bt.y) < 0.6 and Vector2(pp.x - bt.pos.x, pp.z - bt.pos.z).length() < bt.r
+		var hit: bool = absf(lp.y - bt.y) < 0.6 and Vector2(lp.x - bt.pos.x, lp.z - bt.pos.z).length() < bt.r
 		if hit and not bt.down:
 			bt.down = true
 			if not bt.done or not bt.once:
@@ -90,7 +93,7 @@ func _physics_process(dt: float) -> void:
 		var n: Node3D = s.node
 		n.rotation.y = t * 2.4 + s.pos.x
 		n.position.y = s.pos.y + sin(t * 2.0 + s.pos.z) * 0.12
-		if pp.distance_to(s.pos + Vector3(0, -0.4, 0)) < 1.3:
+		if lp.distance_to(s.pos + Vector3(0, -0.4, 0)) < 1.3:
 			s.taken = true
 			Game.add_nuts(s.value)
 			Snd.play("nut_pickup", -6, 0.15, 0.03)

@@ -180,12 +180,13 @@ func _sfx(n: String, pos: Vector3, db := 0.0) -> void:
 	if not ResourceLoader.exists(path): return
 	for p in sfx_players:
 		if not p.playing:
-			p.stream = load(path); p.global_position = pos; p.volume_db = db; p.pitch_scale = randf_range(0.94, 1.06); p.play(); return
+			p.stream = load(path); p.global_position = to_global(pos); p.volume_db = db; p.pitch_scale = randf_range(0.94, 1.06); p.play(); return
 
 func _player() -> Node3D:
 	var g := get_node_or_null("/root/Game")
 	return g.player if g and g.player and is_instance_valid(g.player) else null
 
+## p in this node's own space (the yard's original coordinates; the Spread pass moved the whole area)
 func _in_yard(p: Vector3) -> bool:
 	return p.z < -20.0 and p.x > -62.0 and p.x < 62.0 and p.z > -150.0 and absf(p.y) < 30.0
 
@@ -197,7 +198,7 @@ func announce(id: String, force := false) -> bool:
 	var snd := get_node_or_null("/root/Snd")
 	if not force and snd and snd.voice_player and snd.voice_player.playing: return false
 	var pl := _player()
-	var at := Vector3(0, 4, -64)
+	var at := to_global(Vector3(0, 4, -64))
 	if pl:
 		var best := INF
 		for s in speakers:
@@ -244,7 +245,7 @@ func _once(key: String, f: Callable) -> void:
 	said[key] = true; f.call()
 
 func _bot_killed(p: Vector3) -> void:
-	if not _in_yard(p): return
+	if not _in_yard(to_local(p)): return
 	incidents += 1
 	if counter:
 		counter.text = "0"
@@ -277,7 +278,7 @@ func release_pen() -> void:
 	var i := 0
 	for b in pen_bots:
 		var n: Node3D = b
-		var out := n.global_position + Vector3(randf_range(-2, 2), 0, 0) + (Vector3(40, 0, -74) - n.global_position).normalized() * 3.5
+		var out := n.position + Vector3(randf_range(-2, 2), 0, 0) + (Vector3(40, 0, -74) - n.position).normalized() * 3.5
 		out.y = 0.0
 		var tw := n.create_tween(); tw.tween_interval(0.5 + i * 0.15)
 		tw.tween_property(n, "position", out + Vector3(0, 1.2, 0), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -337,7 +338,7 @@ func _process(dt: float) -> void:
 			w.on = not w.on
 			w.t = randf_range(0.6, 1.6) if w.on else randf_range(1.0, 2.6)
 			w.p.emitting = w.on
-			if w.on and is_instance_valid(w.arm): _sfx("yard_weld", w.p.global_position, -8.0)
+			if w.on and is_instance_valid(w.arm): _sfx("yard_weld", to_local(w.p.global_position), -8.0)
 		w.light.light_energy = (1.5 + randf() * 2.5) if w.on else 0.0
 		if is_instance_valid(w.arm): w.arm.rotation.y = w.yaw + sin(t * 0.7 + w.yaw * 3.0) * 0.25
 	for s in sparkers:
@@ -361,7 +362,7 @@ func _process(dt: float) -> void:
 	for d in doors:
 		var want := 0.0 if level and level.gates.has(d.id) else 1.0
 		if want > d.open:
-			if d.open == 0.0: _sfx("yard_siren", d.gate.global_position + Vector3(0, 3, 0), 0.0)
+			if d.open == 0.0: _sfx("yard_siren", to_local(d.gate.global_position) + Vector3(0, 3, 0), 0.0)
 			d.open = minf(1.0, d.open + dt * 0.4)
 			d.l.position = d.l0 + Vector3(-2.6 * d.open, 0, 0)
 			d.r.position = d.r0 + Vector3(2.6 * d.open, 0, 0)
@@ -385,7 +386,7 @@ func _process(dt: float) -> void:
 		arena_hook.position.y = -5.2 + sin(t * 0.8) * 0.4
 	# ambient announcements while Vesk is in the yard
 	var pl := _player()
-	if pl and _in_yard(pl.global_position) and not boss_on:
+	if pl and _in_yard(to_local(pl.global_position)) and not boss_on:
 		pa_t -= dt
 		if pa_t <= 0.0:
 			if announce(pa_order[0]):
@@ -395,12 +396,13 @@ func _process(dt: float) -> void:
 				pa_t = 6.0
 	if boss_on: _step_drops(dt, pl)
 	# the pen's guards jump out the first time Vesk lands in it
-	if pl and not pen_guarded and pen_rect.has_point(Vector2(pl.global_position.x, pl.global_position.z)) and absf(pl.global_position.y) < 3.0:
+	var plp := to_local(pl.global_position) if pl else Vector3.ZERO
+	if pl and not pen_guarded and pen_rect.has_point(Vector2(plp.x, plp.z)) and absf(plp.y) < 3.0:
 		pen_guarded = true
 		var g := get_node_or_null("/root/Game")
 		if g and g.main and g.main.has_method("spawn_bot") and not OS.get_cmdline_user_args().has("--no-bots"):
 			for k in [["roller", Vector3(38, 0, -70)], ["roller", Vector3(44, 0, -76)], ["crew", Vector3(41, 0, -80)]]:
-				g.main.spawn_bot(k[0], k[1], pen_rect)
+				g.main.spawn_bot(k[0], to_global(k[1]), Rect2(pen_rect.position + Vector2(global_position.x, global_position.z), pen_rect.size))
 			_sfx("yard_siren", Vector3(30.6, 6, -75), -2.0)
 	_update_drops(dt, pl)
 
@@ -409,16 +411,17 @@ func _step_drops(dt: float, pl: Node3D) -> void:
 	drop_t -= dt
 	if drop_t > 0.0 or arena_trolley == null: return
 	drop_t = randf_range(9.0, 15.0)
-	var src := arena_hook.global_position + Vector3(0, -1.0, 0)
+	var src := to_local(arena_hook.global_position) + Vector3(0, -1.0, 0)
 	var target := Vector3(clampf(src.x, -19.0, 19.0), 0.0, clampf(src.z, -111.0, -83.0))
 	if pl and randf() < 0.5:   # sometimes it slips right over Vesk
-		target = Vector3(clampf(pl.global_position.x + randf_range(-2, 2), -19, 19), 0, clampf(pl.global_position.z + randf_range(-2, 2), -111, -83))
+		var plp := to_local(pl.global_position)
+		target = Vector3(clampf(plp.x + randf_range(-2, 2), -19, 19), 0, clampf(plp.z + randf_range(-2, 2), -111, -83))
 	if Vector2(target.x, target.z + 102).length() < 4.5: return   # never onto the boss
 	var n := K.node(self, Vector3(target.x, 16.0, target.z))
 	var c := K.bx(n, Vector3.ZERO, Vector3(1.3, 1.3, 1.3), "steel")
 	c.material_override = K.M.paint(Color(0.9, 0.65, 0.18))
 	K.bx(n, Vector3(0, 0, 0.66), Vector3(1.0, 0.25, 0.02), "hazard")
-	var ring: Node3D = FX.warn_ring(target, 1.6, 1.6, Color(1, 0.3, 0.15)) if FX.has_method("warn_ring") else null
+	var ring: Node3D = FX.warn_ring(to_global(target), 1.6, 1.6, Color(1, 0.3, 0.15)) if FX.has_method("warn_ring") else null
 	drops.append({ node = n, vel = 0.0, target = target, landed = false, life = 1.4, ring = ring })
 
 func _update_drops(dt: float, pl: Node3D) -> void:
@@ -433,11 +436,12 @@ func _update_drops(dt: float, pl: Node3D) -> void:
 				n.rotation.x += dt * 1.5
 				if n.position.y <= 0.65:
 					n.position.y = 0.65; n.rotation = Vector3(0, randf() * TAU, 0); d.landed = true; d.life = 5.0
-					FX.shake(0.5); FX.sparks(d.target + Vector3(0, 0.2, 0), Color(1, 0.75, 0.3), 16, 7.0); FX.puff(d.target + Vector3(0, 0.3, 0))
+					FX.shake(0.5); FX.sparks(to_global(d.target) + Vector3(0, 0.2, 0), Color(1, 0.75, 0.3), 16, 7.0); FX.puff(to_global(d.target) + Vector3(0, 0.3, 0))
 					_sfx("yard_crate_land", d.target, 2.0)
 					var g := get_node_or_null("/root/Game")
-					if pl and g and g.combat and Vector2(pl.global_position.x - d.target.x, pl.global_position.z - d.target.z).length() < 1.6 and pl.global_position.y < 2.5:
-						g.combat.hurt_player(1, d.target)
+					var plp := to_local(pl.global_position) if pl else Vector3.ZERO
+					if pl and g and g.combat and Vector2(plp.x - d.target.x, plp.z - d.target.z).length() < 1.6 and plp.y < 2.5:
+						g.combat.hurt_player(1, to_global(d.target))
 		else:
 			d.life -= dt
 			if d.life <= 0.0 or not boss_on:

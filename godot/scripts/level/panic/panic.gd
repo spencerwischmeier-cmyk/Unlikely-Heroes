@@ -9,6 +9,7 @@ extends Node3D
 ## Everything is hidden during the intro cutscene (the morning is quiet until the signal).
 ## Flags: --no-panic (skip all of it), --no-crowd, --no-traffic.
 
+const S := preload("res://scripts/level/layout/spread.gd")
 const Crowd := preload("res://scripts/level/panic/crowd.gd")
 const Traffic := preload("res://scripts/level/panic/traffic.gd")
 const Evac := preload("res://scripts/level/panic/evac.gd")
@@ -105,9 +106,9 @@ func _sound() -> void:
 	# crowd beds where people are
 	for c in [["plaza", Vector3(0, 1.5, 30), -4.0], ["pier_a", Vector3(39, 1.5, 38), -3.0], ["berth", Vector3(122, 1.5, 30), -5.0],
 			["terrace", Vector3(-36, 1.5, 36), -8.0], ["gardens", Vector3(-30, 10.3, -20), -10.0]]:
-		if L.islands.has(c[0]): _bed("panic_crowd_loop" if c[2] > -6.0 else "panic_crowd_near_loop", c[1], c[2], 12.0, 80.0)
+		if L.islands.has(c[0]): _bed("panic_crowd_loop" if c[2] > -6.0 else "panic_crowd_near_loop", S.at(c[1]), c[2], 12.0, 80.0)
 	# the docks PA: speakers on Pier A and the berth, plus the plaza
-	pa_spots = [Vector3(39, 7, 44), Vector3(118, 7, 30), Vector3(18, 7, 30)]
+	pa_spots = [S.at(Vector3(39, 7, 44)), S.at(Vector3(118, 7, 30)), Vector3(18, 7, 30)]
 	pa_player = AudioStreamPlayer3D.new(); pa_player.bus = "World"; pa_player.unit_size = 18.0; pa_player.max_distance = 110.0
 	pa_player.volume_db = 1.0; add_child(pa_player)
 	chime_player = AudioStreamPlayer3D.new(); chime_player.bus = "World"; chime_player.unit_size = 18.0; chime_player.max_distance = 110.0
@@ -188,7 +189,7 @@ func _debug_cam() -> void:
 			if a == "--panic-cam-ship" and evac:
 				# follow the evacuation shuttle from the pier
 				_cam = Camera3D.new(); _cam.fov = 55.0; _cam.far = 4000.0; add_child(_cam)
-				_cam.position = Vector3(30, 4, 34); _cam.set_meta("ship", true); _cam.set_meta("at", Vector3.ZERO)
+				_cam.position = S.at(Vector3(30, 4, 34)); _cam.set_meta("ship", true); _cam.set_meta("at", Vector3.ZERO)
 			if a.begins_with("--panic-cam="):
 				var v := a.substr(12).split_floats(",")
 				_cam = Camera3D.new(); _cam.fov = 60.0; _cam.far = 4000.0; add_child(_cam)

@@ -63,7 +63,7 @@ func _physics_process(dt: float) -> void:
 	var p: CharacterBody3D = Game.player
 	if p == null: return
 	_lift_snd -= dt
-	var pp := p.global_position
+	var pp := to_local(p.global_position)   # fans, triggers and the kettle are in this node's own space
 	var held := Input.is_action_pressed("jump")
 	for f in fans:
 		var d := Vector2(pp.x - f.pos.x, pp.z - f.pos.z).length()
@@ -75,7 +75,7 @@ func _physics_process(dt: float) -> void:
 		p.set("jumps", 2); p.set("jump_cut", true)
 		if _lift_snd <= 0.0:
 			_lift_snd = 1.2
-			Snd.at("terrace_updraft", pp, -6, 0.1, 0.0)
+			Snd.at("terrace_updraft", p.global_position, -6, 0.1, 0.0)
 
 func _process(dt: float) -> void:
 	_t += dt
@@ -113,7 +113,7 @@ func _process(dt: float) -> void:
 	if p:
 		for i in range(triggers.size() - 1, -1, -1):
 			var tr: Dictionary = triggers[i]
-			var pp := p.global_position
+			var pp := to_local(p.global_position)
 			if (tr.rect as Rect2).has_point(Vector2(pp.x, pp.z)) and absf(pp.y - tr.y) < 1.5:
 				triggers.remove_at(i)
 				if Game.input_locked: continue
@@ -122,5 +122,5 @@ func _process(dt: float) -> void:
 	kettle_t -= dt
 	if kettle_t <= 0.0:
 		kettle_t = randf_range(18.0, 30.0)
-		if p and p.global_position.distance_to(kettle_pos) < 26.0:
-			Snd.at("terrace_kettle", kettle_pos, -4, 0.05, 0.0)
+		if p and to_local(p.global_position).distance_to(kettle_pos) < 26.0:
+			Snd.at("terrace_kettle", to_global(kettle_pos), -4, 0.05, 0.0)
