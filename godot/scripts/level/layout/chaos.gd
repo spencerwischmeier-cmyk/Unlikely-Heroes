@@ -14,6 +14,9 @@ static var _meshes := {}         # glb name -> ArrayMesh (all parts merged, one 
 static var _fire_mat: Material
 static var _smoke_mats := {}
 static var _soft: Texture2D
+static var _noise3d: Texture3D
+## Shader fire/smoke, ember sparks and volumetric smoke columns (off with --no-hd-fx).
+static var HD: bool = not OS.get_cmdline_user_args().has("--no-hd-fx")
 
 var L: Node3D
 var batch := {}                  # mesh name -> Array[Transform3D]
@@ -196,6 +199,13 @@ func fire(pos: Vector3, size := 1.0, light := true) -> void:
 		m.vertex_color_use_as_albedo = true; m.albedo_texture = _soft_tex(); m.albedo_color = Color(1.6, 1.3, 1.0)
 		_fire_mat = m
 	q.material = _fire_mat
+	if HD:
+		if not _smoke_mats.has("fire_hd"):
+			var fm := ShaderMaterial.new(); fm.shader = load("res://shaders/fire_particle.gdshader"); _smoke_mats["fire_hd"] = fm
+		q.material = _smoke_mats["fire_hd"]
+		pm.color_ramp = _fire_ramp_hd()
+		p.amount = int(26 * size) + 8
+		q.size = Vector2(0.8, 1.5) * size
 	p.draw_pass_1 = q
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	p.visibility_aabb = AABB(Vector3(-2, -1, -2) * size, Vector3(4, 5, 4) * size)
@@ -207,6 +217,10 @@ func fire(pos: Vector3, size := 1.0, light := true) -> void:
 		l.distance_fade_enabled = true; l.distance_fade_begin = 50.0; l.distance_fade_length = 15.0
 		add_child(l)
 		fires.append({ light = l, base = l.light_energy, ph = randf() * TAU })
+	if HD:
+		embers(pos, size)
+		scorch(pos, size)
+		if size >= 0.9: haze(pos + Vector3(0, 1.4 * size, 0), size)
 
 func smoke(pos: Vector3, size := 1.0, dark := true) -> void:
 	var p := GPUParticles3D.new()
@@ -234,11 +248,127 @@ func smoke(pos: Vector3, size := 1.0, dark := true) -> void:
 		m.billboard_keep_scale = true
 		_smoke_mats[key] = m
 	q.material = _smoke_mats[key]
+	if HD:
+		var hk := key + "_hd"
+		if not _smoke_mats.has(hk):
+			var sm := ShaderMaterial.new(); sm.shader = load("res://shaders/smoke_particle.gdshader")
+			sm.set_shader_parameter("ember", 1.2 if dark else 0.0)
+			_smoke_mats[hk] = sm
+		q.material = _smoke_mats[hk]
+		p.amount = 28
+		if dark: gr.colors = PackedColorArray([Color(0.16, 0.14, 0.13, 0), Color(0.2, 0.18, 0.17, 0.85), Color(0.42, 0.4, 0.38, 0)])
+		q.size = Vector2(2.8, 2.8)
 	p.draw_pass_1 = q
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	p.visibility_aabb = AABB(Vector3(-12, -2, -12) * size, Vector3(24, 30, 24) * size)
 	p.position = pos
 	add_child(p)
+
+static func _fire_ramp_hd() -> GradientTexture1D:
+	var ramp := GradientTexture1D.new(); var gr := Gradient.new()
+	gr.offsets = PackedFloat32Array([0.0, 0.2, 0.55, 0.85, 1.0])
+	gr.colors = PackedColorArray([Color(1.0, 0.85, 0.45, 0.0), Color(1.0, 0.7, 0.28, 1), Color(1.0, 0.42, 0.1, 0.85), Color(0.7, 0.16, 0.04, 0.4), Color(0.2, 0.05, 0.02, 0)])
+	ramp.gradient = gr
+	return ramp
+
+## glowing sparks spiralling up out of a fire
+func embers(pos: Vector3, size := 1.0) -> void:
+	var p := GPUParticles3D.new()
+	p.amount = int(14 * size) + 4; p.lifetime = 2.6; p.preprocess = 2.0
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE; pm.emission_sphere_radius = 0.4 * size
+	pm.direction = Vector3(0, 1, 0); pm.spread = 25.0
+	pm.initial_velocity_min = 1.5; pm.initial_velocity_max = 3.5 * size
+	pm.gravity = Vector3(0.5, 0.6, 0.2)
+	pm.turbulence_enabled = true; pm.turbulence_noise_strength = 2.0; pm.turbulence_noise_scale = 3.0; pm.turbulence_influence_min = 0.1; pm.turbulence_influence_max = 0.25
+	pm.scale_min = 0.6; pm.scale_max = 1.2
+	var ramp := GradientTexture1D.new(); var gr := Gradient.new()
+	gr.offsets = PackedFloat32Array([0.0, 0.7, 1.0])
+	gr.colors = PackedColorArray([Color(1.0, 0.75, 0.35, 1), Color(1.0, 0.35, 0.08, 1), Color(0.6, 0.1, 0.02, 0)])
+	ramp.gradient = gr; pm.color_ramp = ramp
+	p.process_material = pm
+	var q := QuadMesh.new(); q.size = Vector2(0.05, 0.05)
+	if not _smoke_mats.has("ember"):
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.vertex_color_use_as_albedo = true; m.albedo_texture = _soft_tex(); m.albedo_color = Color(4.0, 3.0, 2.0)
+		_smoke_mats["ember"] = m
+	q.material = _smoke_mats["ember"]
+	p.draw_pass_1 = q
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.visibility_aabb = AABB(Vector3(-4, -1, -4) * size, Vector3(8, 10, 8) * size)
+	p.position = pos
+	add_child(p)
+
+## a burnt patch on whatever the fire stands on
+func scorch(pos: Vector3, size := 1.0) -> void:
+	if not _smoke_mats.has("scorch_tex"):
+		var g := GradientTexture2D.new(); g.fill = GradientTexture2D.FILL_RADIAL
+		g.fill_from = Vector2(0.5, 0.5); g.fill_to = Vector2(1, 0.5); g.width = 128; g.height = 128
+		var gr := Gradient.new()
+		gr.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+		gr.colors = PackedColorArray([Color(0.02, 0.015, 0.01, 0.95), Color(0.05, 0.03, 0.02, 0.7), Color(0.1, 0.06, 0.04, 0)])
+		g.gradient = gr
+		_smoke_mats["scorch_tex"] = g
+	var d := Decal.new()
+	d.texture_albedo = _smoke_mats["scorch_tex"]
+	d.size = Vector3(3.2, 4.0, 3.2) * size
+	d.position = pos + Vector3(0, -0.5, 0)
+	d.rotation.y = randf() * TAU
+	d.cull_mask = 1
+	d.distance_fade_enabled = true; d.distance_fade_begin = 50.0; d.distance_fade_length = 10.0
+	add_child(d)
+
+## shimmering heat over a big fire (screen-space refraction on a billboard)
+func haze(pos: Vector3, size := 1.0) -> void:
+	if not _smoke_mats.has("haze"):
+		var m := ShaderMaterial.new(); m.shader = load("res://shaders/heat_haze.gdshader")
+		_smoke_mats["haze"] = m
+	var mi := MeshInstance3D.new()
+	var q := QuadMesh.new(); q.size = Vector2(1.8, 3.0) * size
+	mi.mesh = q; mi.material_override = _smoke_mats["haze"]
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = pos + Vector3(0, 0.8 * size, 0)
+	mi.visibility_range_end = 40.0
+	add_child(mi)
+
+static func _noise_tex3d() -> Texture3D:
+	if _noise3d: return _noise3d
+	var nt := NoiseTexture3D.new(); nt.width = 64; nt.height = 64; nt.depth = 64; nt.seamless = true
+	var fn := FastNoiseLite.new(); fn.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH; fn.frequency = 0.06; fn.fractal_octaves = 4
+	nt.noise = fn
+	_noise3d = nt
+	return nt
+
+## A big volumetric smoke column: a FogVolume plume (lit by the sun and volumetric fog) over a fire, plus
+## the particle smoke and flames at its foot. `height` in metres; `size` scales the fire.
+func column(pos: Vector3, size := 1.0, height := 26.0, lean := 0.18) -> void:
+	fire(pos, size)
+	# the big fires are the few lights worth a shadow
+	if HD and not fires.is_empty(): (fires[-1].light as OmniLight3D).shadow_enabled = true
+	smoke(pos + Vector3(0, 0.8 * size, 0), size * 1.2, true)
+	if not HD: return
+	var fv := FogVolume.new()
+	fv.shape = RenderingServer.FOG_VOLUME_SHAPE_BOX
+	var w := maxf(5.0, height * 0.36) * maxf(0.8, size)
+	fv.size = Vector3(w, height, w)
+	fv.position = pos + Vector3(w * lean * 0.35, height * 0.5 - 0.5, 0)
+	var m := ShaderMaterial.new(); m.shader = load("res://shaders/smoke_column.gdshader")
+	m.set_shader_parameter("noise_tex", _noise_tex3d()); m.set_shader_parameter("lean", lean)
+	fv.material = m
+	add_child(fv)
+
+## a low, sunlit cloud bank drifting below the islands (FogVolume ellipsoid)
+func cloud_bank(pos: Vector3, size: Vector3) -> void:
+	if not HD: return
+	var fv := FogVolume.new()
+	fv.shape = RenderingServer.FOG_VOLUME_SHAPE_ELLIPSOID
+	fv.size = size; fv.position = pos
+	var m := ShaderMaterial.new(); m.shader = load("res://shaders/cloud_bank.gdshader")
+	m.set_shader_parameter("noise_tex", _noise_tex3d())
+	fv.material = m
+	add_child(fv)
 
 ## a sign hanging off one bracket, its neon stuttering
 func broken_sign(text: String, pos: Vector3, yaw: float, c := Color(1.0, 0.45, 0.3), tilt := 0.25, px := 0.012) -> void:

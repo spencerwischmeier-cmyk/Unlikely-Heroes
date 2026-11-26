@@ -14,6 +14,19 @@ static func build(L) -> void:
 	s.setup(L, plan())
 	L.add_child(s)
 	_plumes(L)
+	_junk_columns(L)
+
+## the Junkyard is burning: volumetric smoke columns over the Scrap Heap, the Hull Dock and the Sorting Works
+static func _junk_columns(L) -> void:
+	var C: Node3D = Chaos.make(L, "junk_columns")
+	C.center = Vector3(-5, 0, 125); C.radius = 70.0
+	C.column(Vector3(-44.5, 0.0, 141.5), 1.3, 30.0, 0.22)    # behind the Scrap Heap summit
+	C.column(Vector3(43.0, 0.0, 140.5), 1.1, 24.0, 0.2)      # the far corner of the Hull Dock
+	C.column(Vector3(-47.5, 0.0, 106.5), 1.0, 22.0, 0.25)    # the Sorting Works' back fence
+	# cloud banks drifting below the island edges give the drop some depth
+	for cb in [[Vector3(-80, -22, 150), Vector3(70, 16, 50)], [Vector3(75, -26, 160), Vector3(80, 18, 60)],
+			[Vector3(0, -30, 230), Vector3(110, 20, 50)], [Vector3(-60, -18, 95), Vector3(50, 12, 40)]]:
+		C.cloud_bank(cb[0], cb[1])
 
 ## clusters: area, centre (final coords, y = that floor's height), radius, what to drop
 static func plan() -> Array:

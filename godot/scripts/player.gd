@@ -110,6 +110,7 @@ func _ready() -> void:
 	hero.scale = Vector3.ONE * HERO_SCALE
 	body.add_child(hero)
 	_shadows(hero)
+	_fur(hero)
 	skel = hero.find_child("Skeleton3D", true, false)
 	anim = hero.find_child("AnimationPlayer", true, false)
 	anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
@@ -132,6 +133,19 @@ func _ready() -> void:
 	rope.top_level = true; rope.visible = false
 	add_child(rope)
 	level = get_parent().get_node_or_null("Level") if get_parent() else null
+
+## Vesk's fur: a soft rim sheen and a touch of subsurface so he doesn't read as plastic (--no-fur to compare)
+func _fur(n: Node) -> void:
+	if OS.get_cmdline_user_args().has("--no-fur"): return
+	for mi: MeshInstance3D in n.find_children("*", "MeshInstance3D", true, false):
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_active_material(i)
+			if m is StandardMaterial3D:
+				var f := (m as StandardMaterial3D).duplicate() as StandardMaterial3D
+				f.rim_enabled = true; f.rim = 0.55; f.rim_tint = 0.55
+				f.subsurf_scatter_enabled = true; f.subsurf_scatter_strength = 0.12
+				f.roughness = maxf(f.roughness, 0.55)
+				mi.set_surface_override_material(i, f)
 
 func _shadows(n: Node) -> void:
 	if n is GeometryInstance3D: (n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON

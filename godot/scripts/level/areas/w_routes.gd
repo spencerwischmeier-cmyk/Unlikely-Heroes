@@ -254,9 +254,14 @@ static func _sorting_works(L, rng: RandomNumberGenerator) -> void:
 		var p: Vector2 = st[0]
 		for k in st[1]:
 			var col: Color = bale_cols[(k + int(p.x)) % bale_cols.size()]
-			L.box(Vector3(p.x, 0.6 + k * 1.2, p.y), Vector3(2.3, 1.2, 2.3), JK.paint(col))
-			for q in 3:
-				B.add("plate", "scrap", JK.xform(Vector3(p.x + rng.randf_range(-0.9, 0.9), 0.6 + k * 1.2 + rng.randf_range(-0.5, 0.5), p.y + 1.16), Vector3(PI / 2, 0, rng.randf() * TAU), Vector3(rng.randf_range(0.3, 0.6), 1, rng.randf_range(0.3, 0.6))), col.darkened(0.2))
+			var bx: MeshInstance3D = L.box(Vector3(p.x, 0.6 + k * 1.2, p.y), Vector3(2.3, 1.2, 2.3), JK.paint(col))
+			if JK.hd_on():
+				# the box stays as the collider; the bale you see is the crushed-scrap model
+				bx.visible = false
+				B.add("bale", "bale", JK.xform(Vector3(p.x, 0.6 + k * 1.2, p.y), Vector3(0, rng.randf_range(-0.04, 0.04) + (k % 2) * PI / 2, 0), Vector3(2.26, 1.17, 2.26)), col)
+			else:
+				for q in 3:
+					B.add("plate", "scrap", JK.xform(Vector3(p.x + rng.randf_range(-0.9, 0.9), 0.6 + k * 1.2 + rng.randf_range(-0.5, 0.5), p.y + 1.16), Vector3(PI / 2, 0, rng.randf() * TAU), Vector3(rng.randf_range(0.3, 0.6), 1, rng.randf_range(0.3, 0.6))), col.darkened(0.2))
 	# the sorting gantry along the north wall (3.6): bale steps up, a sprocket stash at the far end
 	L.box(Vector3(-36, 3.4, 88.35), Vector3(22, 0.4, 4.5), M.deck(Color(0.75, 0.75, 0.78)))
 	L.islands["junk_works_gantry"] = Rect2(-47, 86.1, 22, 4.5); L.heights["junk_works_gantry"] = 3.6

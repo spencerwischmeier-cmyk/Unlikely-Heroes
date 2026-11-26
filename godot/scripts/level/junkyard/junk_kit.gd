@@ -18,11 +18,47 @@ const PALETTE := [RUST, RUST, ORANGE, TEAL, CREAM, GUN, GUN, RED, YELLOW]
 
 static var _mats := {}
 static var _meshes := {}
+static var _hd := {}            # mesh kind -> Mesh from models/junkyard/scrap_hd.glb (art/scrap_hd.py)
+static var _hd_loaded := false
+## Pieces with a bevelled high-detail version (falls back to primitives with --no-hd-scrap or if missing).
+const HD_KINDS := ["plate", "beam", "block", "pipe", "drum", "tire", "gear", "nut", "bale"]
+
+static func hd_on() -> bool:
+	return not OS.get_cmdline_user_args().has("--no-hd-scrap")
+
+static func _load_hd() -> void:
+	if _hd_loaded: return
+	_hd_loaded = true
+	if not hd_on() or not ResourceLoader.exists(DIR + "scrap_hd.glb"): return
+	var root: Node = load(DIR + "scrap_hd.glb").instantiate()
+	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		var k := String(mi.name).trim_prefix("scrap_")
+		if mi.mesh: _hd[k] = mi.mesh
+	root.free()
+
+static func _pit_tex() -> Texture2D:
+	if _mats.has("_pit"): return _mats["_pit"]
+	var nt := NoiseTexture2D.new(); nt.width = 256; nt.height = 256; nt.seamless = true; nt.as_normal_map = true; nt.bump_strength = 6.0
+	var fn := FastNoiseLite.new(); fn.noise_type = FastNoiseLite.TYPE_CELLULAR; fn.frequency = 0.05; fn.fractal_octaves = 3
+	nt.noise = fn
+	_mats["_pit"] = nt
+	return nt
+
+## The layered scrap shader (paint from the instance colour, baked edge/cavity wear from UV2).
+static func scrap_shader_mat(rust := 0.55, chip := 0.85) -> ShaderMaterial:
+	var sm := ShaderMaterial.new(); sm.shader = load("res://shaders/scrap.gdshader")
+	sm.set_shader_parameter("pit_nrm", _pit_tex()); sm.set_shader_parameter("rust", rust); sm.set_shader_parameter("chip", chip)
+	return sm
 static var _aabbs := {}
 
 static func mat(kind: String) -> Material:
 	if _mats.has(kind): return _mats[kind]
 	var m: StandardMaterial3D
+	if kind == "scrap" and hd_on():
+		_mats[kind] = scrap_shader_mat(); return _mats[kind]
+	if kind == "bale" and hd_on():
+		var bm := ShaderMaterial.new(); bm.shader = load("res://shaders/bale.gdshader")
+		_mats[kind] = bm; return bm
 	match kind:
 		"scrap": m = M.surface("paint", Color.WHITE, 0.55, 0.62, 0.6); m.vertex_color_use_as_albedo = true
 		"rubber": m = M.rubber(); m.vertex_color_use_as_albedo = false
@@ -56,6 +92,16 @@ static func paint(c: Color) -> Material:
 ## Unit meshes for clutter pieces (scaled per instance).
 static func mesh(kind: String) -> Mesh:
 	if _meshes.has(kind): return _meshes[kind]
+	_load_hd()
+	if _hd.has(kind):
+		var hm: Mesh = _hd[kind]
+		# the bale's straps (surface 1) are steel; the tyre's hub (surface 1) is painted metal
+		if hm.get_surface_count() > 1 and kind in ["bale", "tire"]:
+			hm = hm.duplicate()
+			hm.surface_set_material(0, mat("bale") if kind == "bale" else mat("rubber"))
+			hm.surface_set_material(1, scrap_shader_mat(0.35, 0.9))
+		_meshes[kind] = hm
+		return hm
 	var m: Mesh
 	match kind:
 		"plate": var b := BoxMesh.new(); b.size = Vector3(1, 0.07, 1); m = b
@@ -69,6 +115,7 @@ static func mesh(kind: String) -> Mesh:
 		"ball": var s := SphereMesh.new(); s.radius = 0.5; s.height = 1.0; s.radial_segments = 10; s.rings = 6; m = s
 		"link": var t := TorusMesh.new(); t.inner_radius = 0.05; t.outer_radius = 0.11; t.rings = 8; t.ring_segments = 5; m = t
 		"cone": var c := CylinderMesh.new(); c.top_radius = 0.0; c.bottom_radius = 0.5; c.height = 1; c.radial_segments = 8; c.rings = 1; m = c
+		"bale": var b := BoxMesh.new(); b.size = Vector3.ONE; m = b
 	_meshes[kind] = m
 	return m
 
@@ -90,7 +137,8 @@ class Batch:
 			mm.instance_count = b.xf.size()
 			for i in b.xf.size():
 				mm.set_instance_transform(i, b.xf[i]); mm.set_instance_color(i, b.col[i])
-			var mi := MultiMeshInstance3D.new(); mi.multimesh = mm; mi.material_override = script.mat(parts[1])
+			var mi := MultiMeshInstance3D.new(); mi.multimesh = mm
+			if mm.mesh.get_surface_count() < 2 or parts[0] not in ["bale", "tire"]: mi.material_override = script.mat(parts[1])
 			mi.name = "Scrap_" + parts[0]
 			parent.add_child(mi)
 		buckets.clear()
@@ -214,6 +262,10 @@ static func bulbs(B: Batch, L: Node3D, a: Vector3, b: Vector3, sag: float, n: in
 		var u := (i + 0.5) / n
 		var p := a.lerp(b, u) + Vector3(0, -sag * 4.0 * u * (1.0 - u) - 0.12, 0)
 		B.add("ball", "bulb", xform(p, Vector3.ZERO, Vector3.ONE * 0.16))
+	if hd_on() and a.distance_to(b) > 3.0:
+		var l := omni(L, a.lerp(b, 0.5) + Vector3(0, -sag - 0.4, 0), Color(1.0, 0.68, 0.38), 0.9, minf(a.distance_to(b) * 0.7, 9.0))
+		l.light_volumetric_fog_energy = 0.4
+		l.distance_fade_enabled = true; l.distance_fade_begin = 45.0; l.distance_fade_length = 10.0
 
 ## A hanging chain of links from top down `length` metres; returns the bottom point.
 static func chain(B: Batch, top: Vector3, length: float) -> Vector3:
