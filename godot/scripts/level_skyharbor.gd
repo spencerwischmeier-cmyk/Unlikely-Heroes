@@ -590,11 +590,14 @@ func _hanging(pos: Vector3, rot_y: float, mat: Material) -> void:
 		cyl(pos + off + Vector3(0, 2.5 + 6, 0), 0.04, 0.04, 12, mat_dark, 6)
 
 func _build_mast() -> void:
-	# the Signal Mast at the center: east landing (3) -> gallery (8) -> spiral ledges -> dish deck (20)
+	# the Signal Mast at the center: east landing (3) -> gallery (8) -> ledges -> catwalk, cable rail, relay
+	# pylon lift and a hook chain -> dish deck (20). The lattice, spire, pylon and dressing are built in
+	# scripts/level/areas/mast.gd; this keeps the pieces the story and the other areas rely on.
 	var C := Vector3(14, 0, -34)
-	cyl(Vector3(C.x, -42, C.z), 2.6, 4.5, 124, mat_dark, 16)
-	cyl(Vector3(C.x, 14, C.z), 2.4, 2.6, 12, M.std(Color(0.78, 0.8, 0.84), 0.7, 0.35), 16, true)
-	for y in [10.0, 14.0, 18.0]: cyl(Vector3(C.x, y, C.z), 2.75, 2.75, 0.3, glow_warm, 16)
+	cyl(Vector3(C.x, -48, C.z), 2.6, 4.5, 112, mat_dark, 16)
+	# the lattice tower between the gallery and the dish deck is drawn by the area file; this is its collider
+	var core := StaticBody3D.new(); var ccs := CollisionShape3D.new(); var cbx := BoxShape3D.new()
+	cbx.size = Vector3(3.9, 12, 3.9); ccs.shape = cbx; core.position = Vector3(C.x, 14, C.z); core.add_child(ccs); add_child(core)
 	island("gallery", rect(C.x, C.z, 18, 18), 8.0, Color(0.8, 0.84, 0.9))
 	label("SIGNAL MAST", Vector3(C.x, 8, C.z + 6.5), 5, Color(1, 0.85, 0.6))
 	checkpoints.append({ pos = Vector3(8, 8.1, -27), r = 2.4 })
@@ -605,9 +608,11 @@ func _build_mast() -> void:
 	# catch ledge under the west edge, where the promenade hook chain drops you
 	ledge(2.5, -40, 5, 6, 6.6)
 	checkpoints.append({ pos = Vector3(29, 3.1, -36), r = 2.4 })
-	# ledges spiralling up the mast
+	# ledges up the mast: two to the east catwalk; the third was cut (the long way round is in the area
+	# file); the fourth is a perch under the dish deck
 	var tops := [10.4, 12.8, 15.2, 17.6]
 	for i in tops.size():
+		if i == 2: continue
 		var a := deg_to_rad(37.0 * i)
 		var p := Vector2(C.x + 6.5 * cos(a), C.z + 6.5 * sin(a))
 		if i == 0: block(p.x, p.y, 2.5, 2.5, tops[i] - 8.0, 8.0, M.deck(Color(0.8, 0.75, 0.68)))
@@ -615,18 +620,18 @@ func _build_mast() -> void:
 	# dish deck on top with the relay dish (aligned by three cranks)
 	island("dish_deck", rect(C.x, C.z, 8, 8), 20.0, Color(0.8, 0.82, 0.86), 0.8)
 	checkpoints.append({ pos = Vector3(16.5, 20.1, -36), r = 1.4 })
-	dish_pivot = Node3D.new(); dish_pivot.position = Vector3(C.x, 21.5, C.z - 0.5); add_child(dish_pivot)
-	cyl(Vector3(C.x, 20.75, C.z - 0.5), 0.35, 0.5, 1.5, mat_dark, 10)
-	if ResourceLoader.exists("res://models/kit/dish_small.glb"):
-		Kit.place(dish_pivot, "dish_small", Vector3.ZERO, 0.0, 3.0, false)
-	else:
-		var d := CylinderMesh.new(); d.top_radius = 2.0; d.bottom_radius = 0.35; d.height = 0.8
-		mesh_at(d, mat_white, Vector3(0, 0.6, 0), dish_pivot).rotation.x = -1.1
+	dish_pivot = Node3D.new(); dish_pivot.position = Vector3(C.x, 23.2, C.z - 0.5); add_child(dish_pivot)
+	cyl(Vector3(C.x, 20.6, C.z - 0.5), 0.55, 0.9, 1.2, mat_dark, 16)
+	if ResourceLoader.exists("res://models/mast/relay_dish.glb"):
+		var dm: Node3D = load("res://models/mast/relay_dish.glb").instantiate()
+		dm.scale = Vector3.ONE * 2.65; dish_pivot.add_child(dm)
+	elif ResourceLoader.exists("res://models/kit/dish_small.glb"):
+		Kit.place(dish_pivot, "dish_small", Vector3(0, -1.7, 0), 0.0, 3.0, false)
 	dish_glow = M.glow(Color(1, 0.45, 0.1), 6.0)
-	var e := SphereMesh.new(); e.radius = 0.4; e.height = 0.8
-	mesh_at(e, dish_glow, Vector3(0, 1.1, 0.6), dish_pivot)
-	dish_light = OmniLight3D.new(); dish_light.light_color = Color(1, 0.5, 0.15); dish_light.light_energy = 6.0; dish_light.omni_range = 14
-	dish_light.position = Vector3(0, 1.4, 0.8); dish_pivot.add_child(dish_light)
+	var e := SphereMesh.new(); e.radius = 0.32; e.height = 0.64
+	mesh_at(e, dish_glow, Vector3(0, 0, 1.05), dish_pivot)
+	dish_light = OmniLight3D.new(); dish_light.light_color = Color(1, 0.5, 0.15); dish_light.light_energy = 6.0; dish_light.omni_range = 12
+	dish_light.position = Vector3(0, 0, 1.6); dish_pivot.add_child(dish_light)
 	dish_pivot.rotation = Vector3(0.5, 2.2, 0)
 	dish_target = Vector2(2.2, 0.5)
 	# rail from the dish deck down to the Crane Yard gate (opens when the dish is aligned)
