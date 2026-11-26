@@ -19,7 +19,8 @@ static var L: Node3D
 static var _mats := {}
 static var _aabbs := {}
 static var life: Node3D
-static var cables: Array = []      # [from, to, sag, kind] kind "lantern" | "bunting" | "plain"
+static var cables: Array = []
+static var _made: Array = []       # primitive MeshInstance3Ds to merge into one mesh per material      # [from, to, sag, kind] kind "lantern" | "bunting" | "plain"
 
 const SPOTS := {
 	plaza_gate = [Vector3(0, 0.1, 53.5), PI],          # arriving from the junkyard, looking at the arch
@@ -33,6 +34,7 @@ const SPOTS := {
 static func build(level: Node3D) -> void:
 	L = level
 	cables = []
+	_made = []
 	life = LIFE.new(); life.name = "PlazaLife"; L.add_child(life)
 	_fountain()
 	_floor_art()
@@ -46,6 +48,7 @@ static func build(level: Node3D) -> void:
 	_props()
 	_cables()
 	_sky_life()
+	_merge_static()
 	# hidden sprocket crates up on the ring
 	L.crate_spots.append_array([
 		Vector3(-20.6, 7.4, 21.4),     # on the cafe roof shed
@@ -132,17 +135,22 @@ static func _water() -> StandardMaterial3D:
 static func bx(pos: Vector3, size: Vector3, m: String, collide := false, parent: Node = null) -> MeshInstance3D:
 	var mi: MeshInstance3D = L.box(pos, size, mat(m), collide, parent if parent else L)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if size.length() > 2.0 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_made.append(mi)
 	return mi
 
 static func cy(pos: Vector3, r_top: float, r_bot: float, h: float, m: String, sides := 16, parent: Node = null) -> MeshInstance3D:
 	var cm := CylinderMesh.new(); cm.top_radius = r_top; cm.bottom_radius = r_bot; cm.height = h; cm.radial_segments = sides
 	cm.rings = 1
-	return L.mesh_at(cm, mat(m), pos, parent if parent else L)
+	var mi: MeshInstance3D = L.mesh_at(cm, mat(m), pos, parent if parent else L)
+	_made.append(mi)
+	return mi
 
 static func sphere(pos: Vector3, r: float, m: String, parent: Node = null, hemi := false) -> MeshInstance3D:
 	var s := SphereMesh.new(); s.radius = r; s.height = r * (1.0 if hemi else 2.0); s.is_hemisphere = hemi
 	s.radial_segments = 16; s.rings = 8
-	return L.mesh_at(s, mat(m), pos, parent if parent else L)
+	var mi: MeshInstance3D = L.mesh_at(s, mat(m), pos, parent if parent else L)
+	_made.append(mi)
+	return mi
 
 static func frame(pos: Vector3, yaw: float, parent: Node = null) -> Node3D:
 	var n := Node3D.new(); n.position = pos; n.rotation.y = yaw
@@ -418,7 +426,7 @@ static func _arch() -> void:
 		t.rotation.z = i * TAU / 10
 	cy(Vector3(0, 0, 0.12), 0.45, 0.45, 0.06, "teal", 16, g).rotation.x = PI / 2
 	bx(Vector3(0, -1.0, 0), Vector3(0.3, 0.6, 0.3), "dark", false, g)
-	life.spin(g, 0.25)
+	life.spin(g, 0.25); g.set_meta("plaza_anim", true)
 	for x in [-9.25, 9.25]: L.prop("flag_pole", Vector3(x, H, 45.5), 0.0, 0.7, false)
 
 # ---------------------------------------------------------------- the bank (built in level_skyharbor.gd)
@@ -514,14 +522,14 @@ static func _clock_tower() -> void:
 		var mp := Node3D.new(); mp.position.z = 0.14; cf.add_child(mp)
 		bx(Vector3(0, 0.6, 0), Vector3(0.08, 1.25, 0.04), "red", false, mp)
 		sphere(Vector3(0, 0, 0.16), 0.1, "brass", cf)
-		life.clock_hands.append([hp, mp])
+		life.clock_hands.append([hp, mp]); hp.set_meta("plaza_anim", true); mp.set_meta("plaza_anim", true)
 	# belfry: four piers, the bell, a gold dome and the spire
 	for sx in [-1, 1]:
 		for sz in [-1, 1]: bx(T + Vector3(sx * 1.85, 17.3, sz * 1.85), Vector3(0.7, 2.6, 0.7), "cream", true)
 	var bell := frame(T + Vector3(0, 17.8, 0), 0.0)
 	sphere(Vector3(0, -0.2, 0), 0.75, "gold", bell, true)
 	cy(Vector3(0, -0.55, 0), 0.75, 0.95, 0.3, "gold", 16, bell)
-	life.bell = bell
+	life.bell = bell; bell.set_meta("plaza_anim", true)
 	bx(T + Vector3(0, 18.75, 0), Vector3(4.9, 0.3, 4.9), "brass", true)
 	sphere(T + Vector3(0, 18.9, 0), 2.45, "plaster", null, true).scale = Vector3(1, 1.15, 1)
 	for i in 8:
@@ -725,3 +733,32 @@ static func _sky_life() -> void:
 	if ship: DocksDressing.drift(ship, Vector3(-24, 24, 54), Vector3(24, 27, 10), 38.0)
 	life.make_birds(TOWER + Vector3(0, 20, 0), 7)
 	life.add_loop("plaza_crowd", Vector3(0, 3, 30), -9.0, 18.0, 60.0)
+
+# ---------------------------------------------------------------- draw-call diet
+## Bake every static primitive made above into one mesh per material (hundreds of boxes become a few dozen
+## draw calls). The original nodes stay (their colliders are children) but stop drawing.
+static func _merge_static() -> void:
+	var groups := {}   # Material -> [SurfaceTool, casts_shadow]
+	var root_inv := L.global_transform.affine_inverse()
+	for mi: MeshInstance3D in _made:
+		if not is_instance_valid(mi) or mi.mesh == null or not mi.visible: continue
+		var animated := false
+		var p: Node = mi
+		while p and p != L:
+			if p.has_meta("plaza_anim"): animated = true; break
+			p = p.get_parent()
+		if animated: continue
+		var m: Material = mi.material_override
+		if m == null: continue
+		if not groups.has(m):
+			var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+			groups[m] = [st, false]
+		groups[m][0].append_from(mi.mesh, 0, root_inv * mi.global_transform)
+		if mi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF: groups[m][1] = true
+		mi.mesh = null
+	for m in groups:
+		var out := MeshInstance3D.new(); out.name = "PlazaMerged"
+		out.mesh = groups[m][0].commit(); out.material_override = m
+		out.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if groups[m][1] else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		L.add_child(out)
+	_made = []
