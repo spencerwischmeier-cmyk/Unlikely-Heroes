@@ -10,7 +10,7 @@ func run() -> void:
 	var r: Rect2 = C.island_rect("arena", Rect2(-18, -112, 36, 30))
 	var c := Vector3(r.get_center().x, 0, r.get_center().y)
 	var story: Node = Game.story
-	var boss_pos := Vector3(0, 0, -102)
+	var boss_pos := preload("res://scripts/level/layout/spread.gd").at(Vector3(0, 0, -102))
 	if story and story.get("boss_pos") is Vector3: boss_pos = story.boss_pos
 	var p: Vector3 = Game.player.global_position if Game.player else Vector3(c.x, 0.1, r.end.y - 2)
 	if not r.grow(2.0).has_point(Vector2(p.x, p.z)): p = Vector3(c.x, 0.1, r.end.y - 2)

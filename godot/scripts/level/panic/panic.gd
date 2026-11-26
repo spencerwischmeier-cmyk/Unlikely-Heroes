@@ -4,11 +4,12 @@ extends Node3D
 ##   crowd.gd    citizens fleeing, ducking from bots, queueing at the docks and boarding shuttles
 ##   traffic.gd  sky cars jamming the lanes between districts, haywire cars spiralling down, ships climbing off-world
 ##   evac.gd     the evacuation shuttle that keeps landing at Pier A's south edge, loading and taking off
-## Plus the sound of it: a city-wide siren, crowd panic beds around the busy areas and the Skyharbor Authority's
+## Plus the sound of it: sirens now and then from far-off towers, crowd panic beds around the busy areas and the Skyharbor Authority's
 ## evacuation announcements on the docks PA (audio/sfx/panic_*.ogg, audio/voice/panic_pa_*.ogg).
 ## Everything is hidden during the intro cutscene (the morning is quiet until the signal).
 ## Flags: --no-panic (skip all of it), --no-crowd, --no-traffic.
 
+const S := preload("res://scripts/level/layout/spread.gd")
 const Crowd := preload("res://scripts/level/panic/crowd.gd")
 const Traffic := preload("res://scripts/level/panic/traffic.gd")
 const Evac := preload("res://scripts/level/panic/evac.gd")
@@ -23,6 +24,14 @@ var pa_i := 0
 var pa_player: AudioStreamPlayer3D
 var chime_player: AudioStreamPlayer3D
 var beds: Array = []          # AudioStreamPlayer3D
+## occasional city sirens: [sound, db] picked at random (not the same twice running) from one of the towers
+const SIRENS := [["panic_siren_wail", -3.0], ["panic_siren_whoop", -9.0], ["panic_siren_klaxon", -4.0],
+	["panic_siren_bell", -11.0], ["panic_siren_rise", 0.0]]
+const SIREN_TOWERS := [Vector3(-170, 40, 40), Vector3(190, 30, -110), Vector3(60, 50, 200)]
+var siren_player: AudioStreamPlayer3D
+var siren_t := 9.0
+var siren_last := -1
+var calm := false
 var t := 0.0
 
 func setup(level: Node3D) -> void:
@@ -66,6 +75,8 @@ func _ready() -> void:
 
 ## the Crane Bot is down: the sirens stop and people cheer instead of running (the shuttles keep going)
 func _calm() -> void:
+	calm = true
+	if siren_player: create_tween().tween_property(siren_player, "volume_db", -60.0, 3.0)
 	for b in beds:
 		var p := b as AudioStreamPlayer3D
 		if p.stream and String(p.stream.resource_path).contains("siren"):
@@ -99,15 +110,16 @@ func _bed(n: String, pos: Vector3, db: float, unit: float, maxd: float, bus := "
 	p.play.call_deferred(randf() * 8.0)
 
 func _sound() -> void:
-	# the city siren from three far-off towers (so it is never quite in one place)
-	for sp in [Vector3(-170, 40, 40), Vector3(190, 30, -110), Vector3(60, 50, 200)]:
-		_bed("panic_siren_loop", sp, -2.0, 60.0, 900.0)
+	# sirens now and then from far-off towers (never one constant drone): see _siren()
+	siren_player = AudioStreamPlayer3D.new(); siren_player.bus = "Amb"; siren_player.unit_size = 60.0; siren_player.max_distance = 900.0
+	siren_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	add_child(siren_player)
 	# crowd beds where people are
 	for c in [["plaza", Vector3(0, 1.5, 30), -4.0], ["pier_a", Vector3(39, 1.5, 38), -3.0], ["berth", Vector3(122, 1.5, 30), -5.0],
 			["terrace", Vector3(-36, 1.5, 36), -8.0], ["gardens", Vector3(-30, 10.3, -20), -10.0]]:
-		if L.islands.has(c[0]): _bed("panic_crowd_loop" if c[2] > -6.0 else "panic_crowd_near_loop", c[1], c[2], 12.0, 80.0)
+		if L.islands.has(c[0]): _bed("panic_crowd_loop" if c[2] > -6.0 else "panic_crowd_near_loop", S.at(c[1]), c[2], 12.0, 80.0)
 	# the docks PA: speakers on Pier A and the berth, plus the plaza
-	pa_spots = [Vector3(39, 7, 44), Vector3(118, 7, 30), Vector3(18, 7, 30)]
+	pa_spots = [S.at(Vector3(39, 7, 44)), S.at(Vector3(118, 7, 30)), Vector3(18, 7, 30)]
 	pa_player = AudioStreamPlayer3D.new(); pa_player.bus = "World"; pa_player.unit_size = 18.0; pa_player.max_distance = 110.0
 	pa_player.volume_db = 1.0; add_child(pa_player)
 	chime_player = AudioStreamPlayer3D.new(); chime_player.bus = "World"; chime_player.unit_size = 18.0; chime_player.max_distance = 110.0
@@ -120,6 +132,21 @@ func _process(dt: float) -> void:
 	t += dt
 	pa_t -= dt
 	if pa_t <= 0.0: _announce()
+	siren_t -= dt
+	if siren_t <= 0.0: _siren()
+
+func _siren() -> void:
+	siren_t = randf_range(28.0, 55.0)
+	if calm or siren_player == null or Game.input_locked: return
+	var i := randi() % SIRENS.size()
+	if i == siren_last: i = (i + 1) % SIRENS.size()
+	siren_last = i
+	var s := _stream(SIRENS[i][0])
+	if s == null: return
+	siren_player.stream = s; siren_player.volume_db = SIRENS[i][1]
+	siren_player.position = SIREN_TOWERS[randi() % SIREN_TOWERS.size()]
+	siren_player.pitch_scale = randf_range(0.96, 1.04)
+	siren_player.play()
 
 func _announce() -> void:
 	pa_t = randf_range(38.0, 55.0)
@@ -188,7 +215,7 @@ func _debug_cam() -> void:
 			if a == "--panic-cam-ship" and evac:
 				# follow the evacuation shuttle from the pier
 				_cam = Camera3D.new(); _cam.fov = 55.0; _cam.far = 4000.0; add_child(_cam)
-				_cam.position = Vector3(30, 4, 34); _cam.set_meta("ship", true); _cam.set_meta("at", Vector3.ZERO)
+				_cam.position = S.at(Vector3(30, 4, 34)); _cam.set_meta("ship", true); _cam.set_meta("at", Vector3.ZERO)
 			if a.begins_with("--panic-cam="):
 				var v := a.substr(12).split_floats(",")
 				_cam = Camera3D.new(); _cam.fov = 60.0; _cam.far = 4000.0; add_child(_cam)

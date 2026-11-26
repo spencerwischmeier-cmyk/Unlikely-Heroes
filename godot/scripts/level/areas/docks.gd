@@ -30,8 +30,6 @@ static func traversal_cases(moves: Dictionary) -> Dictionary:
 	return {
 		# Pier A across the gangway into the container canyon
 		depot_gangway = [Vector3(46, 0.1, 30), PI / 2, run_long, 0.0, Rect2(56, 26, 10, 8)],
-		# the rail from Pier D's north yard up to Pier B
-		rail_depot = [Vector3(74, 0.1, 16.5), PI, moves.run, 4.0, Rect2(50, -16, 16, 16)],
 		# crate step, then up onto a one-high container in corridor A
 		canyon_crate = [Vector3(67.3, 0.1, 31.0), PI, moves.sj, 1.3, Rect2(66.3, 28.0, 2.0, 2.0)],
 		canyon_top = [Vector3(67.3, 1.4, 28.6), PI, hop, 2.4, Rect2(62, 25, 6, 2.5)],

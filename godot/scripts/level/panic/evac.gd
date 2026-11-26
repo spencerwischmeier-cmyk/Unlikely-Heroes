@@ -8,10 +8,12 @@ extends Node3D
 
 const M := preload("res://scripts/mats.gd")
 
-const FOOT := Vector3(44.0, 0.0, 41.3)     # bottom of the boarding steps (queue slot 0)
-const TOP := Vector3(44.0, 1.45, 43.5)     # top of the steps, over the railing
-const DOCK := Vector3(44.0, 0.4, 50.5)     # where the shuttle holds (bottom of its hull)
-const HATCH := Vector3(44.0, 1.45, 47.6)   # the far end of the bridge, at the shuttle's door
+const S := preload("res://scripts/level/layout/spread.gd")
+# original Pier A positions, moved with the docks by the Spread pass
+var FOOT := S.at(Vector3(44.0, 0.0, 41.3))     # bottom of the boarding steps (queue slot 0)
+var TOP := S.at(Vector3(44.0, 1.45, 43.5))     # top of the steps, over the railing
+var DOCK := S.at(Vector3(44.0, 0.4, 50.5))     # where the shuttle holds (bottom of its hull)
+var HATCH := S.at(Vector3(44.0, 1.45, 47.6))   # the far end of the bridge, at the shuttle's door
 const LENGTH := 15.0
 
 var L: Node3D
@@ -37,8 +39,8 @@ func setup(level: Node3D, c: Node3D) -> void:
 		# the queue: from the steps north up the pier, clear of the turbine switch and the forklift
 		crowd.queue_slots.append(FOOT)
 		for i in 11:
-			crowd.queue_slots.append(Vector3(41.9 + (0.3 if i % 2 else -0.15), 0.0, 40.2 - i * 0.92))
-		crowd.crowd_spot = Rect2(34, 29, 7, 10)
+			crowd.queue_slots.append(Vector3(FOOT.x - 2.1 + (0.3 if i % 2 else -0.15), 0.0, 40.2 - i * 0.92))
+		crowd.crowd_spot = S.rect_at(Rect2(34, 29, 7, 10), "docks")
 		crowd.board_path = []
 
 func _ready() -> void:

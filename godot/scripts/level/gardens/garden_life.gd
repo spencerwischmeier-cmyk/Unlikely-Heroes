@@ -183,7 +183,7 @@ func add_spinner(n: Node3D, axis := Vector3.UP, sp := 1.0) -> void:
 func _process(dt: float) -> void:
 	t += dt
 	var cam := get_viewport().get_camera_3d()
-	var eye := cam.global_position if cam else Vector3.ZERO
+	var eye := to_local(cam.global_position) if cam else Vector3.ZERO   # in this node's (the area's original) space
 	var near := eye.distance_to(amb_center) < amb_radius + 50.0
 	for b in butterflies:
 		if not near: break
@@ -241,7 +241,7 @@ func _process(dt: float) -> void:
 			b.u += dt * b.sp * b.dir
 			if b.u >= 1.0 or b.u <= 0.0:
 				b.u = clampf(b.u, 0.0, 1.0); b.dir = -b.dir; b.wait = rng.randf_range(2.0, 4.0)
-				if chirp and b.n.global_position.distance_to(eye) < 18.0: _chirp(b.n.global_position)
+				if chirp and to_local(b.n.global_position).distance_to(eye) < 18.0: _chirp(b.n.global_position)
 			var p: Vector3 = b.a.lerp(b.b, b.u)
 			var d: Vector3 = (b.b - b.a) * b.dir
 			b.n.position = p
@@ -253,7 +253,7 @@ func _process(dt: float) -> void:
 			s.n.rotate(s.axis, s.sp * dt)
 	# sprockets: spin, and collect when Vesk touches one
 	var pl: Node3D = Game.player
-	var pp := pl.global_position + Vector3(0, 0.9, 0) if pl else Vector3(0, -999, 0)
+	var pp := to_local(pl.global_position) + Vector3(0, 0.9, 0) if pl else Vector3(0, -999, 0)
 	for i in range(sprockets.size() - 1, -1, -1):
 		var s: Dictionary = sprockets[i]
 		s.n.rotation.y = t * 2.5 + s.ph
@@ -262,12 +262,12 @@ func _process(dt: float) -> void:
 			Game.add_nuts(10)
 			Snd.play("nut_pickup", -6, 0.1, 0.02)
 			if chime: _oneshot(chime, -10.0)
-			FX.sparks(s.n.position, Color(1.0, 0.8, 0.35), 6, 3.0)
+			FX.sparks(s.n.global_position, Color(1.0, 0.8, 0.35), 6, 3.0)
 			s.n.queue_free(); sprockets.remove_at(i)
 	if pl and not Game.input_locked and Engine.get_physics_frames() % 10 == 0:
 		for i in range(quips.size() - 1, -1, -1):
 			var q: Dictionary = quips[i]
-			if pl.global_position.distance_to(q.pos) < q.r and (not q.riding or pl.get("riding")):
+			if to_local(pl.global_position).distance_to(q.pos) < q.r and (not q.riding or pl.get("riding")):
 				for id in q.ids: Snd.voice(id)
 				quips.remove_at(i)
 	# now and then a little flock takes off from a nearby tree
@@ -276,7 +276,7 @@ func _process(dt: float) -> void:
 		flock_t = rng.randf_range(18.0, 35.0)
 		if flock and near and eye.distance_to(amb_center) < amb_radius:
 			var p := AudioStreamPlayer3D.new(); p.stream = flock; p.volume_db = -8; p.unit_size = 6.0
-			add_child(p); p.global_position = eye + Vector3(rng.randf_range(-10, 10), rng.randf_range(2, 5), rng.randf_range(-10, 10))
+			add_child(p); p.global_position = to_global(eye) + Vector3(rng.randf_range(-10, 10), rng.randf_range(2, 5), rng.randf_range(-10, 10))
 			p.play(); p.finished.connect(p.queue_free)
 	# garden ambience fades with distance from the gardens
 	if amb:
