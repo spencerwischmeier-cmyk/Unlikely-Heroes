@@ -117,7 +117,8 @@ func _route_all() -> void:
 func _route(n: Node) -> void:
 	if not is_instance_valid(n) or Snd.is_ancestor_of(n): return
 	if n is AudioStreamPlayer3D:
-		if (n as AudioStreamPlayer3D).bus == &"Master": (n as AudioStreamPlayer3D).bus = &"World"
+		var b := (n as AudioStreamPlayer3D).bus
+		if b == &"Master" or b == &"SFX": (n as AudioStreamPlayer3D).bus = &"World"   # World feeds SFX: same slider, plus the area reverb
 	elif n is AudioStreamPlayer:
 		var p := n as AudioStreamPlayer
 		if p.bus != &"Master": return
