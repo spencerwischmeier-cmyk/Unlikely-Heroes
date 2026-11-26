@@ -49,6 +49,22 @@ func add_loop(n: String, pos: Vector3, db: float, unit: float, maxd: float) -> v
 	p.autoplay = true
 	if p.is_inside_tree(): p.play.call_deferred()
 
+## A gentle idle: bob and turn a little (vendor bots behind the stalls).
+func bob(n: Node3D) -> void:
+	var m: Node3D = n.get_child(0)
+	var y := m.position.y
+	var tw := m.create_tween().set_loops()
+	tw.tween_property(m, "position:y", y + 0.06, 0.8 + randf() * 0.4).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(m, "position:y", y, 0.8 + randf() * 0.4).set_trans(Tween.TRANS_SINE)
+	var r := n.rotation.y
+	var tw2 := n.create_tween().set_loops()
+	tw2.tween_interval(randf_range(1.0, 3.0))
+	tw2.tween_property(n, "rotation:y", r + 0.5, 0.6).set_trans(Tween.TRANS_SINE)
+	tw2.tween_interval(randf_range(1.5, 3.0))
+	tw2.tween_property(n, "rotation:y", r - 0.4, 0.8).set_trans(Tween.TRANS_SINE)
+	tw2.tween_interval(randf_range(1.0, 2.0))
+	tw2.tween_property(n, "rotation:y", r, 0.6).set_trans(Tween.TRANS_SINE)
+
 func spin(n: Node3D, speed: float) -> void:
 	spinners.append([n, speed])
 

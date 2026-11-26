@@ -332,6 +332,23 @@ static func shop(r: Rect2, face: String, wall: String, title: String, sub: Strin
 	if title != "":
 		neon(title, Vector3(door if absf(door) < along / 2 - 2.5 else 0.0, 2.95, 0.18), 0.0, c, 0.0055, f)
 		if sub != "": text(sub, Vector3(door if absf(door) < along / 2 - 2.5 else 0.0, 2.6, 0.24), 0.0, Color(1, 0.95, 0.85), 0.0032, f)
+	# a blade sign sticking out at the end of the facade, with a little icon
+	var bl := frame(Vector3(along / 2 - 0.5, 3.6, 0.0), 0.0, f)
+	bx(Vector3(0, 0.45, 0.35), Vector3(0.08, 0.08, 0.8), "dark", false, bl)
+	var plate := bx(Vector3(0, 0.0, 0.62), Vector3(0.08, 0.8, 0.8), stripes[1], false, bl)
+	bx(Vector3(0, 0.0, 0.62), Vector3(0.1, 0.86, 0.86), "brass", false, bl).scale = Vector3(0.9, 1, 1)
+	plate.position.x = 0.02
+	for sx in [-1, 1]:
+		var ic := frame(Vector3(sx * 0.07, 0, 0.62), sx * PI / 2, bl)
+		if title.begins_with("THE RUSTY"):
+			sphere(Vector3(0, -0.05, 0), 0.2, "cream", ic); cy(Vector3(0.22, 0.0, 0), 0.03, 0.06, 0.25, "cream", 6, ic).rotation.z = -0.9
+			sphere(Vector3(0, 0.17, 0), 0.06, "brass", ic)
+		elif title.begins_with("LUCKY"):
+			var nut := cy(Vector3.ZERO, 0.26, 0.26, 0.08, "brass", 6, ic); nut.rotation.x = PI / 2
+			var hole := cy(Vector3(0, 0, 0.03), 0.11, 0.11, 0.06, "dark", 12, ic); hole.rotation.x = PI / 2
+		else:
+			bx(Vector3(0, 0, 0), Vector3(0.36, 0.44, 0.06), "e04a3a", false, ic)
+			bx(Vector3(0, 0.05, 0.04), Vector3(0.24, 0.06, 0.02), "glow_8cff6a", false, ic)
 	# the awning: solid striped slats (a step up to the roof) with a scalloped valance and a row of bulbs
 	if canopy.y > canopy.x:
 		var w := canopy.y - canopy.x
@@ -559,6 +576,8 @@ static func stall(pos: Vector3, yaw: float, title: String, stripes: Array, goods
 		sphere(p + Vector3(0.14, 0.08, 0.05), 0.09, goods[(i + 1) % goods.size()], f)
 	for i in 5:
 		bx(Vector3(-1.2 + i * 0.6, 1.5, -0.5), Vector3(0.4, 0.35, 0.25), goods[i % goods.size()], false, f)
+	var bot := model("res://models/docks/dock_bot.glb", Vector3(-0.6, 0, -0.15), PI, 1.25, 0.0, false, 0.85, f)
+	if bot: life.bob(bot)
 	var lt := sphere(Vector3(1.1, 2.15, 0.9), 0.12, "lantern", f)
 	cy(Vector3(1.1, 2.35, 0.9), 0.01, 0.01, 0.3, "cable", 4, f)
 	light(Vector3(0, 2.0, 1.0), Color(1, 0.75, 0.45), 1.2, 5.0, f)

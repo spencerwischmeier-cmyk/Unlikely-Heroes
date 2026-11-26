@@ -460,10 +460,11 @@ func _build_plaza() -> void:
 	checkpoints.append({ pos = Vector3(0, 0.1, 40), r = 3.0 })
 	# the bank: a sealed vault (needs the Pulse Key from Dustvein Gulch); the Pink Slip Page is inside
 	var bx := 16.0; var bz := 41.0
+	var bank_wall := M.surface("paint", Color(0.93, 0.88, 0.76), 0.1, 0.7, 0.6, true)
 	for w in [[bx, bz - 4, 10, 0.5], [bx, bz + 4, 10, 0.5], [bx + 5, bz, 0.5, 8], [bx - 5, bz - 2.75, 0.5, 2.5], [bx - 5, bz + 2.75, 0.5, 2.5]]:
-		box(Vector3(w[0], 2.25, w[1]), Vector3(w[2], 4.5, w[3]), M.std(Color(0.88, 0.84, 0.74), 0.2, 0.5))
+		box(Vector3(w[0], 2.25, w[1]), Vector3(w[2], 4.5, w[3]), bank_wall)
 	box(Vector3(bx, 4.75, bz), Vector3(10.6, 0.5, 8.6), mat_brass)
-	box(Vector3(bx - 5, 3.75, bz), Vector3(0.5, 1.5, 3.0), M.std(Color(0.88, 0.84, 0.74), 0.2, 0.5))
+	box(Vector3(bx - 5, 3.75, bz), Vector3(0.5, 1.5, 3.0), bank_wall)
 	prop("bank_vault_door", Vector3(bx - 5.1, 0, bz), -PI / 2)
 	hint_sign("SKYHARBOR SAVINGS & LOAN. VAULT SEALED: PULSE KEY REQUIRED", Vector3(bx - 6.5, 0, bz - 3.4), -PI / 2)
 	# bridges: west to the Terrace, east to the docks, north to the causeway
