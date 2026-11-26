@@ -77,8 +77,30 @@ func _ready() -> void:
 	Game.bot_killed.connect(_on_bot_killed)
 	Game.zone_entered.connect(_on_zone_entered)
 	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0)
+	get_tree().node_added.connect(_on_node_added)
+	for t in [0.5, 3.0]: get_tree().create_timer(t).timeout.connect(_route_all)
 	if args.has("--audio-test"): _self_test.call_deferred()
 	for a in args: if a.begins_with("--audio-mix="): _mix_capture.call_deferred(a.substr(12))
+
+## Other systems' own players (area sounds, props) default to the Master bus, which skips the volume
+## sliders, the reverb and the dialogue duck: route them into the mix.
+func _on_node_added(n: Node) -> void:
+	if n is AudioStreamPlayer3D or n is AudioStreamPlayer:
+		_route.call_deferred(n)
+
+func _route_all() -> void:
+	for n in get_tree().root.find_children("*", "AudioStreamPlayer3D", true, false): _route(n)
+	for n in get_tree().root.find_children("*", "AudioStreamPlayer", true, false): _route(n)
+
+func _route(n: Node) -> void:
+	if not is_instance_valid(n) or Snd.is_ancestor_of(n): return
+	if n is AudioStreamPlayer3D:
+		if (n as AudioStreamPlayer3D).bus == &"Master": (n as AudioStreamPlayer3D).bus = &"World"
+	elif n is AudioStreamPlayer:
+		var p := n as AudioStreamPlayer
+		if p.bus != &"Master": return
+		var path := p.stream.resource_path if p.stream else ""
+		p.bus = &"Voice" if path.contains("/voice/") else &"Amb"
 
 func _level_ok() -> bool:
 	return Game.level != null and is_instance_valid(Game.level) and "islands" in Game.level \
@@ -236,9 +258,19 @@ func _update_beds(dt: float) -> void:
 		var lin: float = bed_w[a] * (1.0 - quiet)
 		if lin > 0.01:
 			if not p.playing: p.play(randf() * maxf(p.stream.get_length() - 1.0, 0.0))
-			p.volume_db = AREAS[a].amb_db + linear_to_db(lin)
+			p.volume_db = AREAS[a].amb_db + linear_to_db(lin) - (5.0 if _area_has_own_bed(a) else 0.0)
 		elif p.playing:
 			p.stop()
+
+## area agents' own ambience loops (audio/sfx/<area>_*): ours sits under them
+const OWN_BEDS := {"gardens": ["gardens_ambience"], "docks": ["docks_harbor_amb"], "terrace": ["terrace_market"],
+	"plaza": ["plaza_crowd"], "yard": ["yard_smelter", "yard_conveyor"]}
+var own_bed := {}
+func _area_has_own_bed(a: String) -> bool:
+	if not own_bed.has(a):
+		own_bed[a] = false
+		for n in OWN_BEDS.get(a, []): if Snd.streams.has(n): own_bed[a] = true
+	return own_bed[a]
 
 func _update_oneshots(dt: float) -> void:
 	shot_t -= dt
@@ -329,7 +361,7 @@ func _update_emitters() -> void:
 		for t in Game.level.find_children("*wind_turbine*", "", true, false):
 			if found >= 8: break
 			_attach(t, "turbine_loop", -12.0, 4.0, 34.0, Vector3(0, 6.0, 0)); found += 1
-	if not fountain_done and Game.level.islands.has("plaza") and (Game.level.islands.plaza as Rect2).has_point(Vector2(0, 28)):
+	if not fountain_done and not Snd.streams.has("plaza_fountain") and Game.level.islands.has("plaza") and (Game.level.islands.plaza as Rect2).has_point(Vector2(0, 28)):
 		fountain_done = true
 		var f := Node3D.new(); f.name = "FountainSnd"; Game.level.add_child(f); f.global_position = Vector3(0, 1.2, 28)
 		_attach(f, "fountain", -6.0, 3.0, 26.0)
