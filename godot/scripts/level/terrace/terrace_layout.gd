@@ -426,7 +426,6 @@ static func _wash_nook(L: Node3D) -> void:
 	var y := -3.2
 	for x in [-60.4, -51.6]: TK.post(Vector3(x, y, 59.4), 3.0, 0.08, "wood_dark")
 	TK.laundry(Vector3(-60.4, y + 2.9, 59.4), Vector3(-51.6, y + 2.9, 59.4), 0.5)
-	TK.laundry(Vector3(-60.0, -1.3, 55.0), Vector3(-52.0, -1.3, 55.0), 0.3)
 	TK.add(TK.cyl_mesh(14), TK.mat("wood_dark"), TK.tf(Vector3(-59.4, y + 0.45, 56.4), Vector3(1.4, 0.9, 1.4)))   # wash tub
 	TK.add(TK.cyl_mesh(14), TK.mat("cyan"), TK.tf(Vector3(-59.4, y + 0.86, 56.4), Vector3(1.2, 0.04, 1.2)), false)
 	TK.solid(Vector3(-59.4, y + 0.45, 56.4), Vector3(1.3, 0.9, 1.3))
@@ -499,7 +498,7 @@ static func _spots(L: Node3D) -> void:
 	]
 	var spots := {
 		bazaar = [Vector3(-65, 0.1, 47), PI], tea = [Vector3(-66, 3.7, 28), -2.6], loft = [Vector3(-84.5, 7.9, 12), -PI / 2],
-		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-49.5, 4.1, -20.5), 0.15], perch = [Vector3(-93, 12.7, 23.5), PI], roof = [Vector3(-78.6, 7.9, 15.6), PI / 2],
+		market = [Vector3(-25, 0.1, 33), -PI / 2], fans = [Vector3(-49.5, 4.1, -20.5), 0.15], perch = [Vector3(-93, 12.7, 23.5), PI], roof = [Vector3(-78.6, 7.9, 15.6), PI / 2], nook = [Vector3(-56, -3.1, 56.0), 0.0],
 	}
 	for k in spots: L.debug_spots["terrace_" + k] = spots[k]
 	# debug_spots is filled after the area files run, so honour --at=terrace_* here
