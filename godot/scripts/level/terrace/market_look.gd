@@ -119,7 +119,7 @@ static func label(text: String, pos: Vector3, yaw: float, size := 64, px := 0.00
 	for s in ([1, -1] if two_sided else [1]):
 		var l := Label3D.new(); l.text = text; l.font_size = size; l.pixel_size = px
 		l.modulate = c; l.outline_size = 10; l.outline_modulate = Color(0.18, 0.08, 0.03)
-		var face := Basis(Vector3.UP, yaw) * Vector3(0, 0, 1) * s
+		var face: Vector3 = Basis(Vector3.UP, yaw) * Vector3(0, 0, 1) * float(s)
 		l.position = pos + (face * 0.05 if two_sided else Vector3.ZERO); l.rotation.y = yaw + (0.0 if s > 0 else PI); l.double_sided = false
 		l.visibility_range_end = 70.0
 		root.add_child(l)
