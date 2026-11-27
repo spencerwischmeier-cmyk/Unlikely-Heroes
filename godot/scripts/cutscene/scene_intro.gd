@@ -58,6 +58,7 @@ func run() -> void:
 	var seated: bool = vesk.has_method("hold") and vesk.has("cs_sit_drink")
 	if seated: vesk.hold("cs_sit_drink", 2.6, 0.0)
 	_vesk = vesk
+	_dodger = dodger
 	var vh: Node3D = C.head_of(vesk)            # his eyes, for focus pulls and the light rig
 	var dh: Node3D = dodger
 	C.score("open", 0.0)
@@ -142,7 +143,7 @@ func run() -> void:
 	dodger.look_target = vesk
 	dodger.act("spin")
 	# Dodger, close: Vesk soft over his shoulder
-	C.cut(seat + Vector3(-0.42, 1.32, 0.42), dspot); C.lens(40.0)   # over Vesk's shoulder
+	C.cut(seat + Vector3(-0.8, 1.55, 0.9), dspot); C.lens(50.0)   # over Vesk's shoulder, far enough back that his head is a soft edge, not a wall
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.9)
 	C.light(dodger, "soft", -1.0, 0.0)
 	await C.say("intro_05", 0.4)
@@ -168,10 +169,18 @@ func run() -> void:
 	await C.wait(1.6 + 1.0)
 	# 8. the customer at the gate: shot / reverse shot
 	C.mark("gate")
-	C.cut(seat + Vector3(2.5, 1.45, -2.4), seat + Vector3(0.7, 1.2, 0)); C.lens(35.0)
+	# a two-shot that sees Dodger's face: from Vesk's side of him, swung off the line between them
+	var hv: Vector3 = C.head_of(vesk).global_position
+	var to_vk := ((hv - dspot) * Vector3(1, 0, 1)).normalized()
+	var gcands := []
+	for a in [0.55, -0.55, 0.75, -0.75, 1.0, -1.0]:
+		gcands.append(dspot + to_vk.rotated(Vector3.UP, a) * 2.4 + Vector3(0, 0.35, 0))
+	var gcam: Vector3 = _clear(dspot, gcands)
+	var gmid := dspot.lerp(hv, 0.35)
+	C.cut(gcam, gmid); C.lens(32.0)
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.5)
 	C.light(dodger, "soft", 1.0, 0.0)
-	C.move(seat + Vector3(2.1, 1.4, -2.0), seat + Vector3(0.7, 1.2, 0), 6.0)
+	C.move(gcam + (gmid - gcam).normalized() * 0.4, gmid, 6.0)
 	dodger.act("hop")
 	await C.say("cs_intro_gate_1", 0.25)
 	_cu(-28.0, 1.45, 70.0, 0.0)
@@ -179,7 +188,7 @@ func run() -> void:
 	C.light(vh, "golden", -1.0)
 	vesk.mood("tired", 0.3)
 	await C.say("cs_intro_gate_2", 0.3)
-	C.cut(seat + Vector3(-0.38, 1.3, 0.4), dspot); C.lens(50.0)
+	C.cut(seat + Vector3(-0.8, 1.55, 0.9), dspot); C.lens(60.0)
 	C.focus_on(dodger, Vector3.ZERO, 0.0, 1.0)
 	C.light(dodger, "soft", -1.0, 0.0)
 	dodger.act("squint")
@@ -536,12 +545,37 @@ func _ride(bot: Node3D, n: Node3D, off: Vector3, sc: float) -> void:
 ## target or look point, clamped to how far his head can turn), so the camera always sees his face.
 func _cu(az: float, dist: float, mm: float, dy := 0.0) -> void:
 	var e: Vector3 = C.head_of(_vesk).global_position
+	az = _dodge_az(az, dist, dy, false)
 	C.cut(e + _gaze_dir(az) * dist + Vector3(0, dy, 0), e + Vector3(0, -0.08, 0)); C.lens(mm)
 
-## Slow push-in to `dist` along the same angle.
+## Slow push-in to `dist` along the same angle (shifted the same way _cu shifted it).
 func _push(az: float, dist: float, dur: float) -> void:
 	var e: Vector3 = C.head_of(_vesk).global_position
-	C.move(e + _gaze_dir(az) * dist, e + Vector3(0, -0.08, 0), dur)
+	C.move(e + _gaze_dir(az + _az_shift) * dist, e + Vector3(0, -0.08, 0), dur)
+
+var _dodger: Node3D
+var _az_shift := 0.0
+## Swings the camera angle (up to 70 degrees either way) until Dodger isn't between the lens and Vesk's
+## face, and the lens isn't inside him. `body` frames from his body facing (_cub) instead of his gaze.
+func _dodge_az(az: float, dist: float, dy: float, body: bool) -> float:
+	_az_shift = 0.0
+	if not is_instance_valid(_dodger) or not _dodger.visible: return az
+	var e: Vector3 = C.head_of(_vesk).global_position
+	var dp := _dodger.global_position
+	for off in [0.0, 12.0, -12.0, 24.0, -24.0, 36.0, -36.0, 50.0, -50.0, 70.0, -70.0]:
+		var d: Vector3 = _body_dir(az + off) if body else _gaze_dir(az + off)
+		var cam := e + d * dist + Vector3(0, dy, 0)
+		# Dodger's distance to the sight line, and to the lens
+		var seg := Geometry3D.get_closest_point_to_segment(dp, cam, e)
+		if seg.distance_to(dp) > 0.55 and cam.distance_to(dp) > 0.8:
+			_az_shift = off
+			if off != 0.0 and C.start_args.has("cut-log"): print("[cam] swung %+d deg to clear Dodger at t=%.1f" % [int(off), C.ct])
+			return az + off
+	return az
+
+func _body_dir(az: float) -> Vector3:
+	var r: float = _vesk.rotation.y
+	return Vector3(sin(r), 0, cos(r)).rotated(Vector3.UP, deg_to_rad(az))
 
 ## Candidate camera spots on a ring around `c` (radius r, height h above c), starting at angle a0.
 func _ring(c: Vector3, r: float, h: float, a0 := 0.0, n := 10) -> Array:
@@ -567,8 +601,8 @@ func _clear(target: Vector3, cands: Array) -> Vector3:
 ## Like _cu, but the angle is taken from the way his body faces, not his gaze (for shots where he looks at Dodger).
 func _cub(az: float, dist: float, mm: float, dy := 0.0) -> void:
 	var e: Vector3 = C.head_of(_vesk).global_position
-	var r: float = _vesk.rotation.y
-	var d := Vector3(sin(r), 0, cos(r)).rotated(Vector3.UP, deg_to_rad(az))
+	az = _dodge_az(az, dist, dy, true)
+	var d := _body_dir(az)
 	C.cut(e + d * dist + Vector3(0, dy, 0), e + Vector3(0, -0.08, 0)); C.lens(mm)
 
 func _gaze_dir(az: float) -> Vector3:
