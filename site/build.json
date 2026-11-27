@@ -1,0 +1,26 @@
+{
+ "built": "2026-11-27 02:28 UTC",
+ "commit": "46b4ebe",
+ "pack": "e944f939ea",
+ "files": {
+  "game.e944f939ea.00.part": 47185920,
+  "game.e944f939ea.01.part": 47185920,
+  "game.e944f939ea.02.part": 30546876,
+  "index.144x144.png": 9583,
+  "index.180x180.png": 14024,
+  "index.512x512.png": 62520,
+  "index.apple-touch-icon.png": 11944,
+  "index.audio.position.worklet.js": 2973,
+  "index.audio.worklet.js": 7298,
+  "index.html": 6416,
+  "index.icon.png": 5700,
+  "index.js": 279815,
+  "index.manifest.json": 336,
+  "index.offline.html": 971,
+  "index.png": 21443,
+  "index.service.worker.js": 5965,
+  "index.wasm": 39514754,
+  "pack.json": 220,
+  "sw.js": 553
+ }
+}

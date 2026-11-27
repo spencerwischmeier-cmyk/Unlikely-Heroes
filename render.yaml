@@ -1,15 +1,40 @@
 # Render blueprint: hosts the game as a free static site.
 # In Render: New + > Blueprint > pick this repo > Apply.
+#
+# The site is the Godot web export in site/, built by web/build.sh and committed (Render's build
+# machines don't have Godot). The old Three.js prototype is still in src/ but no longer served.
 services:
   - type: web
     name: unlikely-heroes
     runtime: static
-    buildCommand: npm ci && npm run build
-    staticPublishPath: ./dist
+    buildCommand: test -f site/index.html && test -f site/pack.json
+    staticPublishPath: ./site
     headers:
-      - path: /sw.js
+      - path: /
         name: Cache-Control
         value: no-cache
       - path: /index.html
         name: Cache-Control
         value: no-cache
+      - path: /pack.json
+        name: Cache-Control
+        value: no-cache
+      - path: /index.js
+        name: Cache-Control
+        value: no-cache
+      - path: /index.wasm
+        name: Cache-Control
+        value: no-cache
+      - path: /index.service.worker.js
+        name: Cache-Control
+        value: no-cache
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /index.manifest.json
+        name: Cache-Control
+        value: no-cache
+      # game data parts carry a content hash, so they never change once published
+      - path: /*.part
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

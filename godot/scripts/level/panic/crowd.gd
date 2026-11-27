@@ -13,6 +13,7 @@ extends Node3D
 ## - Cheap at a distance: people more than ACTIVE_D from Vesk freeze (no animation), past SHOW_D they hide.
 ## Debug: `-- --panic-map=out.png` writes the walk grids as an image and quits.
 
+const Device := preload("res://scripts/device.gd")
 const SPECIES := ["cit_frog", "cit_bird", "cit_mole", "cit_goat"]
 const BARK := {"cit_frog": "frog", "cit_bird": "bird", "cit_mole": "mole", "cit_goat": "goat"}
 const WHO := {"frog": "dockhand", "bird": "traveller", "mole": "shopkeeper", "goat": "tourist"}
@@ -76,6 +77,7 @@ func add_layer(name_: String, y: float, r: Rect2) -> int:
 
 ## a home area: `count` people of the given roles ("roam", "evac") start in it
 func add_zone(name_: String, layer: int, r: Rect2, count: int, roles := ["roam"]) -> void:
+	count = Device.scale(count)   # fewer people on phones and in browsers
 	zones.append({ name = name_, layer = layer, rect = r, count = count, roles = roles })
 
 func _ready() -> void:

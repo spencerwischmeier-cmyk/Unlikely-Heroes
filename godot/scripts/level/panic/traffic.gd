@@ -11,6 +11,7 @@ extends Node3D
 ## Sounds: panic_skycar_zoom_* when a car passes close, panic_skycar_honk_*, panic_far_crash, panic_ship_takeoff.
 
 const M := preload("res://scripts/mats.gd")
+const Device := preload("res://scripts/device.gd")
 const TOWER_SEED := 7
 const DISTRICTS := [[Vector3(205, -6, 10), 26.0], [Vector3(170, 4, -120), 20.0], [Vector3(60, -12, 175), 22.0],
 	[Vector3(-150, 0, -150), 24.0], [Vector3(-190, -10, 60), 20.0], [Vector3(110, 14, -210), 28.0],
@@ -219,6 +220,7 @@ func _build_cars() -> void:
 	car_mm.mesh = mesh
 	var per_lane := [18, 16, 14, 12, 10, 12, 12, 10]
 	var total := 0
+	for i in per_lane.size(): per_lane[i] = Device.scale(per_lane[i], 3)   # fewer sky cars on phones and in browsers
 	for i in lanes.size(): total += per_lane[i % per_lane.size()]
 	car_mm.instance_count = total
 	var mmi := MultiMeshInstance3D.new(); mmi.multimesh = car_mm; mmi.material_override = sm
