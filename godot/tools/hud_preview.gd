@@ -189,6 +189,23 @@ func _ready() -> void:
 			hud.res_t = hud.RES_TIME - 3.2
 			combat.weapon_level_up.emit("thump_lobber", 3)
 			hud.lv_t = hud.LV_TIME - 1.3
+		"boss2", "scrapped":
+			var cam := Camera3D.new(); add_child(cam); cam.current = true; cam.position = Vector3(0, 2, 0)
+			var st := MockStory.new(); add_child(st); Game.story = st
+			for q in [Vector3(-14, 0, 2), Vector3(12, 0, 6), Vector3(3, 0, 10), Vector3(-30, 0, -6), Vector3(0, 0, -12)]:
+				var b := Node3D.new(); b.set("dead", false); add_child(b); b.position = q; st.alive.append(b)
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true}
+			Game.objective_set.emit("boss", "Scrap the Crane Bot")
+			Game.boss_started.emit("CRANE BOT")
+			Game.boss_health.emit("CRANE BOT", 0.6)
+			await get_tree().create_timer(0.1).timeout
+			Game.boss_health.emit("CRANE BOT", 0.42)
+			hud.boss_intro = 2.0
+			Game.checkpoint_reached.emit(Vector3.ZERO)
+			hud.save_t = 2.0
+			if state == "scrapped":
+				Game.boss_defeated.emit("CRANE BOT")
+				hud.boss_a = 0.0; hud.boss_dead_t = 1.6
 		"lowhull":
 			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true, "seeker_hive": true}
 			combat.current = "seeker_hive"; combat.lv = 5; combat.xp = 1.0; combat.am = 0; combat.mx = 55
