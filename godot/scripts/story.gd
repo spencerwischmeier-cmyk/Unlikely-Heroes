@@ -39,6 +39,9 @@ var active := false      # a fight is running in zones[index]
 var wave := 0
 var alive: Array = []
 var wave_delay := 0.0
+var wave_age := 0.0
+var wave_size := 0
+var no_overlap := OS.get_cmdline_user_args().has("--no-wave-overlap")
 var boss: Node3D
 var relay: Node3D
 var switches: Array = []
@@ -115,13 +118,19 @@ func _physics_process(dt: float) -> void:
 	alive = alive.filter(func(b): return is_instance_valid(b) and not b.dead)
 	var kind: String = z.get("kind", "")
 	if kind == "relay" or kind == "boss" or kind == "activate": return
-	if alive.is_empty():
+	var waves: Array = z.get("waves", [])
+	wave_age += dt
+	# the next wave rolls in while the last straggler of a big wave is still up, so a fight flows
+	# instead of stopping dead between waves (never for the final clear, which needs everyone down)
+	var straggler := alive.size() == 1 and wave < waves.size() and wave_age > 4.0 and wave_size >= 3 and not no_overlap
+	if alive.is_empty() or straggler:
 		wave_delay -= dt
 		if wave_delay > 0.0: return
-		var waves: Array = z.get("waves", [])
 		if wave < waves.size():
-			_spawn_wave(z, waves[wave]); wave += 1; wave_delay = 1.2
-		else:
+			_spawn_wave(z, waves[wave]); wave += 1; wave_delay = 1.2; wave_age = 0.0
+			var w: Dictionary = waves[wave - 1]
+			wave_size = int(w.get("roller", 0)) + int(w.get("hornet", 0)) + int(w.get("crew", 0)) * 3
+		elif alive.is_empty():
 			_clear(z)
 
 ## Reaching a later `skip_to` zone early skips the skippable zones in between (alternate routes).
@@ -140,7 +149,7 @@ func _check_skip(p: Vector3) -> void:
 		return
 
 func _begin(z: Dictionary) -> void:
-	active = true; wave_delay = 0.6
+	active = true; wave_delay = 0.6; wave_age = 0.0; wave_size = 0
 	Game.zone_entered.emit(z.id)
 	var cut_lines: bool = z.get("kind", "") == "boss" and _cuts_on()
 	if not cut_lines:

@@ -94,7 +94,7 @@ func center() -> Vector3:
 
 ## Wind up and fire a rivet at Vesk (called by the crew).
 func fire() -> void:
-	if shoot_t < 0.0 and not dead: shoot_t = WIND
+	if shoot_t < 0.0 and not dead and combat.claim_aim(self, WIND + 0.1): shoot_t = WIND
 
 func _physics_process(dt: float) -> void:
 	if dead: return

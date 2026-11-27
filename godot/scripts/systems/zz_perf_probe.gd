@@ -26,12 +26,18 @@ class Mark extends Node:
 	var first := true
 	func _process(_dt: float) -> void:
 		if first: probe.t0 = Time.get_ticks_usec()
-		else: probe.script_us = Time.get_ticks_usec() - probe.t0
+		else: probe.script_us = Time.get_ticks_usec() - probe.t0; probe.t_end = Time.get_ticks_usec()
 	func _physics_process(_dt: float) -> void:
 		if first: probe.p0 = Time.get_ticks_usec()
 		else: probe.phys_us += Time.get_ticks_usec() - probe.p0
 
 var t0 := 0
+var t_end := 0          # end of this frame's _process callbacks
+var t_pre := 0          # RenderingServer.frame_pre_draw (after timers, tweens, deferred calls)
+var t_pf := 0           # SceneTree.process_frame (start of the process step)
+var post_us := 0        # timers + tweens + deferred calls + physics interpolation etc., last frame
+var gap_us := 0         # from frame_pre_draw to the next process_frame: drawing, present, physics steps
+var pre_us := 0         # process_frame awaits before the first _process callback
 var p0 := 0
 var script_us := 0      # time spent in every _process callback this frame
 var phys_us := 0        # time spent in _physics_process callbacks since the last frame
@@ -54,6 +60,8 @@ func _ready() -> void:
 	if on:
 		_add_marks()
 		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+		RenderingServer.frame_pre_draw.connect(func(): t_pre = Time.get_ticks_usec(); post_us = t_pre - t_end if t_end > 0 else 0)
+		get_tree().process_frame.connect(func(): t_pf = Time.get_ticks_usec(); gap_us = t_pf - t_pre if t_pre > 0 else 0)
 
 func _process(dt: float) -> void:
 	if bisect: _bisect(dt); return
@@ -143,7 +151,7 @@ func _spike(dt: float) -> void:
 	var ph_us := phys_us - _last_phys_us
 	if t > 3.0 and dt > 0.030:
 		var vp := get_viewport().get_viewport_rid()
-		print("[spike] t=%.2f frame %.1fms scripts %.1fms physics %.1fms (%d steps) render cpu %.1fms gpu %.1fms setup %.1fms nodes %+d draws %d" % [t, dt * 1000.0,
+		print("[spike] t=%.2f draw+physics gap %.1fms post %.1fms frame %.1fms scripts %.1fms physics %.1fms (%d steps) render cpu %.1fms gpu %.1fms setup %.1fms nodes %+d draws %d" % [t, gap_us / 1000.0, post_us / 1000.0, dt * 1000.0,
 			script_us / 1000.0, ph_us / 1000.0, pf - _last_pf,
 			RenderingServer.viewport_get_measured_render_time_cpu(vp), RenderingServer.viewport_get_measured_render_time_gpu(vp),
 			RenderingServer.get_frame_setup_time_cpu(), nodes - _last_nodes, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)])
