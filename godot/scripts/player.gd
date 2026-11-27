@@ -20,6 +20,7 @@ var melee_hit := 0.0
 var combo := 0               # wrench combo step: 1, 2, then 3 is a spinning finisher
 var combo_window := 0.0      # time left to chain the next swing
 var spin_t := 0.0            # finisher spin (adds a full turn to the model's facing)
+var twist := 0.0             # swing wind-up: the first swing comes from the right, the second backhands from the left
 var aim_point := Vector3.ZERO
 var level: Node3D
 var respawn_pos := Vector3.ZERO
@@ -275,6 +276,7 @@ func _physics_process(dt: float) -> void:
 	grounded = is_on_floor()
 	if not grounded and not _no_ledge: _ledge_assist(wish)
 	else: ledge_used = false
+	if grounded: _edge_slip(dt)
 	if grounded:
 		if not was_grounded:
 			if vy_before < -6.0: land_t = clampf(-vy_before / 20.0, 0.3, 1.0)
@@ -337,6 +339,17 @@ func _ledge_assist(wish: Vector3) -> void:
 	land_t = 0.25
 	Snd.play("land", -10)
 
+## Perched on a lip by the round bottom of his capsule (nothing under his middle): slide him off it
+## instead of letting him hover on the edge.
+func _edge_slip(dt: float) -> void:
+	var n := get_floor_normal()
+	if n.y > 0.985 or riding: return
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 0.3, 0), global_position - Vector3(0, 0.3, 0)); q.collision_mask = 1; q.exclude = [get_rid()]
+	if not get_world_3d().direct_space_state.intersect_ray(q).is_empty(): return
+	var nh := Vector3(n.x, 0, n.z)
+	if nh.length() < 0.05: return
+	global_position += nh.normalized() * 3.5 * dt
+
 func respawn() -> void:
 	global_position = respawn_pos; velocity = Vector3.ZERO; riding = false; swing_hook = null; rope.visible = false
 	dash_t = 0.0; long_jump = false; jumps = 0
@@ -372,6 +385,7 @@ func _combat(dt: float, wish: Vector3) -> void:
 		melee_cd = 0.6 if fin else 0.24; combo_window = 0.0 if fin else 0.6
 		melee_hit = 0.12 if fin else 0.09; melee_t = 0.42 if fin else 0.32
 		if fin: spin_t = 0.3
+		else: twist = 0.55 if combo == 1 else -0.65
 		anim.play("melee", 0.04); anim.seek(0.0, true); cur_anim = "melee"
 		Snd.play("melee_swing", -3 + (1.0 if fin else 0.0), 0.08, 0.0)
 		var nt: Node3D = combat.nearest_target(global_position, 4.0 if fin else 3.4)
@@ -507,7 +521,8 @@ func _face(dt: float) -> void:
 	face_yaw += angle_difference(face_yaw, target) * (1.0 - exp(-(20.0 if aiming else 13.0) * dt))
 	turn_rate = lerpf(turn_rate, angle_difference(prev, face_yaw) / maxf(dt, 1e-4), 1.0 - exp(-10.0 * dt))
 	spin_t = maxf(0.0, spin_t - dt)
-	model.rotation.y = face_yaw - TAU * (1.0 - smoothstep(0.0, 0.3, spin_t)) * (1.0 if spin_t > 0.0 else 0.0)
+	twist = lerpf(twist, 0.0, 1.0 - exp(-11.0 * dt))
+	model.rotation.y = face_yaw + twist - TAU * (1.0 - smoothstep(0.0, 0.3, spin_t)) * (1.0 if spin_t > 0.0 else 0.0)
 
 ## Holds the blaster out front with the right arm (the animation set has no gun-holding clips):
 ## the upper arm hangs slightly forward and the forearm and hand point where Vesk aims.
