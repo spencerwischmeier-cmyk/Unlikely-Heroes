@@ -71,14 +71,16 @@ func _draw_chip() -> void:
 	var col: Color = COLORS[tier]
 	var vs := chip.get_viewport_rect().size
 	var s := 1.0 + pop * 0.25
-	var r := Rect2(vs.x * 0.5 + 64, vs.y * 0.5 + 18, 128 * s, 44 * s)
+	# right of the reticle, level with it (the low-ammo / OVERHEAT tags sit under the reticle)
+	var r := Rect2(vs.x * 0.5 + 84, vs.y * 0.5 - 22 * s, 128 * s, 44 * s)
 	HD.panel(chip, r, col, 12, 0.12, a * 0.95)
 	HD.text(chip, head, Vector2(r.position.x + 14, r.position.y + 33 * s), "x%d" % shown, int(28 * s), col.lerp(Color.WHITE, 0.35), 0, 6, a)
 	HD.text(chip, body, Vector2(r.end.x - 12, r.position.y + 28 * s), "CHAIN", int(14 * s), Color(0.9, 0.92, 1.0), 2, 4, a)
 	if on:
 		# time left before the chain breaks
 		var w := (r.size.x - 24) * clampf(left / CHAIN_T, 0.0, 1.0)
-		chip.draw_rect(Rect2(r.position.x + 12, r.end.y - 7, w, 3), Color(col, 0.9 * a))
+		chip.draw_rect(Rect2(r.position.x + 12, r.end.y - 9, r.size.x - 24, 5), Color(0, 0, 0, 0.35 * a))
+		chip.draw_rect(Rect2(r.position.x + 12, r.end.y - 9, w, 5), Color(col, 0.95 * a))
 	if bonus_t > 0.0:
 		var ba := clampf(bonus_t / 0.4, 0.0, 1.0)
 		var y := r.end.y + 24 - (1.6 - bonus_t) * 14.0
