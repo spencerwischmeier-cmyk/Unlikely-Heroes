@@ -350,6 +350,7 @@ func _guess_icon(title: String) -> String:
 	return "star"
 
 # ---------------------------------------------------------------- per frame
+var _redraw_test := OS.get_cmdline_user_args().has("--hud-redraw-test")
 func _process(dt: float) -> void:
 	t += dt
 	hit_t -= dt
@@ -404,8 +405,9 @@ func _process(dt: float) -> void:
 	for sh in boss_shards:
 		sh.t += dt; sh.v.y += 600.0 * dt
 	boss_shards = boss_shards.filter(func(sh): return sh.t < 0.8)
-	threats.queue_redraw(); saved.queue_redraw()
 	res_t = maxf(0.0, res_t - dt)
+	if _redraw_test and Engine.get_process_frames() % 30 != 0: return   # --hud-redraw-test: perf probe only
+	threats.queue_redraw(); saved.queue_redraw()
 	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs, waves, waypoint, lvup, results]: c.queue_redraw()
 	for c in toast_box.get_children(): c.queue_redraw()
 	strip_t = maxf(0.0, strip_t - dt)
