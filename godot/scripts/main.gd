@@ -49,7 +49,9 @@ func _ready() -> void:
 	Snd.loop("city_loop", true, -20)
 	cam.yaw = level.start_yaw
 	player.face_yaw = level.start_yaw
-	if not OS.get_cmdline_user_args().has("--no-capture"):
+	# browsers only allow pointer lock from a click or key press (asking at boot threw an exception);
+	# there the first click in the game captures the mouse (camera_rig.gd)
+	if not OS.get_cmdline_user_args().has("--no-capture") and not OS.has_feature("web"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _build_environment() -> void:
