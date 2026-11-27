@@ -73,6 +73,14 @@ var prev_wpn := ""
 var shown_wpn := ""
 var waves := Control.new()
 var waypoint := Control.new()
+var threats := Control.new()
+var saved := Control.new()
+var save_t := 0.0                      # checkpoint "saved" chip
+var boss_intro := 0.0                  # time since the boss bar appeared (name types in, bar fills)
+var boss_dead_t := 0.0                 # SCRAPPED! stamp after a boss goes down
+var boss_dead_name := ""
+var boss_shards: Array = []            # { p, v, t } chips knocked off the bar
+var boss_phase2 := false
 var lvup := Control.new()
 var lv_t := 0.0                        # level-up card: counts down from LV_TIME
 var lv_id := ""
@@ -140,6 +148,9 @@ func _ready() -> void:
 	waypoint.draw.connect(_draw_waypoint); root.add_child(waypoint)
 	_place(lvup, Vector2(1, 1), Rect2(-574, -392, 560, 170), _draw_lvup)
 	_place(results, Vector2(0, 0), Rect2(0, 292, 420, 280), _draw_results)
+	threats.set_anchors_preset(Control.PRESET_FULL_RECT); threats.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	threats.draw.connect(_draw_threats); root.add_child(threats)
+	_place(saved, Vector2(0, 1), Rect2(14, -96, 340, 80), _draw_saved)
 	_place(cross, Vector2(0.5, 0.5), Rect2(-160, -160, 320, 320), _draw_cross)
 	_place(prompt, Vector2(0.5, 0.5), Rect2(-320, 70, 640, 60), _draw_prompt)
 	_place(banner, Vector2(0.5, 0), Rect2(-640, 286, 1280, 150), _draw_banner)
@@ -156,7 +167,8 @@ func _ready() -> void:
 	Snd.line_started.connect(_subtitle)
 	Game.boss_started.connect(func(n): set_boss(n, 1.0))
 	Game.boss_health.connect(func(n, f): set_boss(n, f))
-	Game.boss_defeated.connect(func(_n): set_boss("", 0.0))
+	Game.boss_defeated.connect(func(n): boss_dead_name = n if boss_name == "" else boss_name; boss_dead_t = 2.2; set_boss("", 0.0))
+	Game.checkpoint_reached.connect(func(_p): save_t = 2.6)
 	Game.objective_set.connect(func(_id, text): _set_objective(text))
 	Game.collectible_found.connect(func(_k, _id): _refresh_collect(); collect_pop = 1.0; wallet_idle = 0.0)
 	Game.player_hurt.connect(func(_h): vig_a = 0.75)
@@ -316,8 +328,15 @@ func show_banner(title: String, sub := "", color := GOLD) -> void:
 func set_boss(name_: String, frac: float) -> void:
 	if name_ == "":
 		boss_name = ""; return
-	if name_ != boss_name: boss_trail = frac; boss_frac = frac
-	if frac < boss_frac - 0.0001: boss_hit = 1.0
+	if name_ != boss_name:
+		boss_trail = frac; boss_frac = frac; boss_intro = 0.0; boss_phase2 = frac <= 0.5; boss_shards.clear()
+	if frac < boss_frac - 0.0001:
+		boss_hit = 1.0
+		# knock a few chips off the end of the bar
+		for k in 4: boss_shards.append({ f = frac, v = Vector2(randf_range(-60, 160), randf_range(-220, -80)), t = 0.0, s = randf_range(3.0, 6.0) })
+	if frac <= 0.5 and not boss_phase2 and boss_name == name_:
+		boss_phase2 = true
+		show_banner("PHASE 2", "%s is furious!" % name_.capitalize(), BOSS_COL)
 	boss_name = name_; boss_frac = frac
 
 func _guess_icon(title: String) -> String:
@@ -379,6 +398,13 @@ func _process(dt: float) -> void:
 	if shown_wpn == "" and combat: shown_wpn = combat.current
 	_update_waypoint(dt)
 	lv_t = maxf(0.0, lv_t - dt)
+	save_t = maxf(0.0, save_t - dt)
+	boss_intro += dt
+	boss_dead_t = maxf(0.0, boss_dead_t - dt)
+	for sh in boss_shards:
+		sh.t += dt; sh.v.y += 600.0 * dt
+	boss_shards = boss_shards.filter(func(sh): return sh.t < 0.8)
+	threats.queue_redraw(); saved.queue_redraw()
 	res_t = maxf(0.0, res_t - dt)
 	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs, waves, waypoint, lvup, results]: c.queue_redraw()
 	for c in toast_box.get_children(): c.queue_redraw()
@@ -647,36 +673,146 @@ func _draw_weapon() -> void:
 	ci.draw_set_transform(Vector2.ZERO)
 
 # ---------------------------------------------------------------- draw: boss
+## Boss bar: a red plate with the boss badge. The name types in and the bar fills up when the fight
+## starts; the bar has moving hazard stripes, a white damage trail, chips that fly off on hits, a
+## notch at half health where phase 2 starts (then an ENRAGED tag), and a SCRAPPED! stamp at the end.
 func _draw_boss() -> void:
-	if boss_a <= 0.0: return
 	var ci := boss
+	if boss_dead_t > 0.0 and boss_a < 1.0:
+		_draw_boss_scrapped(); return
+	if boss_a <= 0.0: return
 	var a := boss_a
 	var drop := (1.0 - a) * -40.0
 	var shake := Vector2(sin(t * 70.0), cos(t * 53.0)) * 4.0 * boss_hit
 	ci.draw_set_transform(Vector2(0, drop) + shake)
 	var r := Rect2(50, 12, 620, 62)
-	HD.panel(ci, r, BOSS_COL, 14, 0.0, a, Color(0.3, 0.09, 0.1, 0.92), Color(0.1, 0.03, 0.05, 0.92))
-	HD.text(ci, head, Vector2(98, 37), boss_name if boss_name != "" else "", 21, Color(1, 0.85, 0.8), 0, 5, a)
-	HD.text(ci, body, Vector2(650, 37), "%d%%" % int(ceil(boss_frac * 100.0)), 15, Color(1, 0.75, 0.7), 2, 4, a)
+	var rage := boss_frac <= 0.5
+	var pulse := 0.5 + 0.5 * sin(t * (9.0 if boss_frac <= 0.25 else 5.0))
+	HD.panel(ci, r, BOSS_COL.lerp(Color(1, 0.6, 0.3), pulse * 0.5) if rage else BOSS_COL, 14, 0.0, a, Color(0.3, 0.09, 0.1, 0.92), Color(0.1, 0.03, 0.05, 0.92))
+	var nm := boss_name
+	var shown := clampi(int(boss_intro * 28.0), 0, nm.length())
+	HD.text(ci, head, Vector2(98, 37), nm.substr(0, shown), 21, Color(1, 0.85, 0.8), 0, 5, a)
+	var fill_in := clampf((boss_intro - 0.2) / 0.8, 0.0, 1.0)
+	var f := boss_frac * fill_in
+	if rage:
+		var tag := "ENRAGED"
+		var tw := head.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+		var tr := Rect2(590 - tw - 20, 20, tw + 18, 20)
+		HD.panel(ci, tr, Color(1, 0.6, 0.3), 6, 0.12, a, Color(0.6, 0.12, 0.08, 0.95), Color(0.35, 0.05, 0.03, 0.95))
+		HD.text(ci, head, Vector2(tr.get_center().x, tr.position.y + 16), tag, 14, Color(1, 0.9, 0.7).lerp(Color.WHITE, pulse * 0.5), 1, 3, a)
+	HD.text(ci, body, Vector2(650, 37), "%d%%" % int(ceil(f * 100.0)), 15, Color(1, 0.75, 0.7), 2, 4, a)
 	var br := Rect2(98, 45, 552, 18)
 	ci.draw_colored_polygon(HD.rrect(br.grow(2.5), 9), Color(HD.INK, a))
 	ci.draw_colored_polygon(HD.rrect(br, 8), Color(0.12, 0.04, 0.06, a))
-	if boss_trail > boss_frac:
+	if boss_trail > f and fill_in >= 1.0:
 		ci.draw_colored_polygon(HD.rrect(Rect2(br.position, Vector2(br.size.x * boss_trail, br.size.y)), 8), Color(1, 0.92, 0.75, 0.85 * a))
-	if boss_frac > 0.005:
-		var fr := Rect2(br.position, Vector2(maxf(16.0, br.size.x * boss_frac), br.size.y))
+	if f > 0.005:
+		var fr := Rect2(br.position, Vector2(maxf(16.0, br.size.x * f), br.size.y))
 		var pts := HD.rrect(fr, 8)
 		var cols := PackedColorArray()
-		for p in pts: cols.append(Color(1, 0.55, 0.4, a).lerp(Color(0.85, 0.12, 0.1, a), clampf((p.y - fr.position.y) / fr.size.y, 0, 1)))
+		var hi := Color(1, 0.55, 0.4, a) if not rage else Color(1, 0.7, 0.3, a)
+		for p in pts: cols.append(hi.lerp(Color(0.85, 0.12, 0.1, a), clampf((p.y - fr.position.y) / fr.size.y, 0, 1)))
 		ci.draw_polygon(pts, cols)
+		# moving hazard stripes inside the fill
+		var off := fposmod(t * (60.0 if rage else 30.0), 22.0)
+		var x := fr.position.x - 22.0 + off
+		while x < fr.end.x - 4.0:
+			var x0 := maxf(x, fr.position.x + 4.0)
+			var x1 := minf(x + 9.0, fr.end.x - 4.0)
+			if x1 > x0 + 1.0:
+				ci.draw_colored_polygon(PackedVector2Array([Vector2(x0 + 4, fr.position.y + 3), Vector2(x1 + 4, fr.position.y + 3), Vector2(x1 - 2, fr.end.y - 3), Vector2(x0 - 2, fr.end.y - 3)]), Color(1, 1, 1, 0.1 * a))
+			x += 22.0
 		ci.draw_line(fr.position + Vector2(8, 4), Vector2(fr.end.x - 8, fr.position.y + 4), Color(1, 1, 1, 0.45 * a), 2.0, true)
 		if boss_hit > 0.0: ci.draw_colored_polygon(pts, Color(1, 1, 1, boss_hit * 0.6 * a))
+		if boss_frac <= 0.25: ci.draw_colored_polygon(pts, Color(1, 0.9, 0.6, 0.18 * pulse * a))
 	for i in range(1, 10):
-		var x := br.position.x + br.size.x * i / 10.0
-		ci.draw_line(Vector2(x, br.position.y + 2), Vector2(x, br.end.y - 2), Color(0, 0, 0, 0.35 * a), 2.0)
+		if i == 5: continue
+		var xx := br.position.x + br.size.x * i / 10.0
+		ci.draw_line(Vector2(xx, br.position.y + 2), Vector2(xx, br.end.y - 2), Color(0, 0, 0, 0.35 * a), 2.0)
+	# phase notch at half health
+	var nx := br.position.x + br.size.x * 0.5
+	ci.draw_line(Vector2(nx, br.position.y - 4), Vector2(nx, br.end.y + 4), Color(HD.INK, a), 5.0)
+	ci.draw_line(Vector2(nx, br.position.y - 2), Vector2(nx, br.end.y + 2), Color(1, 0.85, 0.5, a), 2.0)
+	var dm := Vector2(nx, br.end.y + 9)
+	ci.draw_colored_polygon(PackedVector2Array([dm + Vector2(0, -8), dm + Vector2(8, 0), dm + Vector2(0, 8), dm + Vector2(-8, 0)]), Color(HD.INK, a))
+	ci.draw_colored_polygon(PackedVector2Array([dm + Vector2(0, -6), dm + Vector2(6, 0), dm + Vector2(0, 6), dm + Vector2(-6, 0)]), Color(1, 0.6, 0.3, a) if rage else Color(0.55, 0.3, 0.3, a))
+	# flying chips
+	for sh in boss_shards:
+		var sp: Vector2 = Vector2(br.position.x + br.size.x * float(sh.f), br.get_center().y) + sh.v * float(sh.t)
+		var sa := (1.0 - float(sh.t) / 0.8) * a
+		var ss: float = sh.s
+		ci.draw_colored_polygon(PackedVector2Array([sp + Vector2(-ss, -ss * 0.4).rotated(sh.t * 9.0), sp + Vector2(ss, -ss * 0.6).rotated(sh.t * 9.0), sp + Vector2(ss * 0.3, ss).rotated(sh.t * 9.0)]), Color(1, 0.5, 0.35, sa))
 	HD.badge(ci, Vector2(56, 42), 36, BOSS_COL, a)
-	HD.icon(ci, "boss", Vector2(56, 44), 21, BOSS_COL, a)
+	HD.icon(ci, "boss", Vector2(56, 44), 21, BOSS_COL.lerp(Color(1, 0.7, 0.3), pulse * 0.6) if rage else BOSS_COL, a)
 	ci.draw_set_transform(Vector2.ZERO)
+
+func _draw_boss_scrapped() -> void:
+	var ci := boss
+	var el := 2.2 - boss_dead_t
+	var a := clampf(boss_dead_t / 0.4, 0.0, 1.0)
+	var q := clampf(el / 0.25, 0.0, 1.0)
+	var r := Rect2(50, 12, 620, 62)
+	HD.panel(ci, r, GOLD, 14, 0.0, a, Color(0.45, 0.32, 0.08, 0.95), Color(0.2, 0.12, 0.03, 0.95))
+	HD.badge(ci, Vector2(56, 42), 36, GOLD, a)
+	HD.icon(ci, "star", Vector2(56, 42), 20, GOLD, a, el * 2.0)
+	HD.text(ci, body, Vector2(98, 36), boss_dead_name, 17, Color(1, 0.9, 0.7), 0, 4, a)
+	var ss := 1.0 + 1.5 * (1.0 - q) * (1.0 - q)
+	var c := Vector2(380, 62)
+	ci.draw_set_transform(c * (1.0 - ss), -0.06, Vector2(ss, ss))
+	HD.text(ci, head, c, "SCRAPPED!", 34, GOLD.lightened(0.2), 1, 8, a * q)
+	ci.draw_set_transform(Vector2.ZERO)
+
+# ---------------------------------------------------------------- off-screen threats
+## Bots in the current fight that are off-screen show as small red chevrons on an oval round the
+## crosshair, pointing at them (closer = bigger and brighter). Up to eight.
+func _draw_threats() -> void:
+	var st = Game.story if "story" in Game else null
+	var cam := get_viewport().get_camera_3d()
+	if st == null or not is_instance_valid(st) or not "alive" in st or cam == null or player == null: return
+	var vs := threats.size
+	var ctr := vs * 0.5
+	var shown := 0
+	for b in st.alive:
+		if shown >= 8: break
+		if not is_instance_valid(b) or not (b is Node3D) or b.get("dead") == true: continue
+		var wp: Vector3 = (b as Node3D).global_position + Vector3(0, 1, 0)
+		var dist := player.global_position.distance_to(wp)
+		if dist > 40.0: continue
+		var behind := cam.is_position_behind(wp)
+		var sp := cam.unproject_position(wp)
+		if not behind and Rect2(Vector2.ZERO, vs).grow(-40).has_point(sp): continue
+		var loc: Vector3 = cam.global_transform.basis.inverse() * (wp - cam.global_position)
+		var d := Vector2(loc.x, -loc.y)
+		if behind: d = Vector2(loc.x, maxf(-loc.y, 0.2 * absf(loc.x)))
+		if d.length() < 0.001: continue
+		d = d.normalized()
+		var rx := vs.x * 0.2
+		var ry := vs.y * 0.24
+		var k := 1.0 / sqrt((d.x * d.x) / (rx * rx) + (d.y * d.y) / (ry * ry))
+		var p := ctr + d * k
+		var near := clampf(1.0 - dist / 40.0, 0.0, 1.0)
+		var sz := 11.0 + 7.0 * near
+		var al := 0.45 + 0.5 * near
+		var sd := Vector2(-d.y, d.x)
+		var pts := PackedVector2Array([p + d * sz, p - d * sz * 0.4 + sd * sz, p - d * sz * 0.1, p - d * sz * 0.4 - sd * sz])
+		var po := PackedVector2Array([p + d * (sz + 3), p - d * (sz * 0.4 + 2) + sd * (sz + 3), p - d * (sz * 0.1 - 1), p - d * (sz * 0.4 + 2) - sd * (sz + 3)])
+		threats.draw_colored_polygon(po, Color(HD.INK, al))
+		threats.draw_colored_polygon(pts, Color(1, 0.3, 0.22, al).lerp(Color(1, 0.75, 0.5, al), 0.3 * (0.5 + 0.5 * sin(t * 8.0))))
+		shown += 1
+
+# ---------------------------------------------------------------- checkpoint chip
+func _draw_saved() -> void:
+	if save_t <= 0.0: return
+	var ci := saved
+	var a := clampf(save_t / 0.4, 0.0, 1.0) * clampf((2.6 - save_t) / 0.2, 0.0, 1.0)
+	var x := (1.0 - clampf((2.6 - save_t) / 0.3, 0.0, 1.0)) * -60.0
+	var r := Rect2(54 + x, 22, 236, 40)
+	HD.panel(ci, r, Color(0.45, 0.95, 1.0), 12, 0.12, a)
+	HD.text(ci, head, Vector2(r.position.x + 30, r.position.y + 28), "CHECKPOINT", 19, Color(0.85, 0.97, 1.0), 0, 5, a)
+	HD.text(ci, body, Vector2(r.end.x - 14, r.position.y + 27), "SAVED", 14, Color(0.6, 1, 0.65), 2, 4, a)
+	var bc := Vector2(34 + x, 42)
+	HD.badge(ci, bc, 20, Color(0.45, 0.95, 1.0), a)
+	HD.icon(ci, "sprocket", bc, 13, Color(0.45, 0.95, 1.0), a, t * 4.0)
 
 # ---------------------------------------------------------------- draw: crosshair + prompt
 ## Each weapon has its own reticle (tinted with its colour): Arc Lancer a tight cross with a heat arc,
