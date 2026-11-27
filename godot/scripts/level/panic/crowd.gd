@@ -317,8 +317,12 @@ func _physics_process(dt: float) -> void:
 				for k in z.count: _spawn(z, z.roles[k % z.roles.size()])
 			for a in OS.get_cmdline_user_args():
 				if a.begins_with("--panic-map="): _dump_map(a.substr(12))
-		return
-	if paused: return
+
+## People move once per drawn frame, not per physics step: they have no bodies, and at 120 Hz physics a
+## slow frame ran the whole crowd (and its O(n^2) separation) four or five times over.
+func _process(dt: float) -> void:
+	if not ready_ or paused: return
+	dt = minf(dt, 0.05)
 	t += dt
 	var pl: Node3D = Game.player
 	var pp: Vector3 = pl.global_position if pl else Vector3(1e6, 0, 1e6)
@@ -335,7 +339,7 @@ func _physics_process(dt: float) -> void:
 	_barks(dt, pp)
 
 ## Level of detail for people: past SHADOW_D they stop casting shadows, past NEAR_D their animation
-## updates every third frame (staggered, with the time saved up so they don't slow down).
+## updates every other frame (staggered, with the time saved up so they don't slow down).
 const NEAR_D := 24.0
 const SHADOW_D := 36.0
 func _lod(p: Dictionary, d: float, dt: float) -> void:
@@ -352,7 +356,7 @@ func _lod(p: Dictionary, d: float, dt: float) -> void:
 		p.adt = 0.0
 	if not near and p.active:
 		p.adt += dt
-		if Engine.get_physics_frames() % 3 == p.phase:
+		if Engine.get_process_frames() % 2 == p.phase % 2:
 			p.ap.advance(p.adt); p.adt = 0.0
 
 func _step(p: Dictionary, dt: float, pp: Vector3) -> void:
