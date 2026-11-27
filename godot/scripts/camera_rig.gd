@@ -29,8 +29,10 @@ func _ready() -> void:
 	arm.add_child(camera)
 	arm.spring_length = 4.3
 	arm.margin = 0.25
-	var sh := SphereShape3D.new(); sh.radius = 0.25
-	arm.shape = sh
+	# the arm itself never collides: update() casts for walls and eases the length (in fast, out slow),
+	# so the camera doesn't snap in and out behind railings and posts
+	arm.collision_mask = 0
+	_probe.radius = 0.16
 	camera.fov = 58
 	camera.current = true
 	camera.far = 2500
@@ -57,6 +59,26 @@ func pivot() -> Vector3:
 	return global_position
 
 ## Jump straight to the target (after a respawn or teleport) instead of sweeping across the level.
+var _probe := SphereShape3D.new()
+var _boom_len := 4.3
+var _boom_q := PhysicsShapeQueryParameters3D.new()
+## Camera distance after walls: pulls in at once when something is in the way, eases back out over
+## about half a second once it clears.
+func _boom(dt: float, want: float) -> float:
+	var from := pitch_node.global_position
+	var dir := pitch_node.global_basis.z
+	_boom_q.shape = _probe
+	_boom_q.transform = Transform3D(Basis(), from)
+	_boom_q.motion = dir * want
+	_boom_q.collision_mask = 1
+	if target: _boom_q.exclude = [target.get_rid()]
+	var r := get_world_3d().direct_space_state.cast_motion(_boom_q)
+	var free := want * (r[0] if r.size() > 0 else 1.0)
+	free = maxf(free - 0.1, 0.3)
+	if free < _boom_len: _boom_len = free
+	else: _boom_len = lerpf(_boom_len, free, 1.0 - exp(-4.0 * dt))
+	return _boom_len
+
 func snap(p: Node3D) -> void:
 	cam_y = p.global_position.y
 	var right := Vector3(-cos(yaw), 0, sin(yaw))
@@ -113,7 +135,7 @@ func update(dt: float, p) -> void:
 	global_position = g
 	rotation = Vector3(0, yaw + PI, 0)
 	pitch_node.rotation = Vector3(pitch, 0, 0)
-	arm.spring_length = 4.3 - maxf(0.0, pitch) * 2.4
+	arm.spring_length = _boom(dt, 4.3 - maxf(0.0, pitch) * 2.4)
 	var speed_fov := clampf((hv.length() - 9.0) / 8.0, 0.0, 1.0) * 8.0
 	fov_kick = lerpf(fov_kick, speed_fov, 1.0 - exp(-4.0 * dt))
 	camera.fov = 58.0 + fov_kick
