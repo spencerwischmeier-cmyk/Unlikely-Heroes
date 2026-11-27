@@ -404,15 +404,66 @@ func _process(dt: float) -> void:
 	for sh in boss_shards:
 		sh.t += dt; sh.v.y += 600.0 * dt
 	boss_shards = boss_shards.filter(func(sh): return sh.t < 0.8)
-	threats.queue_redraw(); saved.queue_redraw()
 	res_t = maxf(0.0, res_t - dt)
-	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs, waves, waypoint, lvup, results]: c.queue_redraw()
-	for c in toast_box.get_children(): c.queue_redraw()
 	strip_t = maxf(0.0, strip_t - dt)
-	wstrip.queue_redraw()
+	_redraw()
 	for f in flyers: f.t += dt
 	flyers = flyers.filter(func(f): return f.t < f.delay + 0.55)
 	flyer_layer.queue_redraw()
+
+# ---------- redraw scheduling ----------
+## Redrawing every HUD panel every frame cost about 5 ms a frame on the PC (52 -> 70 fps at the plaza
+## when skipped). Panels that follow the world or animate all the time (reticle, waypoint, threats,
+## banners, subtitles, toasts, flyers) still redraw every frame. The rest redraw on any frame where the
+## HUD's state (or the bits of Vesk / the blaster / the fight they show) changes, while their own
+## animations run, and otherwise a few times a second as a safety net. `--hud-redraw-all` restores the old way.
+const _TICKERS := ["t", "sub_t", "obj_t", "nut_gain_t", "hit_t", "gear_rot", "boss_intro", "banner_t", "wallet_idle", "_sig_props", "_last_sig", "_hot_t", "_dbg_prev"]
+var _sig_props: Array = []
+var _last_sig := 0
+var _hot_t := 0.0
+var _dbg_prev := {}
+var _sig_log := OS.get_cmdline_user_args().has("--hud-sig-log")
+var _redraw_all := OS.get_cmdline_user_args().has("--hud-redraw-all")
+
+func _state_sig() -> int:
+	if _sig_props.is_empty():
+		for pr in get_property_list():
+			if pr.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and not (pr.name in _TICKERS) and pr.type != TYPE_OBJECT and pr.type != TYPE_CALLABLE:
+				_sig_props.append(pr.name)
+	var vals := []
+	for n in _sig_props: vals.append(get(n))
+	if player:
+		var dcd = player.get("dash_cd")
+		vals.append([player.get("jumps"), dcd != null and float(dcd) > 0.0, player.velocity.y < 0.0, player.is_on_floor(), Input.is_action_pressed("jump")])
+	if combat:
+		var id: String = combat.current
+		vals.append([id, combat.overheated, combat.ammo(id) if combat.uses_ammo(id) else 0, combat.level(id), combat.xp_frac(id)])
+	var st = Game.story
+	if st and st.get("active"): vals.append([st.get("index"), st.get("wave"), st.get("alive").size()])
+	return hash(vals)
+
+func _redraw() -> void:
+	var fast: Array = [threats, cross, boss, banner, subs, waypoint, lvup, results, wstrip]
+	for c in fast: c.queue_redraw()
+	for c in toast_box.get_children(): c.queue_redraw()
+	var slow: Array = [vitals, objective, wallet, collect, weapon, waves, saved, prompt]
+	var sig := _state_sig()
+	if sig != _last_sig:
+		_last_sig = sig; _hot_t = 0.25
+		if _sig_log:
+			var ch := []
+			for n in _sig_props:
+				var h := hash(get(n))
+				if _dbg_prev.get(n, h) != h: ch.append(n)
+				_dbg_prev[n] = h
+			print("[hud] state changed f=", Engine.get_process_frames(), " ", ch)
+	_hot_t -= get_process_delta_time()
+	# their own running animations: objective slide/glow, sprocket count-up, low-hull pulse, heat cooling
+	var animating := _redraw_all or _hot_t > 0.0 or obj_t < 3.0 or nut_gain_t > -0.4 or hull <= 2 \
+		or (combat != null and float(combat.heat) > 0.0)
+	var f := Engine.get_process_frames()
+	for i in slow.size():
+		if animating or (f + i) % 6 == 0: slow[i].queue_redraw()
 
 func _pad() -> bool:
 	return player != null and player.get("using_pad") == true

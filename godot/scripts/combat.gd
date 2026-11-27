@@ -525,7 +525,9 @@ func claim_aim(who: Node3D, dur: float) -> bool:
 	if aimers.has(id): return true
 	if not aim_wait.has(id): aim_wait[id] = now
 	var waited: float = (now - aim_wait[id]) / 1000.0
-	var ok := aimers.size() < MAX_AIMERS and now - last_shot_ms > int(SHOT_GAP * 1000.0)
+	# low on hull: one shooter at a time, so a bad moment can be fought out of instead of piling on
+	var cap := 1 if hull <= 2 else MAX_AIMERS
+	var ok := aimers.size() < cap and now - last_shot_ms > int(SHOT_GAP * 1000.0)
 	var ends := now + int(dur * 1000.0)
 	for k in aimers: if absi(aimers[k] - ends) < int(SHOT_GAP * 1000.0): ok = false   # would fire on the same beat
 	if ok and waited < OFFSCREEN_WAIT:
