@@ -46,6 +46,7 @@ func _add_marks() -> void:
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a == "--perf-bisect": bisect = true; on = true; secs = 9999.0
+		if a == "--spike-bisect": bisect = true; spike_mode = true; on = true; secs = 9999.0
 		if a == "--perf-probe": on = true
 		elif a.begins_with("--perf-probe="): on = true; secs = float(a.substr(13))
 	set_process(on)
@@ -137,6 +138,9 @@ func _ms() -> float:
 	phys_us = 0
 	return v
 
+## --spike-bisect: the same, but each group is judged by the worst frame in a 6.6 s window (two
+## periods of a 3.2 s job), so a script that only costs something every few seconds shows up
+var spike_mode := false
 var sub := 0          # 0 = measuring with the group on, 1 = with it off
 var on_ms := 0.0
 var win: Array = []
@@ -147,9 +151,10 @@ func _bisect(dt: float) -> void:
 		_collect(); ci = 0; sub = 0; phase_t = 0.0; samp = 0.0; samp_n = 0
 		return
 	if phase_t > 0.4: win.append(_ms())   # skip the switch-over frames
-	if phase_t < 2.5: return
+	if phase_t < (6.6 if spike_mode else 2.5): return
 	win.sort()
 	var avg: float = win[win.size() / 2] if not win.is_empty() else 0.0   # median: ignores the periodic spikes
+	if spike_mode: avg = win.back() if not win.is_empty() else 0.0
 	win.clear(); phase_t = 0.0
 	var g: Array = cands[ci]
 	if sub == 0:

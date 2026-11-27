@@ -578,12 +578,13 @@ func _physics_process(dt: float) -> void:
 		s.life -= dt
 		var seg := to - from
 		var k := clampf((hero_c - from).dot(seg) / maxf(seg.length_squared(), 1e-6), 0, 1)
-		var hit_hero := player and (from + seg * k).distance_to(hero_c) < 0.6
+		var miss_d := (from + seg * k).distance_to(hero_c) if player else INF
+		var hit_hero := miss_d < 0.6
 		var q := PhysicsRayQueryParameters3D.create(from, to); q.collision_mask = 1
 		var hw := space.intersect_ray(q)
 		# a dash through a shot is a close call: it flies past, time slows for a breath and the dash
 		# is ready again, so a good read chains straight into the counter
-		if hit_hero and player.since_dash < 0.3:
+		if miss_d < 1.4 and player.since_dash < 0.4:
 			hit_hero = false
 			if not s.get("dodged", false):
 				s.dodged = true

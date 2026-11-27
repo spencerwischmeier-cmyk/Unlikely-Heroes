@@ -202,7 +202,7 @@ func _autoplay(dt: float) -> void:
 	var k := 1.0 - exp(-7.0 * dt)
 	Game.cam.yaw += angle_difference(Game.cam.yaw, atan2(to.x, to.z)) * k
 	Game.cam.pitch = lerpf(Game.cam.pitch, asin(clampf(to.y, -1, 1)), k)
-	_ap_hold("fire", true)
+	_ap_hold("fire", not flags.has("dodge"))
 	ap_strafe_t -= dt
 	if ap_strafe_t <= 0.0: ap_strafe_t = randf_range(1.2, 2.6); ap_strafe = -ap_strafe
 	_ap_hold("move_left", ap_strafe < 0.0); _ap_hold("move_right", ap_strafe > 0.0)
@@ -210,6 +210,12 @@ func _autoplay(dt: float) -> void:
 	_ap_hold("move_back", roller_close and best.get("state") != "fuse")
 	ap_dash_cd -= dt
 	_ap_hold("dash", false)
+	# --et-dodge: dash just as an enemy shot is about to arrive (exercises the close-call dodge)
+	if flags.has("dodge"):
+		threat = false
+		for sh in Game.combat.shots:
+			var to_me: Vector3 = pp + Vector3(0, 0.9, 0) - sh.node.global_position
+			if to_me.length() < 3.0 and to_me.dot(sh.vel) > 0.0: threat = true
 	if threat and ap_dash_cd <= 0.0: Input.action_press("dash"); ap_dash_cd = 0.7
 	_ap_hold("melee", best.has_method("_launch") and bd < 2.3 and best.get("state") == "chase")
 
