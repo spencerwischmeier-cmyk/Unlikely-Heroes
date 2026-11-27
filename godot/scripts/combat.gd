@@ -514,6 +514,29 @@ func enemy_shot(from: Vector3, to: Vector3) -> void:
 	shots.append({ node = mi, vel = dir * 17.0, life = 3.0 })
 	Snd.at("hornet_shot", from, -4, 0.1, 0.02)
 
+## Sends an enemy shot back, homing on the nearest bot in front of Vesk (or straight back).
+var parry_mat: StandardMaterial3D
+func _parry(s: Dictionary, at: Vector3) -> void:
+	s.reflected = true; s.life = 2.0
+	var back: Vector3 = -(s.vel as Vector3).normalized()
+	var best: Node3D = null
+	var bd := 30.0
+	for t in get_tree().get_nodes_in_group("targets"):
+		if t.dead or t.is_in_group("crate"): continue
+		var d: Vector3 = (t.center() as Vector3) - at
+		var l := d.length()
+		if l < bd and d.normalized().dot(back) > 0.3: bd = l; best = t
+	var dir := ((best.center() as Vector3) - at).normalized() if best else back
+	s.vel = dir * 30.0
+	if parry_mat == null: parry_mat = _glow(Color(1.0, 0.85, 0.3), 9.0)
+	s.node.material_override = parry_mat
+	s.node.global_basis = Basis(Quaternion(Vector3.UP, dir)).scaled(Vector3(1.4, 0.9, 1.4))
+	FX.sparks(at, Color(1, 0.95, 0.6), 16, 6); FX.ring(at, Color(1, 0.85, 0.4), 0.4)
+	FX.stop(0.06); FX.shake(0.4)
+	Snd.play("melee_hit", 0, 0.05, 0.0, 1.25)
+	float_text(at + Vector3(0, 0.5, 0), "PARRY", Color(1.0, 0.85, 0.35), 40)
+	Game.shot_parried.emit()
+
 func _close_call() -> void:
 	FX.slow(0.3, 0.35)
 	player.dash_cd = 0.0
@@ -620,6 +643,25 @@ func _physics_process(dt: float) -> void:
 		var hit_hero := miss_d < 0.6
 		var q := PhysicsRayQueryParameters3D.create(from, to); q.collision_mask = 1
 		var hw := space.intersect_ray(q)
+		if s.get("reflected", false):
+			# a batted-back shot: it flies at the bots instead
+			var struck: Node = null
+			for t in get_tree().get_nodes_in_group("targets"):
+				if not t.dead and (t.center() as Vector3).distance_to(to) < (2.2 if t.is_in_group("boss") else 1.1): struck = t; break
+			if struck or hw or s.life <= 0.0:
+				if struck:
+					struck.damage(4.0 if struck.is_in_group("boss") else 3.0, to, s.vel.normalized())
+					damage_number(to, 4.0 if struck.is_in_group("boss") else 3.0, struck.dead)
+					FX.sparks(to, Color(1, 0.9, 0.5), 18, 6); Snd.at("melee_hit", to, 0)
+				else: FX.sparks(to, Color(1, 0.8, 0.4), 8, 4)
+				s.node.queue_free(); shots.remove_at(i); continue
+			s.node.global_position = to
+			continue
+		# a wrench swing in front of Vesk bats the shot back at the nearest bot (a parry)
+		if player and player.melee_t > 0.14 and to.distance_to(hero_c) < 2.1 \
+				and (to - hero_c).normalized().dot(Vector3(sin(player.face_yaw), 0, cos(player.face_yaw))) > -0.1:
+			_parry(s, to)
+			continue
 		# a dash through a shot is a close call: it flies past, time slows for a breath and the dash
 		# is ready again, so a good read chains straight into the counter
 		if miss_d < 1.4 and player.since_dash < 0.4:
