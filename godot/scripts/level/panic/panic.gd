@@ -56,7 +56,7 @@ func _plan_crowd() -> void:
 	for h in by_h: layer_of[h] = crowd.add_layer("h%.1f" % h, h, by_h[h])
 	var lay := func(island: String) -> int: return layer_of[snappedf(L.heights.get(island, 0.0), 0.1)]
 	# [island, roamers, evacuees]
-	var homes := [["plaza", 12, 6], ["terrace", 6, 2], ["gardens", 5, 0], ["promenade", 2, 0], ["conservatory", 2, 0],
+	var homes := [["plaza", 12, 6], ["terrace", 8, 3], ["bazaar", 0 if OS.get_cmdline_user_args().has("--no-market") else 7, 2], ["gardens", 5, 0], ["promenade", 2, 0], ["conservatory", 2, 0],
 		["pier_a", 3, 9], ["pier_b", 2, 0], ["pier_c", 2, 0], ["pier_d", 3, 0], ["berth", 7, 0], ["causeway", 2, 0],
 		["tier2", 1, 0], ["tier3", 1, 0], ["tier4", 1, 0], ["plaza_park", 2, 0]]
 	for h in homes:

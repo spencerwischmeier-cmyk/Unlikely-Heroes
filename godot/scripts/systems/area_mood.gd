@@ -51,6 +51,30 @@ const MOODS := {
 		"ssr": false,                   # the stage is big; SSR there cost more than it showed
 		"fill_energy": 0.16,
 	},
+	# the Market Terrace and the Spice Bazaar: warm late-afternoon light through drifting smoke, rich colour,
+	# deeper contact shadows under the stalls and awnings (scripts/level/terrace/market_look.gd dresses it)
+	"market": {
+		"rect": Rect2(-111, 20, 54, 35),
+		"fade": 9.0,
+		"off_flag": "--no-market",
+		"env": {
+			"tonemap_exposure": 0.86,
+			"adjustment_contrast": 1.14,
+			"adjustment_saturation": 1.14,
+			"volumetric_fog_density": 0.0028,
+			"volumetric_fog_albedo": Color(1.0, 0.88, 0.74),
+			"volumetric_fog_anisotropy": 0.76,
+			"fog_light_color": Color(0.98, 0.76, 0.56),
+			"fog_sun_scatter": 0.32,
+			"ssao_intensity": 2.6,
+			"ssil_intensity": 1.3,
+			"glow_intensity": 1.0,
+			"glow_bloom": 0.14,
+		},
+		"sun_color": Color(1.0, 0.8, 0.58),
+		"ssr": false,
+		"fill_energy": 0.24,
+	},
 	# the Roof Gardens: warm, bright golden hour; more haze so the sun cuts shafts through the canopies, a soft
 	# bloom on the lanterns and glow-pods, richer greens (scripts/level/gardens/gardens_look.gd dresses it)
 	"gardens": {
@@ -83,12 +107,15 @@ var base := {}            # parameter -> value from main.gd
 var base_sun := Color.WHITE
 var base_fill := 0.35
 var weight := {}          # mood -> current 0..1
+var disabled := {}        # moods turned off by their off_flag
 var off := false
 var last_p := Vector3.INF
 
 func _ready() -> void:
 	off = OS.get_cmdline_user_args().has("--no-mood")
 	for k in MOODS: weight[k] = 0.0
+	for k in MOODS.keys():   # a mood can be switched off with its area's own flag (before/after shots)
+		if MOODS[k].has("off_flag") and OS.get_cmdline_user_args().has(MOODS[k].off_flag): disabled[k] = true
 
 func _grab() -> bool:
 	if env and sun: return true
@@ -122,6 +149,7 @@ func _process(dt: float) -> void:
 		var dx := maxf(maxf(r.position.x - q.x, q.x - r.end.x), 0.0)
 		var dz := maxf(maxf(r.position.y - q.y, q.y - r.end.y), 0.0)
 		var target := 1.0 - clampf(Vector2(dx, dz).length() / float(md.fade), 0.0, 1.0)
+		if disabled.has(k): target = 0.0
 		weight[k] = target if snap else move_toward(weight[k], target, dt * 0.6)
 	_apply()
 
