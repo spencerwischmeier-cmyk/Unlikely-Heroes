@@ -214,6 +214,7 @@ func _physics_process(dt: float) -> void:
 		var dir := wish.normalized() if wish.length() > 0.8 else Vector3(sin(face_yaw), 0, cos(face_yaw))
 		velocity.x = dir.x * 18.0; velocity.z = dir.z * 18.0
 		dash_t = 0.16; dash_cd = 0.6; since_dash = 0.0; Snd.play("dash", -3)
+		if combat: combat.invuln = maxf(combat.invuln, 0.25)   # a dash slips through shots and blasts
 
 	var hs := Vector2(velocity.x, velocity.z).length()
 	if dash_t > 0.0:

@@ -208,11 +208,40 @@ func _switched(z: Dictionary, sw: Node3D) -> void:
 
 func _spawn_in(r: Rect2, y: float, w: Dictionary) -> void:
 	var n := 0
+	var base := randf() * TAU
 	for kind in ["roller", "hornet", "crew"]:
 		for i in int(w.get(kind, 0)):
-			var a := TAU * float(n) / 5.0 + randf() * 0.6
-			var c := r.get_center() + Vector2(cos(a), sin(a)) * minf(r.size.x, r.size.y) * 0.3
-			alive.append(Game.main.spawn_bot(kind, Vector3(c.x, y, c.y), r)); n += 1
+			alive.append(Game.main.spawn_bot(kind, _spawn_spot(r, y, base + TAU * float(n) / 5.0), r)); n += 1
+
+## A drop-in spot in the zone: never right on top of Vesk, and where possible somewhere he is facing,
+## so bots arrive in view instead of behind him.
+func _spawn_spot(r: Rect2, y: float, a: float) -> Vector3:
+	var rad := minf(r.size.x, r.size.y) * 0.3
+	var c := r.get_center() + Vector2(cos(a), sin(a)) * rad
+	var p: Node3D = Game.player
+	if p == null or Game.cam == null: return Vector3(c.x, y, c.y)
+	var pp := Vector2(p.global_position.x, p.global_position.z)
+	var fwd: Vector3 = Game.cam.forward()
+	var best := c
+	var best_s := -INF
+	for k in 8:
+		var aa := a + randf_range(-0.9, 0.9) if k > 0 else a
+		var rr := rad * (randf_range(0.6, 1.2) if k > 0 else 1.0)
+		var q := r.get_center() + Vector2(cos(aa), sin(aa)) * rr
+		q = q.clamp(r.position + Vector2(1.5, 1.5), r.end - Vector2(1.5, 1.5))
+		var d := q - pp
+		var dist := d.length()
+		var s := -absf(dist - 11.0) * 0.3 + (d.normalized().dot(Vector2(fwd.x, fwd.z)) * 2.0 if dist > 0.1 else -9.0)
+		if dist < 6.0: s -= 10.0
+		if k > 0 and not _floor_at(Vector3(q.x, y, q.y)): continue
+		if s > best_s: best_s = s; best = q
+	return Vector3(best.x, y, best.y)
+
+## True when there is open floor at about height `p.y` under `p` (not a roof, a pit or a wall).
+func _floor_at(p: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(p + Vector3(0, 7.0, 0), p - Vector3(0, 1.5, 0)); q.collision_mask = 1
+	var hit := Game.main.get_world_3d().direct_space_state.intersect_ray(q)
+	return not hit.is_empty() and absf(hit.position.y - p.y) < 0.8 and hit.normal.y > 0.8
 
 func _spawn_wave(z: Dictionary, w: Dictionary) -> void:
 	_spawn_in(z.rect, z.get("y", 0.0), w)

@@ -498,9 +498,15 @@ func hurt_player(n: int, from = null, force := false) -> void:
 		var k: Vector3 = (player.global_position - from); k.y = 0
 		player.velocity += k.normalized() * 6.0
 	if hull <= 0:
-		hull = MAX_HULL
-		hull_changed.emit(hull, true)
-		if player: player.respawn()
+		hull = 0
+		if Game.player_downed.get_connections().is_empty(): revive()
+		else: Game.player_downed.emit()
+
+## Back on your feet at the last checkpoint with a full hull.
+func revive() -> void:
+	hull = MAX_HULL; invuln = 1.5
+	hull_changed.emit(hull, true)
+	if player: player.respawn()
 
 func heal(n: int) -> void:
 	hull = mini(MAX_HULL, hull + n); hull_changed.emit(hull, true)
