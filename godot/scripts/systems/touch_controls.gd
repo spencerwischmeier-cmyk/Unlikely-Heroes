@@ -35,6 +35,8 @@ var buttons := {}
 var touch_btn := {}                 # touch index -> button id
 var wheel_open := false
 var last_size := Vector2.ZERO
+var subs_ctl: Control
+var subs_base := Vector2.ZERO
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -71,6 +73,26 @@ func _enable() -> void:
 		for ev in InputMap.action_get_events(a):
 			if ev is InputEventMouseButton: InputMap.action_erase_event(a, ev)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_make_room_in_hud()
+
+## the HUD's weapon panel sits where the right thumb goes: move it to the bottom middle
+func _make_room_in_hud() -> void:
+	var hud = Game.hud
+	if hud == null: return
+	for n in ["weapon", "wstrip"]:
+		var c = hud.get(n) if n in hud else null
+		if not (c is Control): continue
+		var w: float = c.offset_right - c.offset_left
+		c.anchor_left = 0.5; c.anchor_right = 0.5
+		c.offset_left = -w * 0.5 + 20.0; c.offset_right = w * 0.5 + 20.0
+	var subs = hud.get("subs") if "subs" in hud else null
+	if subs is Control: subs_ctl = subs; subs_base = Vector2(subs.offset_top, subs.offset_bottom)
+
+## during play, subtitles sit higher to clear the weapon panel; in cutscenes they go back to the bottom
+func _place_subs() -> void:
+	if subs_ctl == null or not is_instance_valid(subs_ctl): return
+	var lift := 150.0 if _mode() == "play" else 0.0
+	subs_ctl.offset_top = subs_base.x - lift; subs_ctl.offset_bottom = subs_base.y - lift
 
 ## which buttons show right now
 func _mode() -> String:
@@ -207,6 +229,7 @@ func _process(dt: float) -> void:
 	if not enabled: return
 	var mode := _mode()
 	pad.visible = mode != "off"
+	_place_subs()
 	if mode != "play" and (stick_id != -1 or not look_ids.is_empty()):
 		stick_id = -1; stick_vec = Vector2.ZERO; _apply_stick(); look_ids.clear()
 	# buttons that vanished (a menu opened) let go of their actions
