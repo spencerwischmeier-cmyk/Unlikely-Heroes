@@ -24,6 +24,8 @@ var player: CharacterBody3D
 var nuts := 0
 var hull := MAX_HULL
 var invuln := 0.0
+var nut_chain := 0
+var nut_last := 0
 
 const ORDER := ["arc_lancer", "scatter_bloom", "thump_lobber", "seeker_hive"]
 const WEAPONS := {
@@ -597,7 +599,12 @@ func _physics_process(dt: float) -> void:
 			p.node.rotation += p.spin * dt
 			if d < 0.75:
 				match p.kind:
-					"nut": Game.add_nuts(10); Snd.play("nut_pickup", -8, 0.15, 0.04)
+					"nut":
+						# a run of sprockets climbs in pitch, so scooping up a big pile sounds like it
+						var now := Time.get_ticks_msec()
+						nut_chain = nut_chain + 1 if now - nut_last < 450 else 0
+						nut_last = now
+						Game.add_nuts(10); Snd.play("nut_pickup", -8, 0.03, 0.03, 1.0 + minf(nut_chain, 12) * 0.045)
 					"ammo": _collect_ammo(); Snd.play("cell_pickup", -5, 0.1); Snd.play("weapon_switch", -10)
 					_: heal(1); Snd.play("cell_pickup", -3)
 				p.node.queue_free(); pickups.remove_at(i); continue

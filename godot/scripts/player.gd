@@ -20,6 +20,7 @@ var melee_hit := 0.0
 var combo := 0               # wrench combo step: 1, 2, then 3 is a spinning finisher
 var combo_window := 0.0      # time left to chain the next swing
 var spin_t := 0.0            # finisher spin (adds a full turn to the model's facing)
+var flip_t := 0.0           # forward flip on the double jump
 var twist := 0.0             # swing wind-up: the first swing comes from the right, the second backhands from the left
 var aim_point := Vector3.ZERO
 var level: Node3D
@@ -264,6 +265,7 @@ func _physics_process(dt: float) -> void:
 				velocity.y = JUMP; long_jump = false; Snd.play("jump", -4)
 		elif jumps < 2:
 			jump_buf = 0.0; velocity.y = BOOST; jumps = 2; jet_t = 0.35; jump_cut = true; long_jump = false
+			if Vector2(velocity.x, velocity.z).length() > 3.0 and aim_hold <= 0.0: flip_t = 0.42
 			Snd.play("double_jump", -3)
 	jump_age += dt
 	if not jump_held and not jump_cut and jump_age > 0.09 and not grounded and velocity.y > 0.0 and jumps == 1 and not long_jump:
@@ -623,7 +625,13 @@ func _animate(dt: float) -> void:
 	hurt_t = maxf(0.0, hurt_t - dt)
 	var fl := sin(clampf(hurt_t / 0.35, 0.0, 1.0) * PI) * 0.35
 	for m in fur_mats: (m as StandardMaterial3D).emission_energy_multiplier = (hurt_t / 0.35) * 1.6
-	body.rotation = Vector3(-fl, 0, lean)
+	flip_t = maxf(0.0, flip_t - dt)
+	if grounded or riding or swing_hook: flip_t = 0.0
+	var flip := TAU * smoothstep(0.42, 0.0, flip_t) if flip_t > 0.0 else 0.0
+	body.rotation = Vector3(-fl + flip, 0, lean)
+	# the flip turns about Vesk's middle, not his feet
+	var piv := Vector3(0, 0.85, 0)
+	body.position = piv - Basis.from_euler(body.rotation) * piv if flip != 0.0 else Vector3.ZERO
 	body.scale = Vector3(1 + land_t * 0.08, 1 - land_t * 0.1, 1 + land_t * 0.08)
 	_update_weapon(dt)
 	_update_jets(dt)

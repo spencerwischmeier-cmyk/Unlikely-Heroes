@@ -130,11 +130,11 @@ func _free_player(arr: Array, n: String):
 		return o
 	return oldest
 
-func play(n: String, db := 0.0, pitch_var := 0.06, gap := 0.03) -> void:
+func play(n: String, db := 0.0, pitch_var := 0.06, gap := 0.03, pitch_base := 1.0) -> void:
 	if n == "step_metal" and _dir(): n = "step_" + director.surface()
 	if n == "land" and _dir(): director.landed(db)
 	if not _ok(n, gap): return
-	var pitch := 1.0 + randf_range(-pitch_var, pitch_var)
+	var pitch := pitch_base + randf_range(-pitch_var, pitch_var)
 	if pitch_var > 0.0: db += randf_range(-1.0, 0.4)
 	_play2(pick(n), db, pitch, n)
 	_layers(n, db, pitch, null)
