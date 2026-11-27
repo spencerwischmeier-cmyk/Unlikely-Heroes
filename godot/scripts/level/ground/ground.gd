@@ -22,7 +22,9 @@ extends Node3D
 const M := preload("res://scripts/mats.gd")
 const DIR := "res://textures/ground/"
 const LAYERS := ["deck", "junk", "cobble", "terracotta", "flagstone", "planks", "tread", "concrete", "side", "sandstone"]
-enum { DECK, JUNK, COBBLE, TERRA, FLAG, PLANKS, TREAD, CONCRETE, CURB, SAND }
+enum { DECK, JUNK, COBBLE, TERRA, FLAG, PLANKS, TREAD, CONCRETE, CURB, SAND, TIMBER }
+## style names (TIMBER reuses the planks texture with a warm lacquered-timber tint)
+const STYLE_NAMES := ["deck", "junk", "cobble", "terracotta", "flagstone", "planks", "tread", "concrete", "side", "sandstone", "timber"]
 const NONE_RECT := Vector4(-100000.0, -100000.0, 100000.0, 100000.0)
 
 var L: Node3D
@@ -49,14 +51,28 @@ func setup(level: Node3D) -> void:
 		_make_arrays()
 		_make_mats()
 		_reskin(L)
+		if not args.has("--no-thresholds") and not OLD_FLOORS: _thresholds()
 	if stats:
 		print("[ground] floors=%d by style %s" % [floors.size(), counts])
+		var names: Array = L.islands.keys()
+		for n in names: print("[ground] island %s %s y=%.1f %s" % [n, STYLE_NAMES[name_style(n)], float(L.heights.get(n, 0.0)), L.islands[n]])
+		for i in names.size():
+			for j in range(i + 1, names.size()):
+				var a: String = names[i]; var b: String = names[j]
+				if absf(float(L.heights.get(a, 0.0)) - float(L.heights.get(b, 0.0))) > 0.3: continue
+				var ra: Rect2 = L.islands[a]; var rb: Rect2 = L.islands[b]
+				if not ra.grow(3.0).intersects(rb): continue
+				if name_style(a) == name_style(b): continue
+				print("[ground] seam %s(%s) | %s(%s) %s" % [a, STYLE_NAMES[name_style(a)], b, STYLE_NAMES[name_style(b)], ra.grow(0.6).intersection(rb.grow(0.6))])
 	set_physics_process(dress and not off)
 	for a in args:
 		if a.begins_with("--ground-tour="): tour_prefix = a.substr(14)
 		if a.begins_with("--tour-only="): tour_only = a.substr(12).split(",")
 		if a == "--tour-fast": tour_fast = true
 	set_process(tour_prefix != "")
+	for a in args:
+		if a.begins_with("--floor-top="):
+			var ft: Node = load("res://scripts/level/ground/floor_top.gd").new(); ft.prefix = a.substr(12); add_child(ft)
 
 func _physics_process(_dt: float) -> void:
 	_frames += 1
@@ -65,6 +81,35 @@ func _physics_process(_dt: float) -> void:
 	var t0 := Time.get_ticks_msec()
 	_dress()
 	if stats: print("[ground] dressed in %d ms" % (Time.get_ticks_msec() - t0))
+	if OS.get_cmdline_user_args().has("--floor-audit"): _audit()
+
+## --floor-audit: raycast the whole level on a 1 m grid and list walkable surfaces that didn't get an area
+## floor (by mesh and material), so stray stock or plain floors can be found
+func _audit() -> void:
+	var sp := get_world_3d().direct_space_state
+	var mine := {}
+	for k in mats: mine[mats[k]] = true
+	var hits := {}
+	for x in range(-140, 160):
+		for z in range(-200, 190):
+			var q := PhysicsRayQueryParameters3D.create(Vector3(x + 0.5, 60, z + 0.5), Vector3(x + 0.5, -30, z + 0.5))
+			var h := sp.intersect_ray(q)
+			if h.is_empty() or (h.normal as Vector3).y < 0.8: continue
+			var col: Node = h.collider
+			var g: Node = col.get_parent() if col else null
+			var desc := "?"
+			if g is GeometryInstance3D:
+				var m := _mat_of(g as GeometryInstance3D)
+				if m and mine.has(m): continue
+				desc = "%s mat=%s" % [g.name, (m.resource_name if m and m.resource_name != "" else (str(m.get_class()) + (" " + (m as StandardMaterial3D).albedo_color.to_html(false) if m is StandardMaterial3D else "")) if m else "none")]
+			else:
+				desc = "%s/%s" % [g.name if g else "-", col.name if col else "-"]
+			if not hits.has(desc): hits[desc] = [0, Vector3(h.position)]
+			hits[desc][0] += 1
+	var keys := hits.keys()
+	keys.sort_custom(func(a, b): return hits[a][0] > hits[b][0])
+	for k in keys.slice(0, 60):
+		print("[audit] %5d m2  %s  e.g. %s" % [hits[k][0], k, (hits[k][1] as Vector3).snapped(Vector3(0.1, 0.1, 0.1))])
 
 # ------------------------------------------------------------------ screenshot + fps tour
 ## [name, player position, facing yaw, camera pitch]
@@ -85,6 +130,11 @@ const TOUR := [
 	# Junkyard close-ups for the look pass
 	["junk_shack", Vector3(-1, 0.1, 86.5), 0.0, -0.12], ["junk_hull", Vector3(26.5, 0.1, 79.5), 0.84, -0.15],
 	["works_climb", Vector3(-34, 0.1, 104), -PI / 2, -0.05, true],
+	# where two areas' floors meet (thresholds)
+	["seam_halt", Vector3(1.5, 0.1, 88), 0.0, -0.32, true], ["seam_plaza_west", Vector3(-18, 0.1, 33), -PI / 2, -0.32, true],
+	["seam_market", Vector3(-53, 0.1, 31), -PI / 2, -0.3, true], ["seam_bazaar", Vector3(-75, 0.1, 42), -PI / 2, -0.32, true],
+	["seam_gangway", Vector3(17, 0.1, 31), PI / 2, -0.32, true], ["seam_approach", Vector3(-4, 0.1, 15), PI, -0.32, true],
+	["mast_terminal", Vector3(3, 6.7, -51), PI, -0.3, true],
 ]
 ## --tour-only=a,b,c limits the tour to those spots.
 var tour_only := PackedStringArray()
@@ -184,17 +234,26 @@ func _make_mats() -> void:
 		edge_grime = 0.35, side_tint = Color(1.0, 0.95, 0.86) })
 	mats[PLANKS] = _mat({ layer = 5.0, side_layer = 0.0, tile_m = 6.0, side_m = 7.1, side_tint = Color(0.62, 0.66, 0.7), puddles = 0.35, oil = 0.25, moss = 0.15,
 		edge_grime = 0.5, grime_col = Color(0.4, 0.36, 0.32), nrm_depth = 1.2 })
+	# the Signal Mast's steel: tread plate in a weathered copper-bronze paint, so it never reads as the grey stock deck
 	mats[TREAD] = _mat({ layer = 6.0, side_layer = 6.0, tile_m = 3.0, side_m = 3.0, puddles = 0.2, oil = 0.3, edge_grime = 0.4,
-		metal = 0.6, rough_mul = 1.1, grime_col = Color(0.4, 0.38, 0.36) })
+		metal = 0.6, rough_mul = 1.1, grime_col = Color(0.4, 0.38, 0.36) }) if OLD_FLOORS else _mat({ layer = 6.0, side_layer = 6.0, tile_m = 3.0, side_m = 3.0, puddles = 0.2, oil = 0.3, edge_grime = 0.55,
+		metal = 0.6, rough_mul = 1.1, grime_col = Color(0.32, 0.26, 0.22), tint = Color(0.86, 0.66, 0.5), side_tint = Color(0.62, 0.5, 0.42) })
 	mats[CONCRETE] = _mat({ layer = 7.0, side_layer = 7.0, tile_m = 5.0, side_m = 6.0, puddles = 0.55, oil = 0.8, moss = 0.08,
 		edge_grime = 0.55, grime_col = Color(0.42, 0.38, 0.34) })
 	mats[SAND] = _mat({ layer = 9.0, side_layer = 8.0, tile_m = 7.0, side_m = 3.2, puddles = 0.0, moss = 0.05, edge_grime = 0.45,
 		grime_col = Color(0.55, 0.45, 0.32), side_tint = Color(1.0, 0.92, 0.8) })
+	mats[TIMBER] = _mat({ layer = 5.0, side_layer = 5.0, tile_m = 4.5, side_m = 4.5, tint = Color(0.86, 0.7, 0.58), side_tint = Color(0.62, 0.42, 0.34),
+		puddles = 0.0, oil = 0.0, moss = 0.1, edge_grime = 0.45, grime_col = Color(0.36, 0.22, 0.16), nrm_depth = 1.2 })
 	mats[CURB] = _mat({ layer = 8.0, side_layer = 8.0, tile_m = 3.2, side_m = 3.2, edge_grime = 0.0, variation = 0.5,
 		tint = Color(1.0, 0.96, 0.9), side_tint = Color(1.0, 0.96, 0.9) })
 
 # ------------------------------------------------------------------ which area a floor belongs to
 static func name_style(n: String) -> int:
+	# the routes between the areas: each keeps one surface end to end (see routes/routes_look.gd), and the
+	# steel gantries read as steel, not as junkyard dirt
+	if not OLD_FLOORS:
+		var o := _route_style(n)
+		if o >= 0: return o
 	if n.begins_with("junk"): return JUNK
 	if n.begins_with("plaza") or n.begins_with("causeway"): return COBBLE
 	if n in ["bazaar", "wash_nook"]: return SAND
@@ -204,6 +263,16 @@ static func name_style(n: String) -> int:
 	if n == "depot" or n.begins_with("yard") or n == "arena": return CONCRETE
 	if n.begins_with("mast") or n == "gallery" or n == "dish_deck": return TREAD
 	return DECK
+
+## --old-floors: the floors as they were before the routes/transitions pass (for before shots)
+static var OLD_FLOORS := OS.get_cmdline_user_args().has("--old-floors")
+
+static func _route_style(n: String) -> int:
+	if n in ["junk_viaduct", "plaza_viaduct"]: return COBBLE
+	if n == "plaza_bridge_west": return TIMBER
+	if n in ["junk_halt_gantry", "junk_works_gantry"]: return TREAD
+	if n.begins_with("causeway"): return CONCRETE
+	return -1
 
 ## the island a point (x, floor top, z) belongs to: one at the same height under it, else the highest one
 ## under it, else the nearest one within 30 m. Returns [name, height] or ["", 0].
@@ -291,7 +360,7 @@ func _consider(g: GeometryInstance3D) -> void:
 		if not (g is MeshInstance3D and (g as MeshInstance3D).mesh is BoxMesh): return
 		match style:
 			COBBLE, FLAG, TERRA, SAND: g.material_override = mats[CURB]
-			PLANKS:
+			PLANKS, TIMBER:
 				if _curb_wood == null: _curb_wood = M.wood(Color(0.75, 0.55, 0.4))
 				g.material_override = _curb_wood
 			JUNK:
@@ -313,7 +382,63 @@ func _consider(g: GeometryInstance3D) -> void:
 		g.set_instance_shader_parameter("rect", NONE_RECT)
 	g.set_instance_shader_parameter("seed", fposmod(c.x * 0.137 + c.z * 0.291 + top * 0.07, 10.0))
 	floors.append({ node = g, style = style, rect = rect, top = top })
-	counts[LAYERS[style]] = counts.get(LAYERS[style], 0) + 1
+	if stats and style == DECK: print("[ground] stock floor: %s at %s size %s island %s" % [g.name, c.snapped(Vector3(0.1, 0.1, 0.1)), aabb.size.snapped(Vector3(0.1, 0.1, 0.1)), island_at(Vector3(c.x, top, c.z))])
+	counts[STYLE_NAMES[style]] = counts.get(STYLE_NAMES[style], 0) + 1
+
+## Where two areas' floors meet at the same height (a bridge deck onto an island, the bazaar onto the terrace),
+## lay a threshold across the joint so the change of surface reads as built: a stone sill between paving,
+## a timber sill where boards meet anything, a bolted steel plate where steel, concrete or scrap is involved.
+## A few centimetres proud of the floor, no collider. --no-thresholds turns them off.
+var n_sills := 0
+func _thresholds() -> void:
+	var pieces := { "stone": [], "wood": [], "steel": [] }
+	var fl: Array = []
+	for f in floors:
+		if (f.rect as Rect2).size.x > 0.5 and (f.rect as Rect2).size.y > 0.5: fl.append(f)
+	for i in fl.size():
+		for j in range(i + 1, fl.size()):
+			var a: Dictionary = fl[i]; var b: Dictionary = fl[j]
+			if a.style == b.style or absf(float(a.top) - float(b.top)) > 0.12: continue
+			var ra: Rect2 = a.rect; var rb: Rect2 = b.rect
+			var g := 0.4
+			if not ra.grow(g).intersects(rb.grow(g)): continue
+			var it := ra.grow(g).intersection(rb.grow(g))
+			var along_x := it.size.x > it.size.y
+			var thin := it.size.y if along_x else it.size.x
+			if thin > 1.3: continue   # overlapping slabs, not a joint
+			var lo := maxf(ra.position.x, rb.position.x) if along_x else maxf(ra.position.y, rb.position.y)
+			var hi := minf(ra.end.x, rb.end.x) if along_x else minf(ra.end.y, rb.end.y)
+			if hi - lo < 1.2: continue
+			var c := it.get_center()
+			var kind := "stone"
+			var ss := [a.style, b.style]
+			if PLANKS in ss or TIMBER in ss: kind = "wood"
+			elif TREAD in ss or CONCRETE in ss: kind = "steel"
+			var top := maxf(a.top, b.top)
+			var size := Vector3(hi - lo, 0.07, 0.6) if along_x else Vector3(0.6, 0.07, hi - lo)
+			var pos := Vector3((lo + hi) / 2 if along_x else c.x, top + 0.005, c.y if along_x else (lo + hi) / 2)
+			pieces[kind].append(Transform3D(Basis().scaled(size), pos))
+			if kind == "steel":   # a row of bolt heads along both edges of the plate
+				var n := int((hi - lo) / 0.5)
+				for k in n:
+					var u := lo + (k + 0.5) * (hi - lo) / n
+					for e in [-0.23, 0.23]:
+						var bp := Vector3(u, top + 0.045, c.y + e) if along_x else Vector3(c.x + e, top + 0.045, u)
+						pieces["bolt"] = pieces.get("bolt", []); pieces["bolt"].append(Transform3D(Basis().scaled(Vector3(0.07, 0.025, 0.07)), bp))
+			n_sills += 1
+			if stats: print("[ground] sill %s %s-%s at %s len %.1f" % [kind, STYLE_NAMES[a.style], STYLE_NAMES[b.style], pos.snapped(Vector3(0.1, 0.1, 0.1)), hi - lo])
+	var mats_ := { "stone": mats[CURB], "wood": M.wood(Color(0.62, 0.42, 0.3)), "steel": mats[TREAD], "bolt": M.metal(Color(0.3, 0.32, 0.35)) }
+	var bm := BoxMesh.new(); bm.size = Vector3.ONE
+	for k in pieces:
+		var xs: Array = pieces[k]
+		if xs.is_empty(): continue
+		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.mesh = bm; mm.instance_count = xs.size()
+		for i in xs.size(): mm.set_instance_transform(i, xs[i])
+		var mi := MultiMeshInstance3D.new(); mi.multimesh = mm; mi.material_override = mats_[k]; mi.name = "Thresholds_" + k
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if k == "stone" or k == "steel": mi.set_instance_shader_parameter("rect", NONE_RECT)
+		add_child(mi)
+	if stats: print("[ground] thresholds %d" % n_sills)
 
 ## A batched MultiMesh of deck blocks can span several areas (the terrace kit batches the whole market):
 ## split its instances by area into one MultiMesh per style. Returns false when they all share one style.
@@ -352,7 +477,7 @@ func _split_multimesh(g: MultiMeshInstance3D) -> bool:
 		mi.set_instance_shader_parameter("rect", NONE_RECT)
 		mi.set_instance_shader_parameter("seed", float(st) * 1.7)
 		g.get_parent().add_child(mi)
-		counts[LAYERS[st]] = counts.get(LAYERS[st], 0) + 1
+		counts[STYLE_NAMES[st]] = counts.get(STYLE_NAMES[st], 0) + 1
 	g.visible = false
 	g.queue_free()
 	return true
@@ -409,9 +534,10 @@ func _dress() -> void:
 	for fi in floors.size():
 		var f: Dictionary = floors[fi]
 		var r: Rect2 = f.rect
-		if r.size.x < 2.5 or r.size.y < 2.5 or not CLUTTER.has(f.style): continue
+		var cs: int = PLANKS if f.style == TIMBER else f.style
+		if r.size.x < 2.5 or r.size.y < 2.5 or not CLUTTER.has(cs): continue
 		var area := r.get_area()
-		var cfg: Array = CLUTTER[f.style]
+		var cfg: Array = CLUTTER[cs]
 		var want := mini(int(area * cfg[0]), 450)
 		var parent := Node3D.new(); parent.name = "GroundDress%d" % fi; add_child(parent)
 		var per := {}
