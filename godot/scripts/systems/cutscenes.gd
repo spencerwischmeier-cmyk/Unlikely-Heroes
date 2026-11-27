@@ -891,7 +891,7 @@ func _rig_update() -> void:
 	fill.global_position = c + fd.normalized() * 1.8
 
 const GRADES := {
-	"vista": {"adjustment_saturation": 1.22, "adjustment_contrast": 1.16, "tonemap_exposure": 0.9, "volumetric_fog_density": 0.0008, "glow_intensity": 0.8, "fog_aerial_perspective": 0.6},
+	"vista": {"adjustment_saturation": 1.26, "adjustment_contrast": 1.22, "tonemap_exposure": 0.88, "volumetric_fog_density": 0.0004, "glow_intensity": 0.75, "fog_aerial_perspective": 0.45, "fog_depth_begin": 220.0, "fog_depth_end": 1500.0},
 	"golden": {"adjustment_saturation": 1.24, "adjustment_contrast": 1.12, "tonemap_exposure": 0.95, "volumetric_fog_density": 0.0024, "glow_intensity": 0.9},
 	"porch": {"adjustment_saturation": 1.2, "adjustment_contrast": 1.1, "tonemap_exposure": 0.92, "volumetric_fog_density": 0.0045, "glow_intensity": 1.0},
 	"tension": {"adjustment_saturation": 0.88, "adjustment_contrast": 1.22, "tonemap_exposure": 0.82, "volumetric_fog_density": 0.005, "glow_intensity": 1.05},

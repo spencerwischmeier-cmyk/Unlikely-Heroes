@@ -212,8 +212,10 @@ func run() -> void:
 	C.mark("clock")
 	C.score("tension", 1.5)
 	C.grade("tension", 3.0)
-	C.cut(seat + Vector3(2.4, 1.3, -3.6), seat + Vector3(0.5, 0.9, 0)); C.lens(40.0)
-	C.move(seat + Vector3(2.0, 1.2, -3.0), seat + Vector3(0.5, 0.95, 0), 3.4)
+	# from his other side, so Dodger (hovering front-right of him) sits beside him instead of over his face
+	var kc: Vector3 = _clear(seat + Vector3(0.3, 0.9, 0), [seat + Vector3(-2.2, 1.3, -3.6), seat + Vector3(-1.2, 1.4, -3.9), seat + Vector3(2.4, 1.3, -3.6)])
+	C.cut(kc, seat + Vector3(0.3, 0.9, 0)); C.lens(40.0)
+	C.move(kc.lerp(seat + Vector3(0.3, 0.9, 0), 0.15), seat + Vector3(0.3, 0.95, 0), 3.4)
 	C.focus(0.0)
 	C.light(vh, "tension", 1.0)
 	C.clock_label.text = "SKYHARBOR   7:59:57 AM"
@@ -511,7 +513,17 @@ func run() -> void:
 	await C.wait(0.25)
 	C.fx(func(): Snd.at("explode_small", crash, -4); C.foley("scrap_crash", crash, 0); FX.sparks(crash + Vector3(0, 0.3, 0), Color(1, 0.7, 0.3), 18, 5.0); FX.puff(crash + Vector3(0, 0.4, 0), Color(0.5, 0.45, 0.4)); FX.shake(0.4); C.shake = 0.5)
 	C.setv(dodger, "tilt", Vector3(0.9, 0.4, 1.2)); dodger.hover = 0.0; dodger.dim = 0.6
-	await C.wait(maxf(0.4, fly * 0.45 - 0.25) + 1.0)
+	await C.wait(0.4)
+	# the aftermath, close: Dodger upside down in the scrap, props winding down, smoke drifting
+	var cpt: Vector3 = crash + Vector3(0, 0.3, 0)
+	var to_c := ((S.at(Vector3(1.5, 2.6, 93.5)) - crash) * Vector3(1, 0, 1)).normalized()
+	var ccands := []
+	for a in [0.0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6]:
+		ccands.append(crash + to_c.rotated(Vector3.UP, a) * 2.2 + Vector3(0, 0.9, 0))
+	C.look_node = null
+	C.cut(_clear(cpt, ccands), cpt); C.lens(35.0)
+	C.focus_on(dodger, Vector3.ZERO, 0.0, 0.6)
+	await C.wait(maxf(0.4, fly * 0.45 - 0.25) + 0.6)
 	# 20. hand over: crane down behind Vesk on the porch steps, settling into the gameplay camera
 	C.mark("handover")
 	C.mblur = 0.55
@@ -521,7 +533,7 @@ func run() -> void:
 	C.setv(vesk, "global_position", start + Vector3(0, -0.1, 0.9))
 	C.setv(vesk, "rotation:y", PI)
 	vesk.play("idle")
-	C.cut(start + Vector3(0.9, 2.8, 5.8), start + Vector3(0, 1.0, -3.0)); C.lens(35.0)
+	C.cut(start + Vector3(0.9, 2.15, 6.2), start + Vector3(0, 1.0, -3.0)); C.lens(35.0)   # under the string lights, not through them
 	C.move(start + Vector3(0.6, 2.0, 4.4), start + Vector3(0, 1.2, -3.0), 2.6, -1.0, Tween.TRANS_SINE, Tween.EASE_OUT)
 	C.walk(vesk, start + Vector3(0, -0.1, 0), 2.0)
 	await C.wait(0.6)
