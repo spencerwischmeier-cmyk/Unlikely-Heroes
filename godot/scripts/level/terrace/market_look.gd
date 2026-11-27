@@ -26,6 +26,7 @@ static var root: Node3D
 static var batches := {}         # "zone|prop" -> Array[Transform3D]
 static var n_lights := 0
 static var n_props := 0
+static var _no_lights := false
 
 static func on() -> bool:
 	return not OS.get_cmdline_user_args().has("--no-market")
@@ -106,6 +107,7 @@ static func put(zone: String, name_: String, pos: Vector3, yaw := 0.0, opts := {
 
 static func light(pos: Vector3, c: Color, energy := 1.3, rng := 6.0) -> OmniLight3D:
 	var l := OmniLight3D.new()
+	if _no_lights: l.visible = false
 	l.light_color = c; l.light_energy = energy; l.omni_range = rng; l.omni_attenuation = 1.3
 	l.shadow_enabled = false; l.light_specular = 0.35
 	l.distance_fade_enabled = true; l.distance_fade_begin = 45.0; l.distance_fade_length = 12.0
@@ -147,15 +149,20 @@ static func build(L: Node3D) -> void:
 	var t0 := Time.get_ticks_msec()
 	root = Node3D.new(); root.name = "MarketBuildUp"; L.add_child(root)
 	n_lights = 0; n_props = 0
+	var args := OS.get_cmdline_user_args()   # --market-skip=houses,props,overhead,fx,lights (profiling)
+	var skip: Array = []
+	for a in args: if a.begins_with("--market-skip="): skip = Array(a.substr(14).split(","))
+	_no_lights = skip.has("lights")
 	_clear_north_railing(L)
 	TK.begin(L).name = "MarketBuildUpKit"   # bunting, lantern strings and laundry go through the terrace kit's batcher
-	_shophouses(L)
-	_terrace()
-	_bazaar()
-	_overhead()
+	if not skip.has("houses"): _shophouses(L)
+	if not skip.has("props"):
+		_terrace()
+		_bazaar()
+	if not skip.has("overhead"): _overhead()
 	TK.flush()
 	flush()
-	_panic(L)
+	if not skip.has("fx"): _panic(L)
 	_spots(L)
 	print("[market] %d props, %d lights, built in %d ms" % [n_props, n_lights, Time.get_ticks_msec() - t0])
 
