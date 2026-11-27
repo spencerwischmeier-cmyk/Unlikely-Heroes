@@ -276,7 +276,13 @@ static func _heap(L, B, rng: RandomNumberGenerator, life) -> void:
 	var steps := [[Vector2(-27.5, 84.0), 3.0, 1.2], [Vector2(-31.0, 86.6), 3.0, 2.4], [Vector2(-34.6, 89.2), 3.0, 3.6], [Vector2(-39.6, 86.0), 5.0, 6.0]]
 	for s in steps:
 		var p: Vector2 = s[0]
-		L.block(p.x, p.y, s[1], s[1], s[2], 0, JK.mat("rust"), true)
+		var tw: MeshInstance3D = L.block(p.x, p.y, s[1], s[1], s[2], 0, JK.mat("rust"), true)
+		if JK.hd_on():
+			# the block stays as the collider; what you see is a stack of crushed-scrap bales
+			tw.visible = false
+			var n := maxi(1, roundi(s[2] / 1.2)); var bh: float = s[2] / n
+			for k in n:
+				B.add("bale", "bale", JK.xform(Vector3(p.x, bh * (k + 0.5), p.y), Vector3(0, rng.randf_range(-0.05, 0.05) + (k % 2) * PI / 2, 0), Vector3(s[1] - 0.04, bh - 0.02, s[1] - 0.04)), JK.PALETTE[rng.randi() % JK.PALETTE.size()])
 		# junk piled against each tower so it reads as a heap, not a pillar
 		JK.pile(B, rng, Vector3(p.x, 0, p.y), s[1] * 0.85, s[2] * 0.95, int(18 + s[2] * 9))
 		# a lip of loose plates on top
