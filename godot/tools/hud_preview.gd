@@ -15,12 +15,18 @@ class MockCombat extends Node3D:
 	signal weapon_xp(id: String, level: int, frac: float)
 	signal weapon_level_up(id: String, level: int)
 	const MAX_HULL := 8
+	const ORDER := ["arc_lancer", "scatter_bloom", "thump_lobber", "seeker_hive"]
 	const WEAPONS := {
-		"arc_lancer": { name = "ARC LANCER", v5 = "ARC STORM", color = Color(0.45, 0.95, 1.0) },
-		"scatter_bloom": { name = "SCATTER BLOOM", v5 = "FULL BLOOM", color = Color(1.0, 0.45, 0.65) },
-		"thump_lobber": { name = "THUMP LOBBER", v5 = "THUMP CLUSTER", color = Color(0.5, 1.0, 0.45) },
-		"seeker_hive": { name = "SEEKER HIVE", v5 = "QUEEN HIVE", color = Color(1.0, 0.8, 0.25) },
+		"arc_lancer": { name = "ARC LANCER", v5 = "ARC STORM", color = Color(0.45, 0.95, 1.0), blurb = "Rapid bolts. Never runs dry, but mind the heat." },
+		"scatter_bloom": { name = "SCATTER BLOOM", v5 = "FULL BLOOM", color = Color(1.0, 0.45, 0.65), blurb = "A fan of petal shrapnel. Get close." },
+		"thump_lobber": { name = "THUMP LOBBER", v5 = "THUMP CLUSTER", color = Color(0.5, 1.0, 0.45), blurb = "Lobs bouncing thump-bombs over cover." },
+		"seeker_hive": { name = "SEEKER HIVE", v5 = "QUEEN HIVE", color = Color(1.0, 0.8, 0.25), blurb = "Homing micro-drones find the bots for you." },
 	}
+	var wheel_open := false
+	func usable(id: String) -> bool: return Game.data.get("unlocked", {}).has(id)
+	func owned_weapons() -> Array: return ORDER.filter(func(i): return usable(i))
+	func equip(id: String) -> void: current = id; weapon_changed.emit(id)
+	func cycle(_d: int) -> void: pass
 	var current := "arc_lancer"
 	var hull := 8
 	var heat := 0.0
@@ -131,6 +137,29 @@ func _ready() -> void:
 			combat.weapon_changed.emit("thump_lobber")
 			await get_tree().create_timer(0.15).timeout
 			combat.hit_marker.emit(true)
+		"wheel", "wheel_pad":
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true}
+			combat.current = "scatter_bloom"; combat.lv = 3; combat.am = 7; combat.mx = 32
+			Game.objective_set.emit("row", "Clear Container Row")
+			player.using_pad = state == "wheel_pad"
+			var wp: Node = load("res://scripts/systems/weapons.gd").new(); add_child(wp)
+			await get_tree().process_frame
+			wp.hold_debug = true
+			await get_tree().create_timer(0.05).timeout
+			wp.point = Vector2(0.75, 0.66).normalized() * 150.0 if state == "wheel" else Vector2(0, 1) * 150.0
+		"pause", "settings", "title":
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true}
+			combat.current = "scatter_bloom"; combat.lv = 3; combat.am = 19; combat.mx = 32
+			Game.objective_set.emit("row", "Find Dodger on top of the scrap pile (WASD to run, Space to jump, hold it to go higher)")
+			Game.data.nuts = 1240
+			var mn: Node = load("res://scripts/systems/menus.gd").new(); add_child(mn)
+			await get_tree().create_timer(0.1).timeout
+			if state == "title":
+				hud.visible = false; mn.state = "title"; mn.title_root.visible = true; mn.title_buttons.get_child(1).grab_focus()
+			else:
+				mn.open_pause()
+				if state == "settings": mn._open_settings()
+				else: mn.pause_buttons.get_child(1).grab_focus()
 		"lowhull":
 			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true, "seeker_hive": true}
 			combat.current = "seeker_hive"; combat.lv = 5; combat.xp = 1.0; combat.am = 0; combat.mx = 55
