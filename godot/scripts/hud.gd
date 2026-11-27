@@ -73,6 +73,16 @@ var prev_wpn := ""
 var shown_wpn := ""
 var waves := Control.new()
 var waypoint := Control.new()
+var lvup := Control.new()
+var lv_t := 0.0                        # level-up card: counts down from LV_TIME
+var lv_id := ""
+var lv_level := 1
+const LV_TIME := 3.6
+var results := Control.new()
+var res_t := 0.0                       # area results card: counts down from RES_TIME
+var res := {}                          # name, kills, nuts, secs, hits
+var zone_run := {}                     # stats of the fight in progress
+const RES_TIME := 7.0
 var wp_a := 0.0                        # objective marker fade
 var wp_pos := Vector2(-1, -1)          # smoothed screen spot of the marker
 var wp_dist := 0.0
@@ -128,6 +138,8 @@ func _ready() -> void:
 	_place(waves, Vector2(0.5, 0), Rect2(-200, 96, 400, 50), _draw_waves)
 	waypoint.set_anchors_preset(Control.PRESET_FULL_RECT); waypoint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	waypoint.draw.connect(_draw_waypoint); root.add_child(waypoint)
+	_place(lvup, Vector2(1, 1), Rect2(-574, -392, 560, 170), _draw_lvup)
+	_place(results, Vector2(0, 0), Rect2(0, 292, 420, 280), _draw_results)
 	_place(cross, Vector2(0.5, 0.5), Rect2(-160, -160, 320, 320), _draw_cross)
 	_place(prompt, Vector2(0.5, 0.5), Rect2(-320, 70, 640, 60), _draw_prompt)
 	_place(banner, Vector2(0.5, 0), Rect2(-640, 286, 1280, 150), _draw_banner)
@@ -149,6 +161,10 @@ func _ready() -> void:
 	Game.collectible_found.connect(func(_k, _id): _refresh_collect(); collect_pop = 1.0; wallet_idle = 0.0)
 	Game.player_hurt.connect(func(_h): vig_a = 0.75)
 	if Game.has_signal("player_hit_from"): Game.player_hit_from.connect(func(p): dmg_arrows.append({ pos = p, t = 0.0 }))
+	Game.zone_entered.connect(_zone_started)
+	Game.zone_cleared.connect(_zone_done)
+	Game.bot_killed.connect(func(_b, _p, _k): if not zone_run.is_empty(): zone_run.kills += 1)
+	Game.player_hurt.connect(func(_h): if not zone_run.is_empty(): zone_run.hits += 1)
 	combat.nuts_changed.connect(_nuts)
 	combat.hull_changed.connect(_hull)
 	combat.hit_marker.connect(func(k): hit_t = 0.18; hit_kill = k; if k: kill_t = 1.0)
@@ -230,10 +246,22 @@ func _hull(h: int, healed: bool) -> void:
 
 func _level_up(id: String, lv: int) -> void:
 	lvl_pop = 1.0
-	if lv >= 5:
-		show_banner("%s V5" % combat.WEAPONS[id].name, "EVOLVED INTO THE %s!" % combat.WEAPONS[id].v5, GOLD)
-	else:
-		toast("%s  V%d" % [combat.WEAPONS[id].name, lv], "Weapon level up! Bigger magazine, harder hits.", combat.weapon_color(id), 3.6, "up")
+	lv_id = id; lv_level = lv; lv_t = LV_TIME
+
+func _zone_started(_id: String) -> void:
+	var nm := ""
+	var st = Game.story
+	if st and "zones" in st and st.index >= 0 and st.index < st.zones.size(): nm = str(st.zones[st.index].get("name", ""))
+	zone_run = { name = nm, kills = 0, hits = 0, start = Time.get_ticks_msec(), nuts = nuts }
+
+func _zone_done(_id: String) -> void:
+	if zone_run.is_empty(): return
+	if zone_run.kills > 0:
+		res = zone_run.duplicate()
+		res.secs = (Time.get_ticks_msec() - zone_run.start) / 1000.0
+		res.nuts = maxi(0, nuts - int(zone_run.nuts))
+		res_t = RES_TIME
+	zone_run = {}
 
 func _refresh_collect() -> void:
 	collect_counts.clear()
@@ -350,7 +378,9 @@ func _process(dt: float) -> void:
 	dmg_arrows = dmg_arrows.filter(func(d): return d.t < 1.4)
 	if shown_wpn == "" and combat: shown_wpn = combat.current
 	_update_waypoint(dt)
-	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs, waves, waypoint]: c.queue_redraw()
+	lv_t = maxf(0.0, lv_t - dt)
+	res_t = maxf(0.0, res_t - dt)
+	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs, waves, waypoint, lvup, results]: c.queue_redraw()
 	for c in toast_box.get_children(): c.queue_redraw()
 	strip_t = maxf(0.0, strip_t - dt)
 	wstrip.queue_redraw()
@@ -848,6 +878,122 @@ func _draw_waypoint() -> void:
 	var r := Rect2(cp - Vector2(tw * 0.5 + 12, 13), Vector2(tw + 24, 26))
 	HD.panel(ci, r, OBJ_COL, 9, 0.12, a)
 	HD.text(ci, head, Vector2(cp.x, cp.y + 7), txt, 17, Color(1, 0.95, 0.75), 1, 4, a)
+
+# ---------------------------------------------------------------- level-up card
+## A weapon level-up gets its own card just above the weapon panel: the emblem spins in over turning rays,
+## "V2 > V3" chips, five level pips with the new one popping, and a ribbon tab. V5 turns it gold
+## and names the evolved weapon.
+func _draw_lvup() -> void:
+	if lv_t <= 0.0 or combat == null or lv_id == "": return
+	var ci := lvup
+	var el := LV_TIME - lv_t
+	var a := clampf(el / 0.15, 0.0, 1.0) * clampf(lv_t / 0.35, 0.0, 1.0)
+	var maxed := lv_level >= 5
+	var wc: Color = GOLD if maxed else combat.weapon_color(lv_id)
+	var p_in := clampf(el / 0.45, 0.0, 1.0)
+	var drop := (1.0 - (1.0 + 0.2 * sin(p_in * PI * 1.5) * (1.0 - p_in)) * p_in) * -60.0 + (1.0 - clampf(lv_t / 0.35, 0.0, 1.0)) * -30.0
+	var r := Rect2(30, 38 + drop, 500, 104)
+	# ribbon tab on top
+	var tab := Rect2(r.position.x + 150, r.position.y - 40, 200, 34)
+	HD.panel(ci, tab, wc, 10, 0.12, a, Color(0.6, 0.42, 0.08, 0.97) if maxed else wc.darkened(0.45), Color(0.3, 0.18, 0.03, 0.97) if maxed else wc.darkened(0.75))
+	HD.text(ci, head, Vector2(tab.get_center().x, tab.position.y + 25), "EVOLVED!" if maxed else "LEVEL UP!", 22, Color(1, 0.97, 0.85), 1, 5, a)
+	HD.panel(ci, r, wc, 18, 0.0, a)
+	# rays + emblem
+	var bc := Vector2(r.position.x + 62, r.get_center().y)
+	for k in 12:
+		var ang := el * 0.9 + TAU * k / 12.0
+		var d := Vector2(cos(ang), sin(ang))
+		var sd := Vector2(-d.y, d.x)
+		ci.draw_colored_polygon(PackedVector2Array([bc + d * 30 + sd * 3, bc + d * 64 + sd * 9, bc + d * 64 - sd * 9, bc + d * 30 - sd * 3]), Color(wc, 0.22 * a))
+	var spin := clampf(el / 0.6, 0.0, 1.0)
+	var flip := absf(cos(spin * PI * 2.0)) if spin < 1.0 else 1.0
+	ci.draw_set_transform(Vector2(bc.x * (1.0 - flip), 0), 0.0, Vector2(maxf(0.06, flip), 1))
+	HD.badge(ci, bc, 36, wc, a)
+	HD.icon(ci, HD.weapon_icon(lv_id), bc, 21, wc, a)
+	ci.draw_set_transform(Vector2.ZERO)
+	# name, level chips, pips
+	var x := r.position.x + 120
+	var nm: String = (combat.WEAPONS[lv_id].v5 if maxed and "v5" in combat.WEAPONS[lv_id] else combat.weapon_name(lv_id))
+	HD.text(ci, head, Vector2(x, r.position.y + 38), nm, 28, wc.lightened(0.2), 0, 6, a)
+	for k in 2:
+		var cr := Rect2(x + k * 86, r.position.y + 52, 54, 28)
+		var lvn := lv_level - 1 + k
+		var on := k == 1
+		var pop := 1.0 + (0.25 * sin(clampf((el - 0.5) / 0.3, 0, 1) * PI) if on else 0.0)
+		var crs := Rect2(cr.get_center() - cr.size * 0.5 * pop, cr.size * pop)
+		HD.panel(ci, crs, GOLD if on else Color(0.7, 0.75, 0.85), 8, 0.0, a * (1.0 if on else 0.7), Color(0.55, 0.4, 0.08, 0.97) if on else HD.PANEL_TOP, Color(0.3, 0.2, 0.04, 0.97) if on else HD.PANEL_BOT)
+		HD.text(ci, head, Vector2(crs.get_center().x, crs.position.y + 21 * pop), "V%d" % lvn, int(20 * pop), GOLD if on else Color(0.8, 0.85, 0.95), 1, 4, a)
+	HD.icon(ci, "dash", Vector2(x + 70, r.position.y + 66), 9, GOLD, a)
+	for k in 5:
+		var pc := Vector2(x + 210 + k * 32, r.position.y + 66)
+		var filled := k < lv_level
+		var is_new := k == lv_level - 1
+		var ps := 11.0
+		if is_new:
+			var q := clampf((el - 0.55) / 0.35, 0.0, 1.0)
+			filled = q > 0.0
+			ps = 11.0 * (1.0 + 0.6 * sin(q * PI))
+		if filled: HD.icon(ci, "star", pc, ps, GOLD, a)
+		else:
+			ci.draw_circle(pc, 7, Color(HD.INK, a), true, -1, true)
+			ci.draw_circle(pc, 5, Color(HD.SLOT, a), true, -1, true)
+	var sub := "Evolved into its final form!" if maxed else "Bigger magazine, harder hits."
+	HD.text(ci, body, Vector2(x, r.position.y + 96), sub, 15, Color(0.85, 0.92, 1.0), 0, 4, a)
+
+# ---------------------------------------------------------------- area results
+## After a fight zone is cleared: a tally card slides in on the left. Rows count up one after
+## another (bots scrapped, sprockets earned, time, hits taken) and a medal stamps down at the end:
+## gold for no hits, silver for 1-2, bronze otherwise.
+func _draw_results() -> void:
+	if res_t <= 0.0 or res.is_empty(): return
+	var ci := results
+	var el := RES_TIME - res_t
+	var p_in := clampf(el / 0.4, 0.0, 1.0)
+	var slide := (1.0 - p_in) * (1.0 - p_in) * -420.0 + (1.0 - clampf(res_t / 0.5, 0.0, 1.0)) * -420.0
+	ci.draw_set_transform(Vector2(slide, 0))
+	var r := Rect2(24, 18, 370, 236)
+	var acc := Color(0.5, 1, 0.6)
+	HD.panel(ci, r, acc, 16, 0.08)
+	HD.icon(ci, "flag", Vector2(r.position.x + 28, r.position.y + 30), 13, acc)
+	HD.text(ci, head, Vector2(r.position.x + 50, r.position.y + 40), "AREA REPORT", 24, acc.lightened(0.2), 0, 5)
+	if str(res.get("name", "")) != "":
+		HD.text(ci, body, Vector2(r.end.x - 20, r.position.y + 38), str(res.name), 14, Color(0.8, 0.88, 1.0), 2, 4)
+	ci.draw_line(Vector2(r.position.x + 18, r.position.y + 54), Vector2(r.end.x - 18, r.position.y + 54), Color(acc, 0.35), 2.0)
+	var secs: float = res.secs
+	var rows := [
+		["boss", Color(1, 0.45, 0.35), "BOTS SCRAPPED", float(res.kills), "%d"],
+		["sprocket", GOLD, "SPROCKETS", float(res.nuts), "+%d"],
+		["dash", Color(0.45, 0.95, 1.0), "TIME", secs, "time"],
+		["hull", HULL_COL, "HITS TAKEN", float(res.hits), "%d"],
+	]
+	for i in rows.size():
+		var row: Array = rows[i]
+		var t0 := 0.35 + i * 0.35
+		var ra := clampf((el - t0) / 0.2, 0.0, 1.0)
+		if ra <= 0.0: continue
+		var y := r.position.y + 84 + i * 38
+		var cnt := clampf((el - t0) / 0.5, 0.0, 1.0)
+		var v: float = row[3] * cnt
+		var txt := ""
+		if row[4] == "time": txt = "%d:%02d" % [int(v) / 60, int(v) % 60]
+		else: txt = row[4] % int(round(v))
+		HD.icon(ci, row[0], Vector2(r.position.x + 34, y - 7), 11, row[1], ra)
+		HD.text(ci, body, Vector2(r.position.x + 56, y), row[2], 17, Color(0.88, 0.95, 1.0), 0, 4, ra)
+		HD.text(ci, head, Vector2(r.end.x - (120 if i >= 2 else 24), y + 2), txt, 24, Color.WHITE, 2, 5, ra)
+	# medal
+	var mt := 0.35 + rows.size() * 0.35 + 0.3
+	if el > mt:
+		var q := clampf((el - mt) / 0.3, 0.0, 1.0)
+		var hits: int = res.hits
+		var mcol := GOLD if hits == 0 else (Color(0.82, 0.86, 0.95) if hits <= 2 else Color(0.85, 0.55, 0.3))
+		var label := "NO-HIT!" if hits == 0 else ("SILVER" if hits <= 2 else "BRONZE")
+		var ms := 1.0 + 1.2 * (1.0 - q) * (1.0 - q)
+		var mc := Vector2(r.end.x - 60, r.end.y - 62)
+		ci.draw_set_transform(Vector2(slide, 0) + mc * (1.0 - ms), -0.25 * (1.0 - q), Vector2(ms, ms))
+		HD.badge(ci, mc, 30, mcol, q)
+		HD.icon(ci, "star", mc, 18, mcol, q, sin(el * 2.0) * 0.15)
+		HD.text(ci, head, mc + Vector2(0, 52), label, 16, mcol.lightened(0.2), 1, 4, q)
+	ci.draw_set_transform(Vector2.ZERO)
 
 func _draw_prompt() -> void:
 	if prompt_a <= 0.0 or prompt_text == "": return

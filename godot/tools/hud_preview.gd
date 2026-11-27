@@ -173,6 +173,22 @@ func _ready() -> void:
 				combat.current = "arc_lancer"; combat.heat = 1.0; combat.overheated = true
 			combat.weapon_changed.emit(combat.current)
 			Game.objective_set.emit("row", "Get to Container Row")
+		"reports":
+			var st := MockStory.new(); add_child(st); Game.story = st
+			st.zones = [{ id = "row", name = "CONTAINER ROW", rect = Rect2(0, 0, 4, 4) }]
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true}
+			combat.current = "thump_lobber"; combat.lv = 3
+			Game.objective_set.emit("yard", "Get through the Holding Pens")
+			Game.zone_entered.emit("row")
+			for i in 14: Game.bot_killed.emit(null, Vector3.ZERO, "roller")
+			Game.player_hurt.emit(7)
+			combat.nuts_changed.emit(1580)
+			await get_tree().process_frame
+			Game.zone_cleared.emit("row")
+			hud.res.secs = 104.0
+			hud.res_t = hud.RES_TIME - 3.2
+			combat.weapon_level_up.emit("thump_lobber", 3)
+			hud.lv_t = hud.LV_TIME - 1.3
 		"lowhull":
 			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true, "seeker_hive": true}
 			combat.current = "seeker_hive"; combat.lv = 5; combat.xp = 1.0; combat.am = 0; combat.mx = 55
