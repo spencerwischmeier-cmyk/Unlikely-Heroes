@@ -43,6 +43,13 @@ class MockPlayer extends CharacterBody3D:
 	var jumps := 0
 	var dash_cd := 0.0
 
+class MockStory extends Node:
+	var active := true
+	var index := 0
+	var wave := 2
+	var alive: Array = []
+	var zones := [{ id = "row", waves = [{}, {}, {}] }]
+
 class MockLevel extends Node3D:
 	var pickup_spots := [
 		{ kind = "washer", id = "w1" }, { kind = "washer", id = "w2" }, { kind = "washer", id = "w3" },
@@ -108,6 +115,22 @@ func _ready() -> void:
 				giz.rows[2].button.grab_focus()
 				await get_tree().create_timer(0.2).timeout
 				giz._buy("seeker_hive")
+		"combat":
+			var cam := Camera3D.new(); add_child(cam); cam.current = true
+			var st := MockStory.new(); add_child(st); Game.story = st
+			for i in 5:
+				var b := Node3D.new(); b.set("dead", false); add_child(b); st.alive.append(b)
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true}
+			combat.current = "thump_lobber"; combat.lv = 2; combat.xp = 0.3; combat.am = 9; combat.mx = 12
+			combat.hull = 4; combat.hull_changed.emit(4, false)
+			Game.objective_set.emit("row", "Clear Container Row")
+			await get_tree().create_timer(0.25).timeout
+			combat.hull = 5; combat.hull_changed.emit(5, true)
+			Game.player_hit_from.emit(Vector3(6, 0, -3))
+			Game.player_hit_from.emit(Vector3(-4, 0, 5))
+			combat.weapon_changed.emit("thump_lobber")
+			await get_tree().create_timer(0.15).timeout
+			combat.hit_marker.emit(true)
 		"lowhull":
 			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true, "seeker_hive": true}
 			combat.current = "seeker_hive"; combat.lv = 5; combat.xp = 1.0; combat.am = 0; combat.mx = 55

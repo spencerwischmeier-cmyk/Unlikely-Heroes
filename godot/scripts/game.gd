@@ -8,6 +8,7 @@ extends Node
 # ---- events ----
 signal bot_killed(bot: Node, pos: Vector3, kind: String)   # any enemy destroyed
 signal player_hurt(hull: int)
+signal player_hit_from(pos: Vector3)                       # where a hit came from (HUD damage arrows)
 signal player_fell
 signal player_respawned(pos: Vector3)
 signal zone_entered(id: String)
