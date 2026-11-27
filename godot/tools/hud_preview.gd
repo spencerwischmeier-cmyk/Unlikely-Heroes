@@ -160,6 +160,19 @@ func _ready() -> void:
 				mn.open_pause()
 				if state == "settings": mn._open_settings()
 				else: mn.pause_buttons.get_child(1).grab_focus()
+		"waypoint", "waypoint_edge":
+			var cam := Camera3D.new(); add_child(cam); cam.current = true
+			cam.position = Vector3(0, 2, 0)
+			var st := MockStory.new(); add_child(st); Game.story = st
+			st.active = false
+			st.zones = [{ id = "row", rect = Rect2(4, -46, 8, 8) if state == "waypoint" else Rect2(30, 20, 8, 8), y = 0.0 }]
+			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true, "seeker_hive": true}
+			if state == "waypoint":
+				combat.current = "seeker_hive"; combat.am = 6; combat.mx = 55
+			else:
+				combat.current = "arc_lancer"; combat.heat = 1.0; combat.overheated = true
+			combat.weapon_changed.emit(combat.current)
+			Game.objective_set.emit("row", "Get to Container Row")
 		"lowhull":
 			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true, "seeker_hive": true}
 			combat.current = "seeker_hive"; combat.lv = 5; combat.xp = 1.0; combat.am = 0; combat.mx = 55
