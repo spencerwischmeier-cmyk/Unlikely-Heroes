@@ -22,6 +22,7 @@ var combo_window := 0.0      # time left to chain the next swing
 var spin_t := 0.0            # finisher spin (adds a full turn to the model's facing)
 var slam := 0                # wrench slam from the air: 1 = wind-up hang, 2 = plunging (see _slam_land)
 var slam_t := 0.0
+var slam_target: Node3D = null   # a ground bot the plunge drifts onto (a small assist)
 var flip_t := 0.0           # forward flip on the double jump
 var twist := 0.0             # swing wind-up: the first swing comes from the right, the second backhands from the left
 var aim_point := Vector3.ZERO
@@ -363,6 +364,23 @@ func _air_height() -> float:
 	var h := get_world_3d().direct_space_state.intersect_ray(q)
 	return global_position.y - h.position.y if h else INF
 
+## A slam needs real floor 2.2 m or more below (never over the void) and nothing to swing at up here.
+func _slam_ok() -> bool:
+	var h := _air_height()
+	return h > 2.2 and h < 39.0 and not _air_target_near()
+
+## The nearest ground bot below within 6 m (sideways) for the plunge to drift onto.
+func _slam_pick() -> Node3D:
+	var best: Node3D = null
+	var bd := 6.0
+	for b in get_tree().get_nodes_in_group("bots"):
+		if b.get("dead") or not b.has_method("center") or b.get("collision_mask") == 0: continue
+		var c: Vector3 = b.center()
+		if c.y > global_position.y - 0.5: continue
+		var d := Vector2(c.x - global_position.x, c.z - global_position.z).length()
+		if d < bd: bd = d; best = b
+	return best
+
 ## Something to swing at up here (a hornet at this height): then an air press stays a swing.
 func _air_target_near() -> bool:
 	var nt: Node3D = combat.nearest_target(global_position, 3.4) if combat else null
@@ -376,12 +394,20 @@ func _slam_step(dt: float) -> void:
 		slam_t -= dt
 		if slam_t <= 0.0: slam = 2
 	else:
-		velocity.x *= exp(-6.0 * dt); velocity.z *= exp(-6.0 * dt)
 		velocity.y = -28.0
+		if slam_target and is_instance_valid(slam_target) and not slam_target.get("dead"):
+			# drift onto the target so it lands in the shockwave (arrives as Vesk does)
+			var to: Vector3 = slam_target.center() - global_position
+			var fall_t := maxf((global_position.y - slam_target.center().y) / 28.0, 0.05)
+			var want := Vector3(to.x, 0, to.z) / fall_t
+			if want.length() > 12.0: want = want.normalized() * 12.0
+			velocity.x = lerpf(velocity.x, want.x, 1.0 - exp(-12.0 * dt)); velocity.z = lerpf(velocity.z, want.z, 1.0 - exp(-12.0 * dt))
+		else:
+			velocity.x *= exp(-6.0 * dt); velocity.z *= exp(-6.0 * dt)
 
 ## The slam hits the ground: a shockwave knocks back and hurts ground bots around Vesk.
 func _slam_land() -> void:
-	slam = 0
+	slam = 0; slam_target = null
 	land_t = 0.9; jumps = 0
 	if combat: combat.slam_wave(global_position)
 	melee_cd = 0.3
@@ -448,9 +474,10 @@ func _combat(dt: float, wish: Vector3) -> void:
 	# melee: a wide swing with a small lunge toward the nearest bot
 	melee_cd -= dt; combo_window -= dt
 	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked and slam == 0 \
-			and not grounded and not riding and swing_hook == null and velocity.y < 4.0 and not _no_slam and _air_height() > 2.2 and not _air_target_near():
+			and not grounded and not riding and swing_hook == null and velocity.y < 4.0 and not _no_slam and _slam_ok():
 		# high in the air: the swing becomes a slam (hang a beat, plunge, shockwave on landing)
 		slam = 1; slam_t = 0.14; spin_t = 0.3; melee_cd = 0.3; combo = 0
+		slam_target = _slam_pick()
 		Snd.play("melee_swing", -1, 0.05, 0.0); Snd.play("dash", -4, 0.0, 0.0, 0.8)
 	elif Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked and slam == 0:
 		combo = combo + 1 if combo_window > 0.0 and combo < 3 else 1
