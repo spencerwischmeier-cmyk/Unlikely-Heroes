@@ -98,7 +98,75 @@ const MOODS := {
 		"ssr": false,
 		"fill_energy": 0.26,
 	},
+	# the routes between the areas (scripts/level/routes/routes_look.gd): the tram viaduct catches the same
+	# dusty gold as the junkyard it leaves, warming toward the plaza; the Lantern Bridge glows like the market
+	# ahead of it; the freight routes are cooler and harder, steel and floodlight
+	"viaduct": {
+		"rect": Rect2(-7, 46, 14, 47),
+		"fade": 8.0,
+		"off_flag": "--no-routes-look",
+		"env": {
+			"tonemap_exposure": 0.84,
+			"adjustment_contrast": 1.15,
+			"adjustment_saturation": 1.14,
+			"volumetric_fog_density": 0.0026,
+			"volumetric_fog_albedo": Color(1.0, 0.88, 0.74),
+			"volumetric_fog_anisotropy": 0.8,
+			"fog_light_color": Color(0.98, 0.78, 0.58),
+			"fog_sun_scatter": 0.34,
+			"ssao_intensity": 2.6,
+			"ssil_intensity": 1.25,
+			"glow_intensity": 0.95,
+			"glow_bloom": 0.14,
+		},
+		"sun_color": Color(1.0, 0.8, 0.6),
+		"ssr": false,
+		"fill_energy": 0.24,
+	},
+	"lantern_bridge": {
+		"rect": Rect2(-58, 28, 34, 10),
+		"fade": 7.0,
+		"off_flag": "--no-routes-look",
+		"env": {
+			"tonemap_exposure": 0.84,
+			"adjustment_contrast": 1.14,
+			"adjustment_saturation": 1.18,
+			"volumetric_fog_density": 0.0026,
+			"volumetric_fog_albedo": Color(1.0, 0.86, 0.76),
+			"volumetric_fog_anisotropy": 0.78,
+			"fog_light_color": Color(1.0, 0.74, 0.58),
+			"fog_sun_scatter": 0.34,
+			"ssao_intensity": 2.6,
+			"ssil_intensity": 1.3,
+			"glow_intensity": 1.05,
+			"glow_bloom": 0.16,
+		},
+		"sun_color": Color(1.0, 0.78, 0.6),
+		"ssr": false,
+		"fill_energy": 0.24,
+	},
+	"freight_gangway": FREIGHT_GANGWAY,
+	"freight_approach": FREIGHT_APPROACH,
 }
+
+const FREIGHT_ENV := {
+	"tonemap_exposure": 0.86,
+	"adjustment_contrast": 1.17,
+	"adjustment_saturation": 1.06,
+	"volumetric_fog_density": 0.0024,
+	"volumetric_fog_albedo": Color(0.9, 0.93, 1.0),
+	"volumetric_fog_anisotropy": 0.72,
+	"fog_light_color": Color(0.78, 0.84, 0.95),
+	"fog_sun_scatter": 0.28,
+	"ssao_intensity": 2.7,
+	"ssil_intensity": 1.2,
+	"glow_intensity": 1.0,
+	"glow_bloom": 0.13,
+}
+const FREIGHT_GANGWAY := { "rect": Rect2(23, 25, 34, 10), "fade": 7.0, "off_flag": "--no-routes-look", "env": FREIGHT_ENV,
+	"sun_color": Color(1.0, 0.9, 0.78), "ssr": false, "fill_energy": 0.3 }
+const FREIGHT_APPROACH := { "rect": Rect2(-11, -97, 10, 105), "fade": 7.0, "off_flag": "--no-routes-look", "env": FREIGHT_ENV,
+	"sun_color": Color(1.0, 0.9, 0.78), "ssr": false, "fill_energy": 0.3 }
 
 var env: Environment
 var sun: DirectionalLight3D

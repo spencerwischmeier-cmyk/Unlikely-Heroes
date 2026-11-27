@@ -19,6 +19,7 @@ const Junk := preload("res://scripts/level/areas/junkyard.gd")
 const YK := preload("res://scripts/level/yard/yard_kit.gd")
 const DD := preload("res://scripts/level/docks_dressing.gd")
 const S := preload("res://scripts/level/layout/spread.gd")
+const RL := preload("res://scripts/level/routes/routes_look.gd")
 
 static var steel: Material
 static var yellow: Material
@@ -74,12 +75,16 @@ static func _rail(L, pts: Array, locked: bool, poles := true) -> int:
 
 ## a bridge deck: walkable slab, trusses under it, glowing trim; registered as an island so the ground pass,
 ## the crowd and the audio know about it
-static func _deck(L, name_: String, r: Rect2, y: float, tint: Color, along_z: bool, keel := true) -> void:
+static func _deck(L, name_: String, r: Rect2, y: float, tint: Color, along_z: bool, keel := true, style := "") -> void:
 	L.islands[name_] = r; L.heights[name_] = y
 	var c := r.get_center()
 	L.box(Vector3(c.x, y - 0.3, c.y), Vector3(r.size.x, 0.6, r.size.y), M.deck(tint))
 	var len: float = r.size.y if along_z else r.size.x
 	var wid: float = r.size.x if along_z else r.size.y
+	if style != "" and RL.on():
+		# the look pass builds this deck's structure (stone arches, timber, plate girders) instead
+		RL.decks.append([style, name_, r, y, along_z])
+		return
 	for s in [-1, 1]:
 		var off: float = (wid / 2 - 0.5) * s
 		var bp := Vector3(c.x + (off if along_z else 0.0), y - 1.05, c.y + (0.0 if along_z else off))
@@ -98,6 +103,43 @@ static func _deck(L, name_: String, r: Rect2, y: float, tint: Color, along_z: bo
 				var a := p + (Vector3(s * (wid / 2 - 0.5), 0, 0) if along_z else Vector3(0, 0, s * (wid / 2 - 0.5)))
 				YK.beam(L, a, kp, 0.18, "dark")
 			L.cyl(kp, 0.25, 0.25, 0.3, L.glow_cyan)
+
+## a railing in the route's style: with the look pass on, only the collider is built here and the look draws
+## the railing (scripts/level/routes/routes_look.gd); without it, the plain level railing
+static func _railing(L, style: String, x1: float, z1: float, x2: float, z2: float, y := 0.0) -> void:
+	if not RL.on():
+		L.railing(x1, z1, x2, z2, y); return
+	var len := Vector2(x2 - x1, z2 - z1).length()
+	if len < 0.5: return
+	var along_x := absf(x2 - x1) > absf(z2 - z1)
+	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var sh := BoxShape3D.new()
+	sh.size = Vector3(len if along_x else 0.25, 1.1, 0.25 if along_x else len)
+	cs.shape = sh; sb.position = Vector3((x1 + x2) / 2, y + 0.55, (z1 + z2) / 2); sb.add_child(cs); L.add_child(sb)
+	RL.segs.append([style, Vector2(x1, z1), Vector2(x2, z2), y])
+
+## L.fence with styled railings
+static func _fence(L, style: String, r: Rect2, y: float, gaps: Array, sides := "nsew") -> void:
+	for side in sides:
+		var horiz: bool = side == "n" or side == "s"
+		var a: float = r.position.x if horiz else r.position.y
+		var b: float = r.end.x if horiz else r.end.y
+		var fixed: float = (r.position.y if side == "n" else r.end.y) if horiz else (r.position.x if side == "w" else r.end.x)
+		var cuts := []
+		for g in gaps: if g[0] == side: cuts.append(Vector2(g[1], g[2]))
+		cuts.sort_custom(func(p, q): return p.x < q.x)
+		var cur := a
+		for cut in cuts:
+			if cut.x > cur:
+				if horiz: _railing(L, style, cur, fixed, cut.x, fixed, y)
+				else: _railing(L, style, fixed, cur, fixed, cut.x, y)
+			cur = maxf(cur, cut.y)
+		if b > cur:
+			if horiz: _railing(L, style, cur, fixed, b, fixed, y)
+			else: _railing(L, style, fixed, cur, fixed, b, y)
+
+static func TKsolid(L, pos: Vector3, size: Vector3) -> void:
+	var sb := StaticBody3D.new(); var cs := CollisionShape3D.new(); var sh := BoxShape3D.new()
+	sh.size = size; cs.shape = sh; sb.position = pos; sb.add_child(cs); L.add_child(sb)
 
 static func _sign(L, text: String, pos: Vector3, yaw: float) -> void:
 	L.hint_sign(text, pos, yaw)
@@ -133,7 +175,7 @@ static func _scrapline(L, rng: RandomNumberGenerator) -> void:
 	# Scrapline Halt: the tram stop right outside Vesk's gate
 	var halt := Rect2(-15, 93, 30, 20)
 	L.island("junk_halt", halt, 0.0, Color(0.9, 0.86, 0.8))
-	L.fence(halt, 0.0, [["n", -4, 4], ["w", 98, 106]], "nwe")
+	_fence(L, "iron", halt, 0.0, [["n", -4, 4], ["w", 98, 106]], "nwe")
 	L.checkpoints.append({ pos = Vector3(0, 0.1, 106), r = 3.0 })
 	L.label("SCRAPLINE HALT", Vector3(4, 0, 106), 4.0, Color(0.85, 1, 0.95))
 	# the track: two rails from the halt all the way to the plaza (decor)
@@ -172,15 +214,15 @@ static func _scrapline(L, rng: RandomNumberGenerator) -> void:
 	L.islands["junk_halt_gantry"] = Rect2(-8, 93, 11, 4.4); L.heights["junk_halt_gantry"] = gy
 	for p in [Vector3(-7.6, 0, 93.4), Vector3(-7.6, 0, 97.0), Vector3(2.6, 0, 93.4), Vector3(2.6, 0, 97.0)]:
 		L.cyl(p + Vector3(0, gy / 2, 0), 0.16, 0.2, gy, yellow, 10, true)
-	L.railing(-8, 93, 3, 93, gy); L.railing(-8, 97.4, -6, 97.4, gy); L.railing(-4.2, 97.4, 3, 97.4, gy)
+	_railing(L, "iron", -8, 93, 3, 93, gy); _railing(L, "iron", -8, 97.4, -6, 97.4, gy); _railing(L, "iron", -4.2, 97.4, 3, 97.4, gy)
 	_ramp(L, Vector3(-5.1, 0.0, 109.8), Vector3(-5.1, gy, 97.4), 2.0, M.deck(Color(0.78, 0.78, 0.8)))
 	L.checkpoints.append({ pos = Vector3(-3, gy + 0.1, 95.5), r = 2.0 })
 	# the viaduct: two spans with a collapsed gap between them
-	_deck(L, "junk_viaduct", Rect2(-4, 72, 8, 21), 0.0, Color(0.82, 0.8, 0.78), true)
-	_deck(L, "plaza_viaduct", Rect2(-4, 46, 8, 21), 0.0, Color(0.85, 0.82, 0.78), true)
+	_deck(L, "junk_viaduct", Rect2(-4, 72, 8, 21), 0.0, Color(0.82, 0.8, 0.78), true, true, "viaduct")
+	_deck(L, "plaza_viaduct", Rect2(-4, 46, 8, 21), 0.0, Color(0.85, 0.82, 0.78), true, true, "viaduct")
 	for s in [-1, 1]:
-		L.railing(s * 4.0, 73, s * 4.0, 92.5, 0.0)
-		L.railing(s * 4.0, 47, s * 4.0, 66.5, 0.0)
+		_railing(L, "viaduct", s * 4.0, 73, s * 4.0, 92.5, 0.0)
+		_railing(L, "viaduct", s * 4.0, 47, s * 4.0, 66.5, 0.0)
 	_sign(L, "LINE DOWN. JUMP THE GAP OR RIDE THE CABLE", Vector3(3.2, 0, 74.2), PI)
 	L.checkpoints.append({ pos = Vector3(1.5, 0.1, 76), r = 2.4 })
 	# broken ends: jagged slabs and dangling track over the drop
@@ -293,13 +335,16 @@ static func _sorting_works(L, rng: RandomNumberGenerator) -> void:
 static func _lantern_bridge(L, rng: RandomNumberGenerator) -> void:
 	var C: Node3D = Chaos.make(L, "lantern_bridge")
 	var r := Rect2(-58, 29, 36, 8)
-	_deck(L, "plaza_bridge_west", r, 0.0, Color(0.96, 0.88, 0.78), false)
-	L.railing(-57.5, 29, -22.5, 29, 0.0)
-	L.railing(-57.5, 37, -22.5, 37, 0.0)
+	_deck(L, "plaza_bridge_west", r, 0.0, Color(0.96, 0.88, 0.78), false, true, "lantern")
+	_railing(L, "lantern", -57.5, 29, -22.5, 29, 0.0)
+	_railing(L, "lantern", -57.5, 37, -22.5, 37, 0.0)
 	L.label("LANTERN BRIDGE", Vector3(-40, 0, 33), 4.0, Color(1, 0.85, 0.6))
 	# two lantern arches with strings of paper lanterns between them
 	var red := M.paint(Color(0.78, 0.22, 0.16))
 	for x in [-31.0, -49.0]:
+		if RL.on():   # the look pass puts its roofed lantern gates here; keep the posts' colliders
+			for z in [29.3, 36.7]: TKsolid(L, Vector3(x, 2.6, z), Vector3(0.5, 5.2, 0.5))
+			continue
 		for z in [29.3, 36.7]: L.cyl(Vector3(x, 2.6, z), 0.22, 0.26, 5.2, red, 10, true)
 		L.box(Vector3(x, 5.3, 33), Vector3(0.6, 0.5, 8.6), red, false)
 		L.box(Vector3(x, 5.65, 33), Vector3(1.0, 0.2, 9.4), L.mat_dark, false)
@@ -333,10 +378,10 @@ static func _lantern_bridge(L, rng: RandomNumberGenerator) -> void:
 static func _gangway(L, rng: RandomNumberGenerator) -> void:
 	var C: Node3D = Chaos.make(L, "gangway")
 	var r := Rect2(22, 26, 36, 8)
-	_deck(L, "pier_gangway", r, 0.0, Color(0.9, 0.9, 0.92), false)
+	_deck(L, "pier_gangway", r, 0.0, Color(0.9, 0.9, 0.92), false, true, "freight")
 	# yellow truss sides with flood lights
 	for s in [26.0, 34.0]:
-		L.railing(22.5, s, 57.5, s, 0.0)
+		_railing(L, "freight", 22.5, s, 57.5, s, 0.0)
 		for x in range(24, 58, 6):
 			L.box(Vector3(x, 1.8, s), Vector3(0.25, 3.6, 0.25), yellow, false)
 		L.box(Vector3(40, 3.7, s), Vector3(36, 0.3, 0.3), yellow, false)
@@ -364,15 +409,15 @@ static func _gangway(L, rng: RandomNumberGenerator) -> void:
 # ------------------------------------------------------------------ Freight Approach: plaza -> causeway -> Crane Yard
 static func _approach(L, rng: RandomNumberGenerator) -> void:
 	var C: Node3D = Chaos.make(L, "approach")
-	_deck(L, "yard_approach", Rect2(-10, -6, 8, 15), 0.0, Color(0.86, 0.86, 0.88), true)
-	_deck(L, "yard_approach_n", Rect2(-10, -31, 8, 11), 0.0, Color(0.86, 0.86, 0.88), true)
+	_deck(L, "yard_approach", Rect2(-10, -6, 8, 15), 0.0, Color(0.86, 0.86, 0.88), true, true, "freight")
+	_deck(L, "yard_approach_n", Rect2(-10, -31, 8, 11), 0.0, Color(0.86, 0.86, 0.88), true, true, "freight")
 	# Grudd's checkpoint halfway: a wider deck, a booth, boom gates (one snapped), abandoned in a hurry
 	var cp := Rect2(-17, -20, 22, 14)
 	_deck(L, "yard_checkpoint", cp, 0.0, Color(0.84, 0.84, 0.86), false, false)
-	L.fence(cp, 0.0, [["n", -10, -2], ["s", -10, -2]], "nswe")
+	_fence(L, "freight", cp, 0.0, [["n", -10, -2], ["s", -10, -2]], "nswe")
 	for s in [-1, 1]:
-		L.railing(-6 + s * 4, 9, -6 + s * 4, -6, 0.0)
-		L.railing(-6 + s * 4, -20, -6 + s * 4, -30.5, 0.0)
+		_railing(L, "freight", -6 + s * 4, 9, -6 + s * 4, -6, 0.0)
+		_railing(L, "freight", -6 + s * 4, -20, -6 + s * 4, -30.5, 0.0)
 	YK.bx(L, Vector3(-13, 1.4, -13), Vector3(3.0, 2.8, 3.0), "yellow", true)
 	YK.bx(L, Vector3(-13, 2.9, -13), Vector3(3.6, 0.3, 3.6), "dark")
 	YK.bx(L, Vector3(-11.45, 1.7, -13), Vector3(0.06, 1.0, 2.2), "glass")
@@ -400,8 +445,8 @@ static func _approach(L, rng: RandomNumberGenerator) -> void:
 	C.luggage(Vector3(-6, 0, 0), 2.0, 4, rng)
 	L.label("FREIGHT APPROACH", Vector3(-6, 0, -26), 3.0, Color(1, 0.78, 0.85))
 	# the long haul span between the old causeway and the gate: a queue of freight carts left where they stopped
-	_deck(L, "yard_approach_span", Rect2(-10, -66, 8, 25), 0.0, Color(0.84, 0.84, 0.86), true)
-	for s in [-1, 1]: L.railing(-6 + s * 4, -41, -6 + s * 4, -66, 0.0)
+	_deck(L, "yard_approach_span", Rect2(-10, -66, 8, 25), 0.0, Color(0.84, 0.84, 0.86), true, true, "freight")
+	for s in [-1, 1]: _railing(L, "freight", -6 + s * 4, -41, -6 + s * 4, -66, 0.0)
 	for z in [-45.5, -53.0, -61.0]:
 		C.prop("luggage_cart", Vector3(-8.4, 0, z), rng.randf_range(-0.3, 0.3), 1.0, Vector2.ZERO, true)
 		C.luggage(Vector3(-3.4, 0, z + 2.0), 1.2, 3, rng)
@@ -413,8 +458,8 @@ static func _approach(L, rng: RandomNumberGenerator) -> void:
 	# (the gate island's south fence only opens at x -3..3, so the bridge widens east to meet it)
 	_deck(L, "yard_liftbridge_s", Rect2(-10, -80, 8, 6), 0.0, Color(0.84, 0.84, 0.86), true, false)
 	_deck(L, "yard_liftbridge", Rect2(-10, -97, 14, 17), 0.0, Color(0.84, 0.84, 0.86), true)
-	L.railing(-10, -74.5, -10, -96.5, 0.0); L.railing(-2, -74.5, -2, -80, 0.0)
-	L.railing(4, -80, 4, -96.5, 0.0); L.railing(-2, -80, 4, -80, 0.0)
+	_railing(L, "freight", -10, -74.5, -10, -96.5, 0.0); _railing(L, "freight", -2, -74.5, -2, -80, 0.0)
+	_railing(L, "freight", 4, -80, 4, -96.5, 0.0); _railing(L, "freight", -2, -80, 4, -80, 0.0)
 	for s in [-1, 1]:
 		YK.lattice(L, Vector3(-6 + s * 5.6, 0, -78), 1.6, 12.0, "yellow", true)
 	YK.girder(L, Vector3(-11.6, 12, -78), Vector3(-0.4, 12, -78), 1.0, "yellow")
@@ -432,7 +477,7 @@ static func _cableway(L, rng: RandomNumberGenerator) -> void:
 	L.hook(Vector3(-44, 15.3, -40)); L.hook(Vector3(-34, 15.3, -40))
 	var st := Rect2(-31, -44, 8, 8)
 	L.island("mast_cable_station", st, 6.6, Color(0.86, 0.86, 0.9), 0.8)
-	L.fence(st, 6.6, [["w", -42, -38], ["e", -42, -39]], "nsew")
+	_fence(L, "iron", st, 6.6, [["w", -42, -38], ["e", -42, -39]], "nsew")
 	L.checkpoints.append({ pos = Vector3(-27, 6.7, -40), r = 2.4 })
 	L.label("CABLEWAY", Vector3(-27, 6.6, -42.5), 2.4, Color(1, 0.85, 0.6))
 	# the station's A-frame and the haul rope beside the grind cable
@@ -449,7 +494,7 @@ static func _cableway(L, rng: RandomNumberGenerator) -> void:
 	# the mast end: a terminal deck west of the catch ledge
 	var tm := Rect2(0, -57, 6, 7)
 	L.island("mast_terminal", tm, 6.6, Color(0.82, 0.84, 0.88), 0.8)
-	L.fence(tm, 6.6, [["w", -54, -50], ["e", -57, -50]], "nsw")
+	_fence(L, "iron", tm, 6.6, [["w", -54, -50], ["e", -57, -50]], "nsw")
 	for s in [-1, 1]: YK.beam(L, Vector3(3.0, 6.6, -53.5 + s * 3.0), Vector3(3.0, 11.6, -53.5), 0.25, "yellow")
 	C.luggage(Vector3(-27, 6.6, -38.5), 1.6, 5, rng)
 	C.prop("luggage_cart", Vector3(-29, 6.6, -42), 0.5, 1.0, Vector2.ZERO, true)
@@ -466,7 +511,7 @@ static func _balloon_line(L, rng: RandomNumberGenerator) -> void:
 	L.box(Vector3(58, 2.7, -34), Vector3(8, 0.6, 12), M.worn("deck", Color(0.85, 0.8, 0.72), 0.14, 0.45, 0.6, 0.55))
 	L.box(Vector3(58, 1.9, -34), Vector3(7.2, 1.0, 11.2), M.paint(Color(0.2, 0.5, 0.82)), false)
 	L.box(Vector3(58, 1.35, -34), Vector3(6.4, 0.2, 10.4), L.glow_cyan, false)
-	L.fence(bg, 3.0, [["e", -38, -33], ["w", -36, -32]], "nsew")
+	_fence(L, "iron", bg, 3.0, [["e", -38, -33], ["w", -36, -32]], "nsew")
 	L.checkpoints.append({ pos = Vector3(58, 3.1, -34), r = 2.4 })
 	L.label("BALLOON BARGE", Vector3(58, 3.0, -31), 2.0, Color(0.75, 0.98, 1))
 	for p in [Vector3(55.5, 3.0, -38.5), Vector3(60.5, 3.0, -29.5)]:
