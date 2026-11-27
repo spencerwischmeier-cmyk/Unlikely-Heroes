@@ -16,6 +16,7 @@ func _ready() -> void:
 		elif a.begins_with("--scenario="): scenario = a.substr(11)
 		elif a == "--side": side_cam = true
 	process_priority = 1000
+	process_mode = Node.PROCESS_MODE_ALWAYS   # keeps counting frames while the game is paused (pause menu shots)
 
 func _process(_dt: float) -> void:
 	if path == "" and scenario == "": return
