@@ -7,6 +7,8 @@ extends SceneTree
 var out := "/tmp/char_preview.png"
 var which := "bots"
 var frames := 40
+var seq := 0      # --seq=N: also save N more frames (every --step) as <out>_000.png.. for GIFs (run with --fixed-fps 30)
+var step := 2
 var n := 0
 var root3: Node3D
 var actors: Array = []
@@ -16,6 +18,8 @@ func _initialize() -> void:
 		if a.begins_with("--out="): out = a.substr(6)
 		elif a.begins_with("--set="): which = a.substr(6)
 		elif a.begins_with("--frames="): frames = int(a.substr(9))
+		elif a.begins_with("--seq="): seq = int(a.substr(6))
+		elif a.begins_with("--step="): step = int(a.substr(7))
 	root3 = Node3D.new(); root.add_child(root3)
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR; env.background_color = Color(0.55, 0.68, 0.82)
@@ -138,7 +142,13 @@ func _process(_dt: float) -> bool:
 		for a in actors: a.call("_burst")
 		for a in actors: a.visible = false
 	if which == "gizmart" and n == 5 and actors.size() > 0: actors[0].mood("hello", 99.0)
-	if n == frames:
+	if seq > 0 and n >= frames and (n - frames) % step == 0:
+		var k := (n - frames) / step
+		root.get_viewport().get_texture().get_image().save_png(out.get_basename() + "_%03d.png" % k)
+		if k + 1 >= seq:
+			print("saved ", seq, " frames")
+			return true
+	elif n == frames:
 		var img := root.get_viewport().get_texture().get_image()
 		img.save_png(out)
 		print("saved ", out)
