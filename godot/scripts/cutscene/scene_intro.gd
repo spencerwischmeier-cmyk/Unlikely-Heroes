@@ -71,6 +71,14 @@ func run() -> void:
 	C.cut(S.at(Vector3(40, 58, 190)), S.at(Vector3(4, 6, 30))); C.lens(24.0)
 	C.move(S.at(Vector3(22, 30, 138)), S.at(Vector3(0, 2, 40)), 16.0, -1.0, Tween.TRANS_CUBIC, Tween.EASE_OUT)
 	C.lens(28.0, 16.0)
+	# an airship slides across the foreground of the crane, for scale and depth
+	var sa0: Vector3 = S.at(Vector3(-40, 27, 96)); var sa1: Vector3 = S.at(Vector3(80, 23, 72))
+	var ship_n: Node3D = C.actor(Node3D.new(), sa0)
+	var shp: Node3D = DocksDressing.place(ship_n, "airship", Vector3.ZERO, 0.0, 9.0, false)
+	if shp:
+		shp.look_at_from_position(sa0, sa0 + (sa1 - sa0).normalized(), Vector3.UP)
+		shp.rotate_object_local(Vector3.UP, PI)
+	C.tw(ship_n, "global_position", sa1, 17.0)
 	C.tw(C, "fade", 0.0, 3.5)
 	C.show_location("SKYHARBOR", "Planet 1  ·  The sky city  ·  Golden hour", 5.0)
 	await C.wait(2.6)
@@ -241,10 +249,14 @@ func run() -> void:
 	C.lens(240.0, 7.0)
 	C.hand = 0.5
 	C.tw(C, "clock_a", 0.0, 1.0, 1.2)
-	for i in 4:
-		C.fx(func(): FX.ring(mast + Vector3(0, 1.5, 0), Color(1, 0.5, 0.15), 3.0 + i))
-		await C.wait(0.5)
+	# the broadcast: an orange glow on the dish and rings of signal rolling out toward us
+	var mpt: Vector3 = mast + Vector3(0, 1.2, 0)
+	var glow: OmniLight3D = C.actor(OmniLight3D.new(), mpt)
+	glow.light_color = Color(1.0, 0.5, 0.15); glow.omni_range = 14.0; glow.light_energy = 0.0; glow.shadow_enabled = false
+	_broadcast(mpt, mcam, glow, 2.0)
+	await C.wait(2.0)
 	var cl: float = C.say_async("cs_intro_clock")
+	_broadcast(mpt, mcam, glow, cl + 0.4)
 	await C.wait(cl + 0.4)
 	C.hand = 0.0
 	C.grade("tension", 0.0)
@@ -566,6 +578,39 @@ func _push(az: float, dist: float, dur: float) -> void:
 	C.move(e + _gaze_dir(az + _az_shift) * dist, e + Vector3(0, -0.08, 0), dur)
 
 var _dodger: Node3D
+
+## Rings of signal from the mast dish for `dur` seconds, each facing `cam` so it reads as a circle, with the
+## dish light thumping in time.
+func _broadcast(at: Vector3, cam: Vector3, glow: OmniLight3D, dur: float) -> void:
+	# polls the cutscene clock instead of C.wait: a second waiter would also push the clock while seeking
+	var end: float = C.ct + dur
+	var next: float = C.ct
+	while C.ct < end and C.playing != "":
+		if C.ct >= next:
+			next += 0.65
+			C.fx(func(): _signal_ring(at, cam))
+			C.fx(func():
+				var tw := glow.create_tween()
+				tw.tween_property(glow, "light_energy", 6.0, 0.06)
+				tw.tween_property(glow, "light_energy", 0.6, 0.38))
+		await (C as Node).get_tree().process_frame
+
+func _signal_ring(at: Vector3, cam: Vector3) -> void:
+	var tm := TorusMesh.new(); tm.inner_radius = 0.93; tm.outer_radius = 1.0; tm.rings = 48; tm.ring_segments = 6
+	var mi := MeshInstance3D.new(); mi.mesh = tm
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH   # drawn in the opaque pass: blended rings went missing at this distance
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.albedo_color = Color(1.0, 0.45, 0.1, 0.75)   # mixed, not added: an added ring vanishes against the bright sky
+	mi.material_override = m
+	C.actor(mi, at + (cam - at).normalized() * 12.0)   # in front of the mast's own geometry
+	mi.look_at(cam, Vector3.UP); mi.rotate_object_local(Vector3.RIGHT, -PI / 2)
+	mi.scale = Vector3.ONE * 0.4
+	var tw := mi.create_tween().set_parallel()
+	tw.tween_property(mi, "scale", Vector3.ONE * 6.0, 1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(m, "albedo_color", Color(1.0, 0.45, 0.1, 0.0), 1.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(mi.queue_free)
 var _az_shift := 0.0
 ## Swings the camera angle (up to 70 degrees either way) until Dodger isn't between the lens and Vesk's
 ## face, and the lens isn't inside him. `body` frames from his body facing (_cub) instead of his gaze.
