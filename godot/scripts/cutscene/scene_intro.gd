@@ -380,6 +380,7 @@ func run() -> void:
 	C.tw(roller2, "global_position", S.at(Vector3(4, 0, 79)), 4.0, 0.3, Tween.TRANS_LINEAR)
 	C.tw(hornet, "global_position", S.at(Vector3(12, 5, 74)), 6.0, 0.0, Tween.TRANS_LINEAR)
 	C.fx(func(): FX.sparks(S.at(Vector3(10, 1.4, 94.5)), Color(1, 0.7, 0.3), 16, 5.0); Snd.at("bot_spawn", S.at(Vector3(-6, 0, 80)), -4))
+	_haywire_fx(C.line_len("intro_09") + 1.0)
 	await C.wait(0.5)
 	await C.say("intro_09", 0.5)
 	C.fx(func(): FX.sparks(S.at(Vector3(10, 1.4, 94.5)), Color(1, 0.7, 0.3), 10, 4.0))
@@ -392,7 +393,9 @@ func run() -> void:
 	C.cut(scam, mast + Vector3(0, 0.8, 0)); C.lens(140.0)
 	C.move(scam + mdir * 0.6 + Vector3(0, 0.2, 0), mast + Vector3(0, 1.0, 0), 6.0)
 	C.lens(200.0, 6.0)
-	C.fx(func(): FX.ring(mast + Vector3(0, 1.5, 0), Color(1, 0.5, 0.15), 4.0))
+	var sglow: OmniLight3D = C.actor(OmniLight3D.new(), mast + Vector3(0, 1.2, 0))
+	sglow.light_color = Color(1.0, 0.5, 0.15); sglow.omni_range = 14.0; sglow.light_energy = 0.0; sglow.shadow_enabled = false
+	_broadcast(mast + Vector3(0, 1.2, 0), scam, sglow, C.line_len("intro_10") + 0.8)
 	C.light(dodger, "tension", 1.0, 0.0)
 	C.tw(dodger, "rotation:y", PI, 0.6)
 	dodger.look_target = null
@@ -593,6 +596,21 @@ func _broadcast(at: Vector3, cam: Vector3, glow: OmniLight3D, dur: float) -> voi
 				var tw := glow.create_tween()
 				tw.tween_property(glow, "light_energy", 6.0, 0.06)
 				tw.tween_property(glow, "light_energy", 0.6, 0.38))
+		await (C as Node).get_tree().process_frame
+
+## Sparks and smoke popping around the yard while the bots go haywire (polls the clock, like _broadcast).
+func _haywire_fx(dur: float) -> void:
+	var spots := [Vector3(10, 1.4, 94.5), Vector3(-5, 0.6, 81), Vector3(3, 0.6, 80), Vector3(-8, 1.2, 88), Vector3(7, 2.5, 76), Vector3(0, 0.8, 85)]
+	var end: float = C.ct + dur
+	var next: float = C.ct + 0.3
+	var i := 0
+	while C.ct < end and C.playing != "":
+		if C.ct >= next:
+			next += 0.55
+			var p: Vector3 = S.at(spots[i % spots.size()]); i += 1
+			C.fx(func():
+				FX.sparks(p, Color(1, 0.72, 0.3), 10, 4.0)
+				if i % 2 == 0: FX.puff(p + Vector3(0, 0.3, 0), Color(0.45, 0.42, 0.4)))
 		await (C as Node).get_tree().process_frame
 
 func _signal_ring(at: Vector3, cam: Vector3) -> void:
