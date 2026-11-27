@@ -184,13 +184,19 @@ func hold_mug(on: bool) -> void:
 	if on and mug == null and sk:
 		var ba := BoneAttachment3D.new(); ba.bone_name = "gun"; sk.add_child(ba)
 		mug = Node3D.new(); ba.add_child(mug)
-		var c := CylinderMesh.new(); c.top_radius = 0.06; c.bottom_radius = 0.055; c.height = 0.12
-		var mi := MeshInstance3D.new(); mi.mesh = c; mi.material_override = M.std(Color(0.95, 0.55, 0.2), 0.0, 0.4); mug.add_child(mi)
-		var h := TorusMesh.new(); h.inner_radius = 0.025; h.outer_radius = 0.045
-		var hi := MeshInstance3D.new(); hi.mesh = h; hi.rotation.z = PI / 2; hi.position = Vector3(0.065, 0, 0)
-		hi.material_override = mi.material_override; mug.add_child(hi)
-		var top := CylinderMesh.new(); top.top_radius = 0.052; top.bottom_radius = 0.052; top.height = 0.005
-		var ti := MeshInstance3D.new(); ti.mesh = top; ti.position.y = 0.05; ti.material_override = M.std(Color(0.22, 0.12, 0.06), 0.0, 0.2); mug.add_child(ti)
+		# a chunky cream enamel mug with a teal band and a chipped rim, so it never reads as part of his orange gauntlet
+		var cream := M.std(Color(0.93, 0.89, 0.8), 0.0, 0.35)
+		var c := CylinderMesh.new(); c.top_radius = 0.07; c.bottom_radius = 0.064; c.height = 0.14; c.radial_segments = 24
+		var mi := MeshInstance3D.new(); mi.mesh = c; mi.material_override = cream; mug.add_child(mi)
+		var band := CylinderMesh.new(); band.top_radius = 0.0705; band.bottom_radius = 0.0695; band.height = 0.028; band.radial_segments = 24
+		var bi := MeshInstance3D.new(); bi.mesh = band; bi.position.y = 0.025; bi.material_override = M.std(Color(0.12, 0.55, 0.58), 0.0, 0.35); mug.add_child(bi)
+		var rim := TorusMesh.new(); rim.inner_radius = 0.062; rim.outer_radius = 0.072; rim.rings = 24
+		var ri := MeshInstance3D.new(); ri.mesh = rim; ri.position.y = 0.07; ri.material_override = M.std(Color(0.2, 0.2, 0.22), 0.3, 0.4); mug.add_child(ri)
+		var h := TorusMesh.new(); h.inner_radius = 0.028; h.outer_radius = 0.05
+		var hi := MeshInstance3D.new(); hi.mesh = h; hi.rotation.z = PI / 2; hi.position = Vector3(0.075, 0, 0)
+		hi.material_override = cream; mug.add_child(hi)
+		var top := CylinderMesh.new(); top.top_radius = 0.062; top.bottom_radius = 0.062; top.height = 0.005
+		var ti := MeshInstance3D.new(); ti.mesh = top; ti.position.y = 0.058; ti.material_override = M.std(Color(0.2, 0.11, 0.05), 0.0, 0.15); mug.add_child(ti)
 		mug.position = Vector3(0, 0.02, 0.02)
 		mug.add_child(_steam())
 	if mug: mug.get_parent().visible = on
@@ -488,10 +494,89 @@ func _process(dt: float) -> void:
 		_rot_global("neck", Vector3.RIGHT, -_pitch * 0.4)
 		_rot_global("head", Vector3.RIGHT, -_pitch * 0.6 + nod)
 	_acting(dt)
+	_mug_to_mouth()
+	_palm_to_brow(dt)
 	if has_face():
 		if absf(want_y - _yaw) > 0.6 and randf() < dt * 8.0: blink()
 		_face(dt)
 		_eyes(dt, tp)
+
+## The drink clip was made for a flatter face: it lifts the hand to his brow and the gauntlet goes through
+## his snout. While the mug is up, a two-bone IK on the right arm steers the mug's rim to the front of his
+## mouth instead, blending in as the clip raises the hand (so the pick-up and put-down are untouched).
+const MOUTH_OFF := Vector3(0.0, -0.0, 0.3)   # from the jaw, in his head's frame: just past the snout tip
+func _mug_to_mouth() -> void:
+	if mug == null or not mug.get_parent().visible: return
+	var ia := sk.find_bone("mixamorig_RightArm"); var ib := sk.find_bone("mixamorig_RightForeArm")
+	var ic := sk.find_bone("mixamorig_RightHand"); var ij := sk.find_bone("jaw"); var ih := sk.find_bone("head")
+	if ia < 0 or ib < 0 or ic < 0 or ij < 0 or ih < 0: return
+	var A := sk.get_bone_global_pose(ia).origin
+	var B := sk.get_bone_global_pose(ib).origin
+	var C := sk.get_bone_global_pose(ic).origin
+	var J := sk.get_bone_global_pose(ij).origin
+	# head turn since rest, so the target follows where he faces
+	var hq: Basis = sk.get_bone_global_pose(ih).basis.orthonormalized() * sk.get_bone_global_rest(ih).basis.orthonormalized().inverse()
+	var T := J + hq * MOUTH_OFF
+	# the mug's offset from the hand, carried along
+	var ig := sk.find_bone("gun")
+	var mug_sk: Vector3 = (sk.get_bone_global_pose(ig) * mug.position) if ig >= 0 else C   # from this frame's pose, not last frame's node
+	var Dh := T - (mug_sk - C)
+	# weight: none while the hand is low, full once the clip has it up near the face
+	var chest_y := A.y - 0.25
+	var w := smoothstep(0.0, 1.0, clampf((C.y - chest_y) / maxf(T.y - chest_y, 0.01), 0.0, 1.0))
+	if w < 0.01: return
+	_arm_ik("Right", C.lerp(Dh, w))
+
+## Facepalm: the clip slaps the hand down through the top of his skull, with the huge forearm across his face.
+## Steer the hand onto the side of his brow instead, elbow flared out, so it reads as a palm to the forehead.
+var _fp_w := 0.0
+const BROW_OFF := Vector3(0.13, 0.13, 0.17)   # from the head bone at rest: out to his left, up, forward
+func _palm_to_brow(dt: float) -> void:
+	_fp_w = move_toward(_fp_w, 1.0 if cur == "cs_facepalm" else 0.0, dt * 3.0)
+	if _fp_w <= 0.0: return
+	var ia := sk.find_bone("mixamorig_LeftArm"); var ic := sk.find_bone("mixamorig_LeftHand"); var ih := sk.find_bone("head")
+	if ia < 0 or ic < 0 or ih < 0: return
+	var A := sk.get_bone_global_pose(ia).origin
+	var C := sk.get_bone_global_pose(ic).origin
+	var H := sk.get_bone_global_pose(ih).origin
+	var hq: Basis = sk.get_bone_global_pose(ih).basis.orthonormalized() * sk.get_bone_global_rest(ih).basis.orthonormalized().inverse()
+	var out := signf(sk.get_bone_global_rest(ia).origin.x - sk.get_bone_global_rest(ih).origin.x)
+	var T := H + hq * Vector3(BROW_OFF.x * out, BROW_OFF.y, BROW_OFF.z)
+	var chest_y := A.y - 0.25
+	var w := _fp_w * smoothstep(0.0, 1.0, clampf((C.y - chest_y) / maxf(T.y - chest_y, 0.01), 0.0, 1.0))
+	if w < 0.01: return
+	_arm_ik("Left", C.lerp(T, w), hq * Vector3(out, -0.6, -0.2))
+
+## Two-bone IK on one arm: put the hand at D (skeleton space). The elbow stays on the side the clip has it,
+## or bends toward pole_hint when one is given.
+func _arm_ik(side: String, D: Vector3, pole_hint := Vector3.ZERO) -> void:
+	var ia := sk.find_bone("mixamorig_%sArm" % side); var ib := sk.find_bone("mixamorig_%sForeArm" % side)
+	var ic := sk.find_bone("mixamorig_%sHand" % side)
+	if ia < 0 or ib < 0 or ic < 0: return
+	var A := sk.get_bone_global_pose(ia).origin
+	var B := sk.get_bone_global_pose(ib).origin
+	var C := sk.get_bone_global_pose(ic).origin
+	var l1 := A.distance_to(B); var l2 := B.distance_to(C)
+	var ad := D - A
+	var dl := clampf(ad.length(), absf(l1 - l2) + 0.01, l1 + l2 - 0.01)
+	var dn := ad.normalized()
+	var pole := (pole_hint if pole_hint != Vector3.ZERO else (B - A))
+	pole = pole - dn * pole.dot(dn)
+	if pole.length() < 0.001: pole = Vector3(0, -1, 0)
+	pole = pole.normalized()
+	var ca := clampf((l1 * l1 + dl * dl - l2 * l2) / (2.0 * l1 * dl), -1.0, 1.0)
+	var B2 := A + dn * (l1 * ca) + pole * (l1 * sqrt(1.0 - ca * ca))
+	_rot_from_to("mixamorig_%sArm" % side, B - A, B2 - A)
+	var Bn := sk.get_bone_global_pose(ib).origin
+	var Cn := sk.get_bone_global_pose(ic).origin
+	_rot_from_to("mixamorig_%sForeArm" % side, Cn - Bn, (A + dn * dl) - Bn)
+
+func _rot_from_to(bone: String, a: Vector3, b: Vector3) -> void:
+	if a.length() < 1e-4 or b.length() < 1e-4: return
+	var an := a.normalized(); var bn := b.normalized()
+	var ax := an.cross(bn)
+	if ax.length() < 1e-5: return
+	_rot_global(bone, ax.normalized(), an.signed_angle_to(bn, ax.normalized()))
 
 ## Rotate a bone about a model-space axis through its head (after the animation has posed it).
 func _rot_global(bone: String, axis: Vector3, ang: float) -> void:
