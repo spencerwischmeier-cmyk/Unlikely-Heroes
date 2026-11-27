@@ -526,6 +526,8 @@ func claim_aim(who: Node3D, dur: float) -> bool:
 	if not aim_wait.has(id): aim_wait[id] = now
 	var waited: float = (now - aim_wait[id]) / 1000.0
 	var ok := aimers.size() < MAX_AIMERS and now - last_shot_ms > int(SHOT_GAP * 1000.0)
+	var ends := now + int(dur * 1000.0)
+	for k in aimers: if absi(aimers[k] - ends) < int(SHOT_GAP * 1000.0): ok = false   # would fire on the same beat
 	if ok and waited < OFFSCREEN_WAIT:
 		var cam := get_viewport().get_camera_3d()
 		if cam and not cam.is_position_in_frustum(who.global_position): ok = false
