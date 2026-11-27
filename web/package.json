@@ -1,0 +1,13 @@
+{
+  "name": "unlikely-heroes-web-build",
+  "private": true,
+  "type": "module",
+  "description": "Shrinks the Godot project's models for the phone/web build (see build.sh).",
+  "dependencies": {
+    "@gltf-transform/core": "^4.2.1",
+    "@gltf-transform/extensions": "^4.2.1",
+    "@gltf-transform/functions": "^4.2.1",
+    "sharp": "^0.34.0",
+    "meshoptimizer": "^0.22.0"
+  }
+}
