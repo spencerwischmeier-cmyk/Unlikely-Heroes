@@ -75,6 +75,7 @@ var ammo_mesh: BoxMesh
 var ammo_mat: StandardMaterial3D
 
 func _ready() -> void:
+	no_turns = OS.get_cmdline_user_args().has("--no-turns")
 	Game.nuts_changed.connect(_on_nuts)
 	Game.item_unlocked.connect(_on_unlocked)
 	# bots sometimes drop an ammo canister (only when an owned weapon is short)
@@ -504,6 +505,35 @@ func nearest_target(origin: Vector3, max_d: float) -> Node3D:
 	return best
 
 # ---------- bots' shots ----------
+## Attack turns: at most MAX_AIMERS bots wind up a shot at once, shots are spaced by SHOT_GAP, and a bot
+## out of view waits its turn (up to OFFSCREEN_WAIT) so fights read clearly and Vesk isn't shot from
+## behind by a pile of bots firing on the same beat. Bosses don't ask.
+const MAX_AIMERS := 2
+const SHOT_GAP := 0.4
+const OFFSCREEN_WAIT := 2.5
+var aimers := {}          # instance id -> msec the turn ends
+var aim_wait := {}        # instance id -> msec it first asked
+var last_shot_ms := -10000
+var no_turns := false
+
+func claim_aim(who: Node3D, dur: float) -> bool:
+	if no_turns: return true
+	var now := Time.get_ticks_msec()
+	var id := who.get_instance_id()
+	for k in aimers.keys():
+		if aimers[k] < now or not is_instance_id_valid(k): aimers.erase(k)
+	if aimers.has(id): return true
+	if not aim_wait.has(id): aim_wait[id] = now
+	var waited: float = (now - aim_wait[id]) / 1000.0
+	var ok := aimers.size() < MAX_AIMERS and now - last_shot_ms > int(SHOT_GAP * 1000.0)
+	if ok and waited < OFFSCREEN_WAIT:
+		var cam := get_viewport().get_camera_3d()
+		if cam and not cam.is_position_in_frustum(who.global_position): ok = false
+	if not ok: return false
+	aim_wait.erase(id)
+	aimers[id] = now + int(dur * 1000.0)
+	return true
+
 func enemy_shot(from: Vector3, to: Vector3) -> void:
 	var dir := (to - from).normalized()
 	var mi := MeshInstance3D.new(); mi.mesh = bolt_mesh; mi.material_override = shot_mat
@@ -512,6 +542,7 @@ func enemy_shot(from: Vector3, to: Vector3) -> void:
 	mi.global_basis = Basis(Quaternion(Vector3.UP, dir)).scaled(Vector3(1.4, 0.7, 1.4))
 	var l := OmniLight3D.new(); l.light_color = Color(1, 0.3, 0.2); l.light_energy = 2.0; l.omni_range = 3.5; mi.add_child(l)
 	shots.append({ node = mi, vel = dir * 17.0, life = 3.0 })
+	last_shot_ms = Time.get_ticks_msec(); if OS.get_cmdline_user_args().has("--shot-log"): print("[shot] t=%.2f aimers %d" % [last_shot_ms / 1000.0, aimers.size()])
 	Snd.at("hornet_shot", from, -4, 0.1, 0.02)
 
 ## Sends an enemy shot back, homing on the nearest bot in front of Vesk (or straight back).

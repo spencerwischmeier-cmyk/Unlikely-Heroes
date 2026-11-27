@@ -107,6 +107,8 @@ func _physics_process(dt: float) -> void:
 	if buzz_t <= 0.0: buzz_t = randf_range(2.5, 4.5); Snd.at("hornet_buzz", global_position, -10, 0.12, 0.3)
 	# attack: charge with an aim line, freeze the aim, fire
 	if spawn_t <= 0.0: fire_t -= dt
+	if not aiming and fire_t < AIM_T and fire_t > 0.0 and not combat.claim_aim(self, AIM_T + 0.1):
+		fire_t = AIM_T + randf_range(0.12, 0.35)    # someone else has the shot: keep circling a moment
 	if fire_t < AIM_T and fire_t > 0.0:
 		if not aiming:
 			aiming = true; Snd.at("hornet_buzz", global_position, -3, 0.0, 0.0)
