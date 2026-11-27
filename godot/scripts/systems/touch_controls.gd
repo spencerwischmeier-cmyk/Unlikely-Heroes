@@ -225,6 +225,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and enabled: _release_all()
 
 # ------------------------------------------------------------------ per frame
+var _pad_sig := 0
 func _process(dt: float) -> void:
 	if not enabled: return
 	var mode := _mode()
@@ -243,7 +244,12 @@ func _process(dt: float) -> void:
 			wheel_open = true; _action("weapon_wheel", true)
 	if buttons.fire.held != -1 and mode == "play": _aim_assist(dt)
 	if pad.size != last_size: last_size = pad.size
-	pad.queue_redraw()
+	# redraw only when what the pad shows changes (or now and then), not every frame: phones need the time
+	var held := []
+	for k in buttons: held.append(buttons[k].held)
+	var sig := hash([mode, Game.player != null and Game.player.is_on_floor(), stick_id, stick_vec, held, pad.size, wheel_open, _visible_buttons()])
+	if sig != _pad_sig or Engine.get_process_frames() % 10 == 0:
+		_pad_sig = sig; pad.queue_redraw()
 
 ## pull the view gently toward the bot closest to the crosshair
 func _aim_assist(dt: float) -> void:
