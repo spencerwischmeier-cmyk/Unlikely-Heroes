@@ -46,12 +46,57 @@ static func build(L) -> void:
 	extra.append_array(_sky_tree_canopy())
 	extra.append_array(_arch_garlands(root))
 	var leaves := _foliage(K, root, extra)
+	_koi_pond(K, root)
 	var surf := _surfaces(K, root)
 	_grass_seed(L, K, root)
 	_mist(L)
 	_air(L)
 	_panic(L)
 	print("[gardens-look] %d leaf clumps, %d surfaces restyled, built in %d ms" % [leaves, surf, Time.get_ticks_msec() - t0])
+
+# ------------------------------------------------------------------ koi pond
+## The conservatory pond was a solid stone drum with the water disc hidden just under its top. Turn it into a
+## real pond: the drum becomes a dark pebble bed, a rounded stone lip goes round it, and koi circle under the
+## water (the collider is untouched, so traversal stays the same).
+static func _koi_pond(K, root: Node3D) -> void:
+	var rim: MeshInstance3D = null
+	for c in root.get_children():
+		if c is MeshInstance3D and (c as MeshInstance3D).mesh is CylinderMesh:
+			var cm: CylinderMesh = (c as MeshInstance3D).mesh
+			if is_equal_approx(cm.top_radius, 2.0) and is_equal_approx(cm.bottom_radius, 2.05) and (c as MeshInstance3D).material_override == K.stone_mat:
+				rim = c; break
+	if rim == null: return
+	var base_y := rim.position.y - 0.17          # deck level
+	var bed := CylinderMesh.new(); bed.top_radius = 1.95; bed.bottom_radius = 2.0; bed.height = 0.06; bed.radial_segments = 28; bed.rings = 1
+	rim.mesh = bed; rim.position.y = base_y + 0.03
+	var pebble := StandardMaterial3D.new(); pebble.albedo_color = Color(0.16, 0.18, 0.14); pebble.roughness = 0.9
+	rim.material_override = pebble
+	var lip := TorusMesh.new(); lip.inner_radius = 1.78; lip.outer_radius = 2.12; lip.rings = 40; lip.ring_segments = 10
+	var lm: MeshInstance3D = K.mesh(lip, K.stone_mat, Vector3(rim.position.x, base_y + 0.2, rim.position.z))
+	lm.scale = Vector3(1, 1.35, 1)
+	# koi: a body and a tail fin, circling at different speeds and depths
+	var cols := [Color(1.0, 0.42, 0.1), Color(0.98, 0.95, 0.9), Color(1.0, 0.6, 0.15), Color(0.95, 0.3, 0.12), Color(1.0, 0.85, 0.7)]
+	var body := CapsuleMesh.new(); body.radius = 0.055; body.height = 0.3; body.radial_segments = 8; body.rings = 2
+	var tail := PrismMesh.new(); tail.size = Vector3(0.14, 0.12, 0.012)
+	for i in cols.size():
+		var dir := 1.0 if i % 2 == 0 else -1.0
+		var piv := Swim.new(); piv.speed = TAU * dir / (9.0 + 2.5 * i); piv.position = Vector3(rim.position.x, base_y + 0.12 + 0.03 * (i % 3), rim.position.z)
+		piv.rotation.y = TAU * i / cols.size()
+		root.add_child(piv)
+		var m := StandardMaterial3D.new(); m.albedo_color = cols[i]; m.roughness = 0.35
+		var r := 0.75 + 0.18 * (i % 4)
+		var f: MeshInstance3D = K.mesh(body, m, Vector3(r, 0, 0), piv)
+		f.rotation = Vector3(PI / 2, 0, 0)     # capsule lies along z, the direction of travel
+		f.scale = Vector3(1.0, 1.0, 0.7)
+		# tail fin trails behind: pivots turning +y carry the fish toward -z, so the tail sits on +z
+		var tm: MeshInstance3D = K.mesh(tail, m, Vector3(r, 0, 0.2 * dir), piv)
+		tm.basis = Basis(Vector3(0, 1, 0), Vector3(0, 0, -dir), Vector3(-dir, 0, 0))
+		f.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; tm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+class Swim extends Node3D:
+	var speed := 0.5
+	func _process(d: float) -> void:
+		rotation.y += speed * d
 
 # ------------------------------------------------------------------ foliage
 static var _clumps := {}
@@ -355,6 +400,10 @@ static func _surfaces(K, root: Node3D) -> int:
 		n += 1
 	# a richer lawn
 	(K.lawn_mat as ShaderMaterial).shader = load("res://shaders/lawn_hd.gdshader")
+	# clear water with depth, refraction and foam; glassy falls breaking into white. The kit's flowing
+	# channels duplicate water_mat but share its Shader, so swapping the code reaches all of them.
+	(K.water_mat as ShaderMaterial).shader.code = (load("res://shaders/water_hd.gdshader") as Shader).code
+	(K.fall_mat as ShaderMaterial).shader.code = (load("res://shaders/fall_hd.gdshader") as Shader).code
 	# richer, darker soil in the beds
 	if K.soil_mat is StandardMaterial3D:
 		var s := K.soil_mat as StandardMaterial3D
