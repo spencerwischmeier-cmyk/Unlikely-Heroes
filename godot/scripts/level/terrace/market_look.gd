@@ -114,11 +114,13 @@ static func light(pos: Vector3, c: Color, energy := 1.3, rng := 6.0) -> OmniLigh
 	n_lights += 1
 	return l
 
+## two_sided: lettering on both faces of a hanging board (0.07 thick) centred at pos, facing yaw and yaw + PI
 static func label(text: String, pos: Vector3, yaw: float, size := 64, px := 0.006, c := Color(1, 0.9, 0.62), two_sided := false) -> void:
 	for s in ([1, -1] if two_sided else [1]):
 		var l := Label3D.new(); l.text = text; l.font_size = size; l.pixel_size = px
 		l.modulate = c; l.outline_size = 10; l.outline_modulate = Color(0.18, 0.08, 0.03)
-		l.position = pos; l.rotation.y = yaw + (0.0 if s > 0 else PI); l.double_sided = false
+		var face := Basis(Vector3.UP, yaw) * Vector3(0, 0, 1) * s
+		l.position = pos + (face * 0.05 if two_sided else Vector3.ZERO); l.rotation.y = yaw + (0.0 if s > 0 else PI); l.double_sided = false
 		l.visibility_range_end = 70.0
 		root.add_child(l)
 
@@ -131,7 +133,10 @@ static func flush() -> void:
 		for i in xfs.size(): mm.set_instance_transform(i, xfs[i])
 		var mi := MultiMeshInstance3D.new(); mi.multimesh = mm; mi.name = "Market_" + key.replace("|", "_")
 		var big := name_.begins_with("mk_house") or name_.begins_with("mk_stall") or name_.begins_with("mk_awning")
-		mi.visibility_range_end = 220.0 if big else 95.0
+		mi.visibility_range_end = 220.0 if big else 80.0
+		# small goods are a lot of little triangles: the shadow pass skips them (SSAO grounds them)
+		if not big and not name_.begins_with("mk_hand") and not name_.begins_with("mk_cargo") and not name_.begins_with("mk_hover") and not name_.begins_with("mk_parasol") and not name_.begins_with("mk_crate_wall") and not name_.begins_with("mk_lamp"):
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.visibility_range_end_margin = 10.0
 		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		root.add_child(mi)
@@ -281,7 +286,7 @@ static func _panic(L: Node3D) -> void:
 	var C: Node3D = Chaos.make(L, "market")
 	var rng := RandomNumberGenerator.new(); rng.seed = 919
 	# the collapsed stall is burning; smoke rolls up over the bazaar
-	C.fire(Vector3(-99.6, 0.4, 51.0), 1.1)
+	C.fire(Vector3(-99.6, 0.4, 51.0), 0.85)
 	C.smoke(Vector3(-99.6, 1.4, 51.0), 1.2, true)
 	C.fire(Vector3(-98.2, 0.2, 52.2), 0.6, false)
 	# a fire on the roof behind the shop-houses: a smoke column over the whole market

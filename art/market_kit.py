@@ -75,8 +75,8 @@ def cloth_grid(w, d, nx, nz, sag, scallop=0.0, droop_front=0.0):
     return bm
 
 
-def fruit(p, at, r, c, seg=10):
-    sph(p, r, K('paint', c), at, seg=seg, rings=6)
+def fruit(p, at, r, c, seg=8):
+    sph(p, r, K('paint', c), at, seg=seg, rings=5)
 
 
 def fruit_fill(p, rnd, cx, cz, w, d, y, r, cols, n):
@@ -97,11 +97,11 @@ def slat_crate(p, at=(0, 0, 0), yaw=0.0, w=0.62, h=0.42, d=0.44, c=WOOD, fill=No
     for y in (0.1, 0.24, 0.37):
         if y > h: continue
         for s in (-1, 1):
-            box(p, (w, 0.09, 0.022), m, P(0, y, s * (d / 2 - 0.011)), mat3=R, b=0.006)
-            box(p, (0.022, 0.09, d), m, P(s * (w / 2 - 0.011), y, 0), mat3=R, b=0.006)
+            box(p, (w, 0.09, 0.022), m, P(0, y, s * (d / 2 - 0.011)), mat3=R, b=0.006, seg=1)
+            box(p, (0.022, 0.09, d), m, P(s * (w / 2 - 0.011), y, 0), mat3=R, b=0.006, seg=1)
     for sx in (-1, 1):
         for sz in (-1, 1):
-            box(p, (0.045, h, 0.045), mdk, P(sx * (w / 2 - 0.02), h / 2, sz * (d / 2 - 0.02)), mat3=R, b=0.008)
+            box(p, (0.045, h, 0.045), mdk, P(sx * (w / 2 - 0.02), h / 2, sz * (d / 2 - 0.02)), mat3=R, b=0.008, seg=1)
     if fill and rnd:
         r = 0.065
         for k in range(14):
