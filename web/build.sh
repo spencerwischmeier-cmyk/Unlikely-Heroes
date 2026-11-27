@@ -40,6 +40,11 @@ echo "== export"
 rm -rf "$OUT"; mkdir -p "$OUT"
 "$GODOT" --headless --path "$SRC" --export-release Web "$OUT/index.html" > "$REPO/build/export.log" 2>&1
 test -s "$OUT/index.pck" || { tail -40 "$REPO/build/export.log"; echo "export failed"; exit 1; }
+# computer browsers can't read the phone texture formats (ETC2/ASTC), so they get their own game data (S3TC)
+rm -rf "$REPO/build/desktop"; mkdir -p "$REPO/build/desktop"
+"$GODOT" --headless --path "$SRC" --export-release WebDesktop "$REPO/build/desktop/index.html" >> "$REPO/build/export.log" 2>&1
+test -s "$REPO/build/desktop/index.pck" || { tail -40 "$REPO/build/export.log"; echo "desktop export failed"; exit 1; }
+mv "$REPO/build/desktop/index.pck" "$OUT/index.desktop.pck"
 
 echo "== site extras"
 cp "$HERE/site_extra/"* "$OUT/"
