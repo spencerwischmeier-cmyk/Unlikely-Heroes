@@ -263,7 +263,7 @@ func _build_ui() -> void:
 	font = preload("res://scripts/ui/hud_draw.gd").head_font()
 	layer = CanvasLayer.new(); layer.layer = 5; add_child(layer)
 	meter = Control.new(); meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	meter.draw.connect(_draw_meter); meter.set_meta("pop", 0.0)
+	meter.draw.connect(_draw_meter); meter.set_meta("pop", 0.0); meter.modulate.a = 0.0   # hidden until a combo starts (also while paused on the title)
 	layer.add_child(meter)
 	_anchor(meter, Vector2(1, 0.5), Rect2(-190, -150, 160, 160))
 	pop_label = _label(54, Color(1, 0.85, 0.3)); pop_sub = _label(20, Color(0.6, 0.95, 1))

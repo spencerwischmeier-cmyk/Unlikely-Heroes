@@ -43,6 +43,7 @@ static func pad_pos(i: int) -> Vector3:
 
 static func build(L: Node3D) -> void:
 	var K = Kit.new(L)
+	L.set_meta("garden_kit", K)    # the late look pass (areas/y_gardens_look.gd) restyles the kit's pieces
 	var life: Node3D = Life.new(); life.name = "GardenLife"; L.add_child(life)
 	life.amb_center = Vector3(-40, 10, -32); life.amb_radius = 32.0
 	_gardens(L, K, life)
