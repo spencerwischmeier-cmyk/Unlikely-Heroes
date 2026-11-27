@@ -153,6 +153,15 @@ func _physics_process(dt: float) -> void:
 		if c.get_meta("et_last", "") != cs:
 			c.set_meta("et_last", cs); print("[enemy-test] t=%.2f crew %s" % [float(n) / Engine.physics_ticks_per_second, cs])
 	if flags.has("bot"): _autoplay(dt)
+	if flags.has("stomp"):
+		stomp_t -= dt
+		if stomp_t <= 0.0:
+			stomp_t = 2.5
+			for b in get_tree().get_nodes_in_group("bots"):
+				if not b.dead and b.has_method("_launch") and b.state == "chase":
+					print("[enemy-test] drop vesk on a roller, hp ", b.hp)
+					Game.player.global_position = b.global_position + Vector3(0, 3.5, 0); Game.player.velocity = Vector3.ZERO
+					break
 	if flags.has("wrench"):
 		for b in get_tree().get_nodes_in_group("bots"):
 			if b.dead or not b.has_method("_launch"): continue
@@ -163,6 +172,7 @@ func _physics_process(dt: float) -> void:
 				print("[enemy-test] wrenched a roller")
 				break
 
+var stomp_t := 3.0
 var ap_strafe := 1.0
 var ap_strafe_t := 0.0
 var ap_dash_cd := 0.0

@@ -280,6 +280,7 @@ func _physics_process(dt: float) -> void:
 	if not grounded and not _no_ledge: _ledge_assist(wish)
 	else: ledge_used = false
 	if grounded: _edge_slip(dt, wish)
+	if not grounded and vy_before < -2.0: _stomp()
 	if grounded:
 		if not was_grounded:
 			if vy_before < -6.0: land_t = clampf(-vy_before / 20.0, 0.3, 1.0)
@@ -341,6 +342,23 @@ func _ledge_assist(wish: Vector3) -> void:
 	velocity.y = sqrt(2.0 * GRAV * (h + 0.3)); jump_cut = true; long_jump = false
 	land_t = 0.25
 	Snd.play("land", -10)
+
+## Coming down on top of a ground bot bounces Vesk off its head (and gives him his double jump back).
+func _stomp() -> void:
+	for b in get_tree().get_nodes_in_group("bots"):
+		if b.get("dead") or not b.has_method("center") or b.get("state") == "drop": continue
+		if b.is_class("Node3D") and b.get("collision_mask") == 0: continue   # fliers
+		var c: Vector3 = b.center()
+		var dy: float = global_position.y - c.y
+		if dy < 0.2 or dy > 1.0: continue
+		if Vector2(global_position.x - c.x, global_position.z - c.z).length() > 0.95: continue
+		b.damage(1.5, c + Vector3(0, 0.4, 0), Vector3.DOWN)
+		if OS.get_cmdline_user_args().has("--et-stomp"): print("[enemy-test] stomp! hp now ", b.get("hp"))
+		if combat: combat.damage_number(c, 1.5, b.dead)
+		velocity.y = JUMP * 0.95; jumps = 1; jump_cut = true; long_jump = false; grounded = false
+		land_t = 0.5; FX.puff(c + Vector3(0, 0.5, 0), Color(1, 0.85, 0.6)); FX.shake(0.35)
+		Snd.play("bounce_pad", -6, 0.1, 0.0); Snd.play("melee_hit", -8)
+		return
 
 ## Perched on a lip by the round bottom of his capsule (nothing under his middle): instead of hovering
 ## there, step him off it if he is heading out, otherwise settle him back onto the ledge (forgiving landings).
