@@ -295,12 +295,10 @@ static func _panic(L: Node3D) -> void:
 	# the collapsed stall is burning; smoke rolls up over the bazaar
 	C.fire(Vector3(-99.6, 0.4, 51.0), 0.85)
 	C.smoke(Vector3(-99.6, 1.4, 51.0), 1.2, true)
-	C.fire(Vector3(-98.2, 0.2, 52.2), 0.6, false)
 	# a fire on the roof behind the shop-houses: a smoke column over the whole market
-	C.column(Vector3(-69.0, 6.4, 21.0), 1.0, 30.0, 0.22)
-	# the hover barrow's pods are shorting out: sparks and a little smoke
-	C.smoke(Vector3(-63.2, 0.5, 44.0), 0.6, false)
-	C.embers(Vector3(-63.2, 0.3, 44.4), 0.6)
+	C.column(Vector3(-69.0, 6.4, 21.0), 0.8, 24.0, 0.22)
+	# the hover barrow's pods are shorting out: sparks
+	C.embers(Vector3(-63.2, 0.3, 44.4), 0.5)
 	# bags dropped in the rush
 	C.luggage(Vector3(-69.5, 0, 33.0), 2.2, 5, rng)
 	C.luggage(Vector3(-94.0, 0, 36.2), 1.8, 4, rng)
