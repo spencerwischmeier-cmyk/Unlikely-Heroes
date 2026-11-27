@@ -8,4 +8,3 @@ build/
 site-test/
 web/node_modules/
 build_run.log
-site/
