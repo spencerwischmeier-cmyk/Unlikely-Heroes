@@ -36,6 +36,7 @@ var anim: AnimationPlayer
 var bones := {}
 var cur_anim := "idle"
 var melee_t := 0.0
+var melee_buf := 0.0
 var land_play := 0.0
 var jets: Array = []
 # weapons in hand (the Arc Lancer is part of the hero mesh; the others are attached at the "gun" bone)
@@ -68,6 +69,7 @@ var jump_cut := false
 var long_jump := false
 var dash_t := 0.0
 var dash_cd := 0.0
+var dash_buf := 0.0
 var since_dash := 9.0
 var jet_t := 0.0
 var land_t := 0.0
@@ -223,7 +225,10 @@ func _physics_process(dt: float) -> void:
 
 	# --- dash ---
 	dash_cd -= dt; since_dash += dt
-	if Input.is_action_just_pressed("dash") and dash_cd <= 0.0:
+	dash_buf -= dt
+	if Input.is_action_just_pressed("dash"): dash_buf = 0.15
+	if dash_buf > 0.0 and dash_cd <= 0.0:
+		dash_buf = 0.0
 		var dir := wish.normalized() if wish.length() > 0.8 else Vector3(sin(face_yaw), 0, cos(face_yaw))
 		velocity.x = dir.x * 18.0; velocity.z = dir.z * 18.0
 		dash_t = 0.16; dash_cd = 0.6; since_dash = 0.0; Snd.play("dash", -3)
@@ -473,13 +478,18 @@ func _combat(dt: float, wish: Vector3) -> void:
 		weapon_kick = 1.0
 	# melee: a wide swing with a small lunge toward the nearest bot
 	melee_cd -= dt; combo_window -= dt
-	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked and slam == 0 \
+	# a press a moment early (mid-swing) is kept and fires when the swing allows, so combos flow
+	melee_buf -= dt
+	if Input.is_action_just_pressed("melee") and not Game.input_locked: melee_buf = 0.2
+	var melee_go := melee_buf > 0.0 and melee_cd <= 0.0
+	if melee_go: melee_buf = 0.0
+	if melee_go and slam == 0 \
 			and not grounded and not riding and swing_hook == null and velocity.y < 4.0 and not _no_slam and _slam_ok():
 		# high in the air: the swing becomes a slam (hang a beat, plunge, shockwave on landing)
 		slam = 1; slam_t = 0.14; spin_t = 0.3; melee_cd = 0.3; combo = 0
 		slam_target = _slam_pick()
 		Snd.play("melee_swing", -1, 0.05, 0.0); Snd.play("dash", -4, 0.0, 0.0, 0.8)
-	elif Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked and slam == 0:
+	elif melee_go and slam == 0:
 		combo = combo + 1 if combo_window > 0.0 and combo < 3 else 1
 		var fin := combo == 3
 		melee_cd = 0.6 if fin else 0.24; combo_window = 0.0 if fin else 0.6
