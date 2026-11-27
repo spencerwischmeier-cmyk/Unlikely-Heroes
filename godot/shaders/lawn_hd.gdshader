@@ -4,9 +4,9 @@
 shader_type spatial;
 render_mode blend_mix, diffuse_burley, specular_schlick_ggx;
 
-uniform vec3 deep_col : source_color = vec3(0.13, 0.3, 0.1);
-uniform vec3 mid_col : source_color = vec3(0.28, 0.5, 0.17);
-uniform vec3 sun_col : source_color = vec3(0.56, 0.68, 0.26);
+uniform vec3 deep_col : source_color = vec3(0.14, 0.28, 0.11);
+uniform vec3 mid_col : source_color = vec3(0.3, 0.47, 0.2);
+uniform vec3 sun_col : source_color = vec3(0.58, 0.65, 0.32);
 varying vec3 wpos;
 
 float h2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
