@@ -107,6 +107,9 @@ func _process(dt: float) -> void:
 	var fw := 20 if tour_fast else 90
 	var fe := 24 if tour_fast else 110
 	if _ti < 0 and _tf < fw: return
+	# wait for the static batcher (scripts/systems/zzz_batcher.gd) so the shots show the final scene
+	var bt: Node = game.main.get_node_or_null("ZzzBatcher") if game.get("main") else null
+	if _ti < 0 and bt and not OS.get_cmdline_user_args().has("--no-batch") and not bt.get("done"): return
 	if _ti < 0 or _tf > fe:
 		_ti += 1; _tf = 0; _ft = 0.0; _fn = 0
 		while not tour_only.is_empty() and _ti < TOUR.size() and not tour_only.has(TOUR[_ti][0]): _ti += 1

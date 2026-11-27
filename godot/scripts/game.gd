@@ -12,6 +12,7 @@ signal player_hit_from(pos: Vector3)                       # where a hit came fr
 signal player_fell
 signal player_respawned(pos: Vector3)
 signal player_downed                                       # hull ran out (systems/knockout.gd fades out and revives)
+signal close_call          # a dash through an enemy shot (combat._close_call)
 signal zone_entered(id: String)
 signal zone_cleared(id: String)
 signal objective_set(id: String, text: String)           # the current main objective

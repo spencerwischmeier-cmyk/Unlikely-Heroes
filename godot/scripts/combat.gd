@@ -488,6 +488,15 @@ func enemy_shot(from: Vector3, to: Vector3) -> void:
 	shots.append({ node = mi, vel = dir * 17.0, life = 3.0 })
 	Snd.at("hornet_shot", from, -4, 0.1, 0.02)
 
+func _close_call() -> void:
+	FX.slow(0.3, 0.35)
+	player.dash_cd = 0.0
+	invuln = maxf(invuln, 0.35)
+	FX.ring(player.global_position + Vector3(0, 0.15, 0), Color(0.45, 0.85, 1.0), 0.7)
+	float_text(player.global_position + Vector3(0, 1.6, 0), "CLOSE CALL", Color(0.55, 0.9, 1.0), 40)
+	Snd.play("dash", -1, 0.0, 0.0, 0.7)
+	Game.close_call.emit()
+
 func hurt_player(n: int, from = null, force := false) -> void:
 	if (invuln > 0.0 and not force) or hull <= 0: return
 	hull -= n; invuln = 0.9; Snd.play("hurt", -2); Game.player_hurt.emit(hull)
@@ -542,6 +551,17 @@ func _collect_ammo() -> void:
 	if got > 0 and Game.hud and Game.hud.has_method("toast_small"):
 		Game.hud.toast_small("+%d %s AMMO" % [got, WEAPONS[id].name], weapon_color(id))
 
+## A short word that rises and fades over a spot (same style as the damage numbers).
+func float_text(pos: Vector3, text: String, color: Color, size := 44) -> void:
+	var l := Label3D.new()
+	l.text = text; l.billboard = BaseMaterial3D.BILLBOARD_ENABLED; l.no_depth_test = true
+	l.font_size = size; l.outline_size = 12; l.modulate = color; l.pixel_size = 0.006
+	add_child(l); l.global_position = pos
+	var tw := create_tween().set_parallel().set_ignore_time_scale(true)
+	tw.tween_property(l, "global_position", pos + Vector3(0, 0.8, 0), 0.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(l, "modulate:a", 0.0, 0.6).set_delay(0.35)
+	tw.chain().tween_callback(l.queue_free)
+
 func damage_number(pos: Vector3, amount: float, kill: bool) -> void:
 	var l := Label3D.new()
 	l.text = str(snappedf(amount, 0.1)).trim_suffix(".0")
@@ -570,9 +590,17 @@ func _physics_process(dt: float) -> void:
 		s.life -= dt
 		var seg := to - from
 		var k := clampf((hero_c - from).dot(seg) / maxf(seg.length_squared(), 1e-6), 0, 1)
-		var hit_hero := player and (from + seg * k).distance_to(hero_c) < 0.6
+		var miss_d := (from + seg * k).distance_to(hero_c) if player else INF
+		var hit_hero := miss_d < 0.6
 		var q := PhysicsRayQueryParameters3D.create(from, to); q.collision_mask = 1
 		var hw := space.intersect_ray(q)
+		# a dash through a shot is a close call: it flies past, time slows for a breath and the dash
+		# is ready again, so a good read chains straight into the counter
+		if miss_d < 1.4 and player.since_dash < 0.4:
+			hit_hero = false
+			if not s.get("dodged", false):
+				s.dodged = true
+				_close_call()
 		if hit_hero or hw or s.life <= 0.0:
 			if hit_hero: hurt_player(1, from)
 			FX.sparks(to, Color(1, 0.4, 0.25), 8, 4)

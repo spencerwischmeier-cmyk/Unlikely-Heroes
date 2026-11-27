@@ -46,14 +46,21 @@ func _add_marks() -> void:
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a == "--perf-bisect": bisect = true; on = true; secs = 9999.0
+		if a == "--spike-marks": spike_marks = true; on = true
+		if a == "--spike-bisect": bisect = true; spike_mode = true; on = true; secs = 9999.0
 		if a == "--perf-probe": on = true
 		elif a.begins_with("--perf-probe="): on = true; secs = float(a.substr(13))
 	set_process(on)
-	if on: _add_marks()
+	if on:
+		_add_marks()
+		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 
 func _process(dt: float) -> void:
 	if bisect: _bisect(dt); return
 	t += dt; acc_t += dt; frames += 1
+	_spike(dt)
+	if spike_marks:
+		if smarks.is_empty() and t > 2.5: _place_smarks()
 	if Game.cam and t > 2.0: Game.cam.yaw += dt * 0.35
 	if acc_t < 1.0: return
 	var fps := frames / acc_t
@@ -76,6 +83,71 @@ func _process(dt: float) -> void:
 		var avg := func(k): return rows.reduce(func(a, x): return a + float(x[k]), 0.0) / rows.size()
 		print("[perf] AVG fps %.1f min %.0f proc %.1fms phys %.1fms draws %.0f prims %.0fk" % [avg.call("fps"), rows.map(func(x): return x.fps).min(), avg.call("proc"), avg.call("phys"), avg.call("draws"), avg.call("prims") / 1000.0])
 		get_tree().quit()
+
+## --spike-marks: drops a timing mark after every node down to a few levels of the tree (marks run in
+## tree order with the nodes around them), and on a frame whose _process callbacks took over 12 ms
+## prints which stretches of the tree the time went to.
+var spike_marks := false
+var smarks: Array = []
+class SMark extends Node:
+	var probe
+	var label := ""
+	var t := 0
+	var checker := false
+	func _process(_dt: float) -> void:
+		if checker: probe._check_smarks()   # last frame's marks are all in place now
+		t = Time.get_ticks_usec()
+
+func _place_smarks() -> void:
+	var stack: Array = [[get_tree().root, 0]]
+	var spots: Array = []
+	while not stack.is_empty():
+		var e: Array = stack.pop_back()
+		var n: Node = e[0]
+		if n is SMark or n == self: continue
+		for c in n.get_children(): stack.append([c, e[1] + 1])
+		if e[1] >= 1 and e[1] <= 4 and n.get_child_count() > 0 or e[1] >= 1 and e[1] <= 2:
+			spots.append(n)
+	for n in spots:
+		if n.get_parent() == null: continue
+		var m := SMark.new(); m.probe = self; m.label = str(n.get_path()).trim_prefix("/root/")
+		n.add_sibling.call_deferred(m)
+		smarks.append(m)
+	var first := SMark.new(); first.label = "<start>"; first.process_priority = -99999; first.probe = self; first.checker = true
+	get_tree().root.add_child.call_deferred(first); smarks.append(first)
+	var last := SMark.new(); last.label = "<end>"; last.process_priority = 99999
+	get_tree().root.add_child.call_deferred(last); smarks.append(last)
+	print("[marks] %d marks" % smarks.size())
+
+func _check_smarks() -> void:
+	var arr := smarks.filter(func(m): return is_instance_valid(m) and m.t > 0)
+	arr.sort_custom(func(a, b): return a.t < b.t)
+	if arr.size() < 2: return
+	var total: float = (arr.back().t - arr[0].t) / 1000.0
+	if total < 12.0: return
+	var gaps: Array = []
+	for i in range(1, arr.size()): gaps.append([(arr[i].t - arr[i - 1].t) / 1000.0, arr[i - 1].label, arr[i].label])
+	gaps.sort_custom(func(a, b): return a[0] > b[0])
+	var out := PackedStringArray()
+	for g in gaps.slice(0, 4): out.append("%.1fms after %s (before %s)" % g)
+	print("[marks] t=%.2f callbacks %.1fms: %s" % [t, total, " | ".join(out)])
+
+## A frame over 30 ms prints what it was made of: our scripts, physics (and how many physics steps
+## it had to catch up), the renderer's CPU and GPU time for the last frame, node count change, draws.
+var _last_nodes := 0
+var _last_pf := 0
+var _last_phys_us := 0
+func _spike(dt: float) -> void:
+	var nodes := int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	var pf := Engine.get_physics_frames()
+	var ph_us := phys_us - _last_phys_us
+	if t > 3.0 and dt > 0.030:
+		var vp := get_viewport().get_viewport_rid()
+		print("[spike] t=%.2f frame %.1fms scripts %.1fms physics %.1fms (%d steps) render cpu %.1fms gpu %.1fms setup %.1fms nodes %+d draws %d" % [t, dt * 1000.0,
+			script_us / 1000.0, ph_us / 1000.0, pf - _last_pf,
+			RenderingServer.viewport_get_measured_render_time_cpu(vp), RenderingServer.viewport_get_measured_render_time_gpu(vp),
+			RenderingServer.get_frame_setup_time_cpu(), nodes - _last_nodes, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)])
+	_last_nodes = nodes; _last_pf = pf; _last_phys_us = phys_us
 
 ## Candidates are groups: every node running a given script's _process/_physics_process, plus all
 ## AnimationPlayers / AnimationTrees, all CPU particles, all Skeleton3Ds.
@@ -117,6 +189,9 @@ func _ms() -> float:
 	phys_us = 0
 	return v
 
+## --spike-bisect: the same, but each group is judged by the worst frame in a 6.6 s window (two
+## periods of a 3.2 s job), so a script that only costs something every few seconds shows up
+var spike_mode := false
 var sub := 0          # 0 = measuring with the group on, 1 = with it off
 var on_ms := 0.0
 var win: Array = []
@@ -127,9 +202,10 @@ func _bisect(dt: float) -> void:
 		_collect(); ci = 0; sub = 0; phase_t = 0.0; samp = 0.0; samp_n = 0
 		return
 	if phase_t > 0.4: win.append(_ms())   # skip the switch-over frames
-	if phase_t < 2.5: return
+	if phase_t < (6.6 if spike_mode else 2.5): return
 	win.sort()
 	var avg: float = win[win.size() / 2] if not win.is_empty() else 0.0   # median: ignores the periodic spikes
+	if spike_mode: avg = win.back() if not win.is_empty() else 0.0
 	win.clear(); phase_t = 0.0
 	var g: Array = cands[ci]
 	if sub == 0:

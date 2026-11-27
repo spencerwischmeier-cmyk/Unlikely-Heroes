@@ -5,6 +5,9 @@ extends Node3D
 
 var shake_request := 0.0
 var hitstop := 0.0
+## brief slow motion (scale, real seconds left), e.g. a close-call dodge
+var slow_scale := 1.0
+var slow_t := 0.0
 var _spark_mesh: Mesh
 var _fire_mesh: Mesh
 var _smoke_mesh: Mesh
@@ -19,7 +22,12 @@ func _ready() -> void:
 	var c := BoxMesh.new(); c.size = Vector3(0.18, 0.12, 0.22)
 	_chunk_mesh = c
 
-func _bill(color: Color, energy: float, tex := false) -> StandardMaterial3D:
+## Particle materials are shared per look (colour, strength, blend, alpha): a fresh material per burst
+## costs a material setup each time and hitches on busy frames.
+var _bills := {}
+func _bill(color: Color, energy: float, tex := false, mix := false, alpha := 1.0) -> StandardMaterial3D:
+	var key := "%s|%.2f|%s|%.2f" % [color.to_html(), energy, mix, alpha]
+	if _bills.has(key): return _bills[key]
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
@@ -29,6 +37,9 @@ func _bill(color: Color, energy: float, tex := false) -> StandardMaterial3D:
 	m.albedo_color.a = 1.0
 	m.vertex_color_use_as_albedo = true
 	m.albedo_texture = _soft_tex()
+	if mix: m.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	m.albedo_color.a = alpha
+	_bills[key] = m
 	return m
 
 var _soft: GradientTexture2D
@@ -72,14 +83,13 @@ func sparks(pos: Vector3, color := Color(0.7, 0.98, 1.0), n := 12, speed := 6.0)
 	_emit(pos, _fire_mesh, _bill(color, 2.0), 1, 0.12, Vector2.ZERO, Vector3.ZERO, Vector2(0.6, 0.6))
 
 func puff(pos: Vector3, color := Color(0.85, 0.9, 1.0)) -> void:
-	var m := _bill(color, 0.6); m.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	var m := _bill(color, 0.6, false, true)
 	_emit(pos, _smoke_mesh, m, 8, 0.6, Vector2(0.5, 2.0), Vector3(0, 0.5, 0), Vector2(0.3, 0.7), 80, Vector3.UP)
 
 func explosion(pos: Vector3, scale := 1.0, chunk_mats: Array = []) -> void:
 	_emit(pos, _fire_mesh, _bill(Color(1.0, 0.6, 0.2), 3.0), 14, 0.55, Vector2(1, 4) * scale, Vector3(0, 1.5, 0), Vector2(1.2, 2.6) * scale)
 	_emit(pos, _fire_mesh, _bill(Color(1.0, 0.95, 0.8), 4.0), 3, 0.18, Vector2(0, 1), Vector3.ZERO, Vector2(2.5, 3.5) * scale)
-	var sm := _bill(Color(0.42, 0.44, 0.5), 1.0); sm.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
-	sm.albedo_color.a = 0.55
+	var sm := _bill(Color(0.42, 0.44, 0.5), 1.0, false, true, 0.55)
 	_emit(pos, _smoke_mesh, sm, 10, 1.6, Vector2(0.5, 2) * scale, Vector3(0, 1.2, 0), Vector2(1.2, 3.0) * scale)
 	_emit(pos, _spark_mesh, _bill(Color(1, 0.7, 0.25), 3.0), 24, 0.6, Vector2(4, 12) * scale, Vector3(0, -9, 0), Vector2(0.6, 1.6))
 	# scrap chunks with real lighting that tumble and bounce
@@ -98,16 +108,25 @@ func load_chunk_mat() -> StandardMaterial3D:
 		_chunk_default = StandardMaterial3D.new(); _chunk_default.albedo_color = Color(0.3, 0.33, 0.38); _chunk_default.metallic = 0.8; _chunk_default.roughness = 0.4
 	return _chunk_default
 
+## The torus and its material are built once (per colour) and shared: building a fresh torus and
+## material for every ring cost ~25 ms a time on the PC (the mast's broadcast pulse hitched every 3.2 s).
+var _ring_mesh: TorusMesh
+var _ring_mats := {}
 func ring(pos: Vector3, color: Color, scale := 1.0) -> void:
-	var t := TorusMesh.new(); t.inner_radius = 0.9; t.outer_radius = 1.0; t.rings = 32
-	var mi := MeshInstance3D.new(); mi.mesh = t
-	var m := StandardMaterial3D.new(); m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD; m.albedo_color = color * 2.0
-	mi.material_override = m
+	if _ring_mesh == null:
+		_ring_mesh = TorusMesh.new(); _ring_mesh.inner_radius = 0.9; _ring_mesh.outer_radius = 1.0; _ring_mesh.rings = 32; _ring_mesh.ring_segments = 8
+	var key := color.to_html()
+	var m: StandardMaterial3D = _ring_mats.get(key)
+	if m == null:
+		m = StandardMaterial3D.new(); m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD; m.albedo_color = color * 2.0
+		_ring_mats[key] = m
+	var mi := MeshInstance3D.new(); mi.mesh = _ring_mesh; mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi); mi.global_position = pos; mi.scale = Vector3.ONE * 0.4
 	var tw := create_tween().set_parallel()
 	tw.tween_property(mi, "scale", Vector3(4, 1, 4) * scale, 0.35)
-	tw.tween_property(m, "albedo_color", Color(0, 0, 0, 0), 0.35)
+	tw.tween_property(mi, "transparency", 1.0, 0.35)
 	tw.chain().tween_callback(mi.queue_free)
 
 func shake(n: float) -> void:
@@ -115,6 +134,9 @@ func shake(n: float) -> void:
 
 func stop(t: float) -> void:
 	hitstop = maxf(hitstop, t)
+
+func slow(scale: float, t: float) -> void:
+	slow_scale = scale; slow_t = maxf(slow_t, t)
 
 ## Directional spark spray (hit reactions): sparks fly back along `dir` (the way the hit came from).
 func hit_sparks(pos: Vector3, dir: Vector3, color := Color(1, 0.85, 0.5), n := 10) -> void:
@@ -134,7 +156,7 @@ func death_burst(pos: Vector3, scale := 1.0, chunk_mats: Array = [], color := Co
 
 ## A trail puff for something falling in flames.
 func smoke_trail(pos: Vector3, scale := 1.0) -> void:
-	var m := _bill(Color(0.3, 0.3, 0.34), 1.0); m.blend_mode = BaseMaterial3D.BLEND_MODE_MIX; m.albedo_color.a = 0.6
+	var m := _bill(Color(0.3, 0.3, 0.34), 1.0, false, true, 0.6)
 	_emit(pos, _smoke_mesh, m, 2, 0.9, Vector2(0.2, 0.8), Vector3(0, 1.0, 0), Vector2(0.5, 1.1) * scale, 60)
 	_emit(pos, _fire_mesh, _bill(Color(1, 0.5, 0.15), 2.5), 1, 0.2, Vector2.ZERO, Vector3.ZERO, Vector2(0.5, 0.8) * scale)
 
