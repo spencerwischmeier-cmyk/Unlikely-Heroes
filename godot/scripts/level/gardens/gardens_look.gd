@@ -41,7 +41,9 @@ static func build(L) -> void:
 	if K == null or K.root == null: return
 	var root: Node3D = K.root
 	var t0 := Time.get_ticks_msec()
-	var leaves := _foliage(root)
+	_beds(K, root)
+	var extra := _tree_crowns(root)
+	var leaves := _foliage(K, root, extra)
 	var surf := _surfaces(K, root)
 	_grass_seed(L, K, root)
 	_mist(L)
@@ -107,7 +109,7 @@ static func _tier(r: float) -> int:
 
 ## Replace the kit's leaf-ball MultiMeshes with leaf-card clumps (per tier, per cell). Hedge boxes keep their
 ## box as a dense core and get a row of clumps along the top and sides.
-static func _foliage(root: Node3D) -> int:
+static func _foliage(K, root: Node3D, extra: Array = []) -> int:
 	var groups := {}       # "tier|cx|cz" -> { xf: [], col: [] }
 	var add := func(xf: Transform3D, col: Color) -> void:
 		var s := xf.basis.get_scale()
@@ -117,12 +119,14 @@ static func _foliage(root: Node3D) -> int:
 		if not groups.has(key): groups[key] = { tier = tier, xf = [], col = [] }
 		groups[key].xf.append(xf); groups[key].col.append(col)
 	var count := 0
+	for e in extra:
+		add.call(e[0], e[1]); count += 1
 	for c in root.get_children():
 		if not (c is MultiMeshInstance3D): continue
 		var mmi := c as MultiMeshInstance3D
 		var mm := mmi.multimesh
-		if mm == null: continue
-		if mmi.name == "MM_leaf":
+		if mm == null or mmi.material_override != K.foliage_mat: continue
+		if mm.mesh == K.blob_mesh:
 			for i in mm.instance_count:
 				var xf := mm.get_instance_transform(i)
 				var sc := xf.basis.get_scale()
@@ -132,7 +136,7 @@ static func _foliage(root: Node3D) -> int:
 				count += 1
 			mmi.visible = false
 			mmi.queue_free()
-		elif mmi.name == "MM_leafbox":
+		elif mm.mesh == K.box_mesh:
 			# hedges: shrink the box into a dark core and cover it with clumps
 			var core := mm.duplicate() as MultiMesh
 			for i in mm.instance_count:
@@ -174,6 +178,69 @@ static func _foliage(root: Node3D) -> int:
 
 static func _vary(c: Color) -> Color:
 	return Color(c.r * randf_range(0.92, 1.08), c.g * randf_range(0.94, 1.06), c.b * randf_range(0.9, 1.1))
+
+# ------------------------------------------------------------------ fuller beds, leafy tree crowns
+## The raised beds get packed: low leafy clumps between the flowers, more blooms in drifts of one colour, and
+## leaf rosettes at the rims, so every bed reads as overflowing rather than a few flowers on soil.
+static func _beds(K, root: Node3D) -> void:
+	var rng := RandomNumberGenerator.new(); rng.seed = 4040
+	var pal: Array = K.FLOWER_COLS
+	var beds := 0
+	var soil_area := 0.0
+	for c in root.get_children():
+		if not (c is MultiMeshInstance3D) or (c as MultiMeshInstance3D).material_override != K.soil_mat: continue
+		var mm: MultiMesh = (c as MultiMeshInstance3D).multimesh
+		for i in mm.instance_count:
+			var xf := mm.get_instance_transform(i)
+			var sz := xf.basis.get_scale()
+			var top := xf.origin.y + sz.y * 0.5
+			var area := sz.x * sz.z
+			beds += 1
+			soil_area += area
+			# leafy fill (becomes leaf clumps in _foliage)
+			for k in int(area * 2.2) + 1:
+				var p := xf.origin + Vector3(rng.randf_range(-0.42, 0.42) * sz.x, 0, rng.randf_range(-0.42, 0.42) * sz.z)
+				var r := rng.randf_range(0.22, 0.34)
+				K.add_inst("leaf", K.blob_mesh, K.foliage_mat, K.xf_at(Vector3(p.x, top + r * 0.45, p.z), Vector3(r, r * 0.75, r), rng.randf() * TAU), K._vary(Color(0.24, 0.52, 0.24)))
+			# drifts of blooms
+			var col: Color = pal[rng.randi() % pal.size()]
+			for k in int(area * 9.0):
+				if rng.randf() < 0.18: col = pal[rng.randi() % pal.size()]
+				var p := xf.origin + Vector3(rng.randf_range(-0.46, 0.46) * sz.x, 0, rng.randf_range(-0.46, 0.46) * sz.z)
+				K.flower(Vector3(p.x, top + rng.randf_range(0.3, 0.62), p.z), col, rng.randf_range(0.16, 0.28))
+			# rosettes spilling over the rim
+			for k in int((sz.x + sz.z) * 1.6):
+				var u := rng.randf()
+				var edge := Vector3((u - 0.5) * sz.x, 0, (0.5 if rng.randf() < 0.5 else -0.5) * sz.z) if rng.randf() < sz.x / (sz.x + sz.z) else Vector3((0.5 if rng.randf() < 0.5 else -0.5) * sz.x, 0, (u - 0.5) * sz.z)
+				var p := xf.origin + edge * 0.92
+				K.add_inst("leafy", K.leaf_mesh, K._petal_mat(Color(0.3, 0.6, 0.28)), K.xf_at(Vector3(p.x, top + 0.02, p.z), Vector3.ONE * rng.randf_range(0.8, 1.3), rng.randf() * TAU), K._vary(Color(0.3, 0.62, 0.28)), false)
+	K.flush()
+	print("[gardens-look] beds filled: %d (%.0f m2 of soil)" % [beds, soil_area])
+
+## The potted Meshy trees' smooth crowns get a shell of leaf clumps (the model stays inside as the dense core).
+static func _tree_crowns(root: Node3D) -> Array:
+	var out := []
+	var rng := RandomNumberGenerator.new(); rng.seed = 6060
+	for h in root.get_children():
+		# model holders lose their "G_<name>" name to auto-renaming; the model root keeps the glb's name
+		if not (h is Node3D) or (h is GeometryInstance3D) or h.get_child_count() == 0: continue
+		if not (String(h.name).contains("garden_tree") or String(h.get_child(0).name).begins_with("garden_tree")): continue
+		var ab := AABB(); var first := true
+		for mi in (h as Node3D).find_children("*", "MeshInstance3D", true, false):
+			var a: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+			ab = a if first else ab.merge(a); first = false
+		if first: continue
+		var c := ab.get_center()
+		var w := maxf(ab.size.x, ab.size.z)
+		var crown_c := Vector3(c.x, ab.position.y + ab.size.y * 0.7, c.z)
+		var cr := w * 0.42
+		for k in 7:
+			var d := Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.4, 0.8), rng.randf_range(-1, 1)).normalized() * cr * 0.55
+			if k == 0: d = Vector3(0, cr * 0.35, 0)
+			var r := cr * rng.randf_range(0.55, 0.7)
+			out.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(r, r * 0.85, r)), crown_c + d), Color(0.36, 0.64, 0.3) * rng.randf_range(0.9, 1.1)])
+	print("[gardens-look] tree crowns: %d clumps" % out.size())
+	return out
 
 # ------------------------------------------------------------------ surfaces
 static func _surf(kind: int, col: Color, moss: float, unit: bool, extra := {}) -> ShaderMaterial:
@@ -218,6 +285,8 @@ static func _surfaces(K, root: Node3D) -> int:
 			if mesh is BoxMesh: gi.set_instance_shader_parameter("box_half", (mesh as BoxMesh).size * 0.5)
 		else: continue
 		n += 1
+	# a richer lawn
+	(K.lawn_mat as ShaderMaterial).shader = load("res://shaders/lawn_hd.gdshader")
 	# richer, darker soil in the beds
 	if K.soil_mat is StandardMaterial3D:
 		var s := K.soil_mat as StandardMaterial3D
@@ -249,7 +318,7 @@ class GrassSeeder extends Node3D:
 	var lawns := []
 	var pave := []
 	var _frames := 0
-	const DENSITY := 7.0
+	const DENSITY := 11.0
 
 	func _physics_process(_dt: float) -> void:
 		_frames += 1
@@ -276,7 +345,7 @@ class GrassSeeder extends Node3D:
 				var ray := PhysicsRayQueryParameters3D.create(p + Vector3(0, 3.0, 0), p - Vector3(0, 0.5, 0))
 				var hit := space.intersect_ray(ray)
 				if hit.is_empty() or absf(hit.position.y - deck) > 0.06: continue
-				var w := rng.randf_range(0.32, 0.5); var h := rng.randf_range(0.2, 0.36)
+				var w := rng.randf_range(0.34, 0.52); var h := rng.randf_range(0.24, 0.42)
 				xfs.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(w, h, w)), Vector3(p.x, deck + 0.02, p.z)))
 			if xfs.is_empty(): continue
 			var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.mesh = mesh
