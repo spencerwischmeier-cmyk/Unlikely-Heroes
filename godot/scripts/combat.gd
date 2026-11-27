@@ -522,6 +522,8 @@ func claim_aim(who: Node3D, dur: float) -> bool:
 	var id := who.get_instance_id()
 	for k in aimers.keys():
 		if aimers[k] < now or not is_instance_id_valid(k): aimers.erase(k)
+	if aim_wait.size() > 32:
+		for k in aim_wait.keys(): if not is_instance_id_valid(k): aim_wait.erase(k)
 	if aimers.has(id): return true
 	if not aim_wait.has(id): aim_wait[id] = now
 	var waited: float = (now - aim_wait[id]) / 1000.0
