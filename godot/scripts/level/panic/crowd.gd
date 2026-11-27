@@ -245,7 +245,8 @@ func _spawn(zone: Dictionary, role: String) -> void:
 		yaw = rng.randf() * TAU, state = "react", t = rng.randf_range(0.2, 2.0), path = PackedVector3Array(), pi = 0,
 		speed = 5.0, anim = "", role = role, active = true, luggage = null, slot = -1, flee_from = Vector3.ZERO,
 		run_clip = "run" if rng.randf() < 0.6 else "run2", rate = rng.randf_range(0.9, 1.12), threat_t = rng.randf(), want_path = false,
-		dest = Vector2i(-1, -1), react = "look" }
+		dest = Vector2i(-1, -1), react = "look",
+		meshes = node.find_children("*", "MeshInstance3D", true, false), near = true, shad = true, adt = 0.0, phase = people.size() % 3 }
 	if role == "evac":
 		p.luggage = _luggage(node, 1.7)
 		p.luggage.visible = false
@@ -333,6 +334,27 @@ func _physics_process(dt: float) -> void:
 	_boarding(dt)
 	_barks(dt, pp)
 
+## Level of detail for people: past SHADOW_D they stop casting shadows, past NEAR_D their animation
+## updates every third frame (staggered, with the time saved up so they don't slow down).
+const NEAR_D := 24.0
+const SHADOW_D := 36.0
+func _lod(p: Dictionary, d: float, dt: float) -> void:
+	var shad := d < SHADOW_D
+	if shad != p.shad:
+		p.shad = shad
+		for mi in p.meshes:
+			if is_instance_valid(mi): (mi as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shad else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if p.ap == null: return
+	var near := d < NEAR_D
+	if near != p.near:
+		p.near = near
+		p.ap.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE if near else AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+		p.adt = 0.0
+	if not near and p.active:
+		p.adt += dt
+		if Engine.get_physics_frames() % 3 == p.phase:
+			p.ap.advance(p.adt); p.adt = 0.0
+
 func _step(p: Dictionary, dt: float, pp: Vector3) -> void:
 	if p.state == "gone":
 		p.t -= dt
@@ -344,6 +366,7 @@ func _step(p: Dictionary, dt: float, pp: Vector3) -> void:
 		p.active = act
 		if p.ap: p.ap.active = act
 	p.node.visible = d < SHOW_D
+	_lod(p, d, dt)
 	# far away people stand still, except those on their way somewhere (evacuees must still reach the queue)
 	if not act and p.state != "walk": return
 	# threats: a bot close by makes people duck and run (queuers just flinch)

@@ -20,6 +20,8 @@ var melee_hit := 0.0
 var combo := 0               # wrench combo step: 1, 2, then 3 is a spinning finisher
 var combo_window := 0.0      # time left to chain the next swing
 var spin_t := 0.0            # finisher spin (adds a full turn to the model's facing)
+var slam := 0                # wrench slam from the air: 1 = wind-up hang, 2 = plunging (see _slam_land)
+var slam_t := 0.0
 var flip_t := 0.0           # forward flip on the double jump
 var twist := 0.0             # swing wind-up: the first swing comes from the right, the second backhands from the left
 var aim_point := Vector3.ZERO
@@ -280,6 +282,7 @@ func _physics_process(dt: float) -> void:
 	if ledge_t > 0.0:
 		ledge_t -= dt
 		velocity.x = ledge_dir.x * 3.2; velocity.z = ledge_dir.z * 3.2
+	if slam > 0: _slam_step(dt)
 	var vy_before := velocity.y
 	var was_grounded := grounded
 	move_and_slide()
@@ -288,6 +291,7 @@ func _physics_process(dt: float) -> void:
 	else: ledge_used = false
 	if grounded: _edge_slip(dt, wish)
 	if not grounded and vy_before < -2.0: _stomp()
+	if grounded and slam == 2: _slam_land()
 	if grounded:
 		if not was_grounded:
 			if vy_before < -6.0: land_t = clampf(-vy_before / 20.0, 0.3, 1.0)
@@ -302,7 +306,7 @@ func _physics_process(dt: float) -> void:
 		for b in level.bouncers:
 			if Vector2(global_position.x - b.pos.x, global_position.z - b.pos.z).length() < 1.15 and absf(global_position.y - b.pos.y) < 0.6:
 				velocity.y = b.power; grounded = false; jumps = 1; jump_cut = true; long_jump = false; coyote = 0.0
-				b.squash = 1.0; Snd.play("bounce_pad", -1)
+				b.squash = 1.0; Snd.play("bounce_pad", -1); slam = 0
 
 	# --- fell off ---
 	if global_position.y < -25.0:
@@ -350,6 +354,38 @@ func _ledge_assist(wish: Vector3) -> void:
 	land_t = 0.25
 	Snd.play("land", -10)
 
+var _no_slam := OS.get_cmdline_user_args().has("--no-slam")
+
+## Height above whatever is below (INF over the void).
+func _air_height() -> float:
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 0.1, 0), global_position - Vector3(0, 40, 0))
+	q.collision_mask = 1; q.exclude = [get_rid()]
+	var h := get_world_3d().direct_space_state.intersect_ray(q)
+	return global_position.y - h.position.y if h else INF
+
+## Something to swing at up here (a hornet at this height): then an air press stays a swing.
+func _air_target_near() -> bool:
+	var nt: Node3D = combat.nearest_target(global_position, 3.4) if combat else null
+	return nt != null
+
+func _slam_step(dt: float) -> void:
+	if riding or swing_hook or grounded and slam == 1: slam = 0; return
+	if combat: combat.invuln = maxf(combat.invuln, 0.1)
+	if slam == 1:
+		velocity = velocity * exp(-18.0 * dt)
+		slam_t -= dt
+		if slam_t <= 0.0: slam = 2
+	else:
+		velocity.x *= exp(-6.0 * dt); velocity.z *= exp(-6.0 * dt)
+		velocity.y = -28.0
+
+## The slam hits the ground: a shockwave knocks back and hurts ground bots around Vesk.
+func _slam_land() -> void:
+	slam = 0
+	land_t = 0.9; jumps = 0
+	if combat: combat.slam_wave(global_position)
+	melee_cd = 0.3
+
 ## Coming down on top of a ground bot bounces Vesk off its head (and gives him his double jump back).
 func _stomp() -> void:
 	for b in get_tree().get_nodes_in_group("bots"):
@@ -359,6 +395,7 @@ func _stomp() -> void:
 		var dy: float = global_position.y - c.y
 		if dy < 0.2 or dy > 1.0: continue
 		if Vector2(global_position.x - c.x, global_position.z - c.z).length() > 0.95: continue
+		if slam == 2: _slam_land()
 		b.damage(1.5, c + Vector3(0, 0.4, 0), Vector3.DOWN)
 		if OS.get_cmdline_user_args().has("--et-stomp"): print("[enemy-test] stomp! hp now ", b.get("hp"))
 		if combat: combat.damage_number(c, 1.5, b.dead)
@@ -381,6 +418,7 @@ func _edge_slip(dt: float, wish: Vector3) -> void:
 	else: move_and_collide(-nh * 2.5 * dt)
 
 func respawn() -> void:
+	slam = 0
 	global_position = respawn_pos; velocity = Vector3.ZERO; riding = false; swing_hook = null; rope.visible = false
 	dash_t = 0.0; long_jump = false; jumps = 0
 	if not is_nan(respawn_yaw): cam.yaw = respawn_yaw; face_yaw = respawn_yaw
@@ -409,7 +447,12 @@ func _combat(dt: float, wish: Vector3) -> void:
 		weapon_kick = 1.0
 	# melee: a wide swing with a small lunge toward the nearest bot
 	melee_cd -= dt; combo_window -= dt
-	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked:
+	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked and slam == 0 \
+			and not grounded and not riding and swing_hook == null and velocity.y < 4.0 and not _no_slam and _air_height() > 2.2 and not _air_target_near():
+		# high in the air: the swing becomes a slam (hang a beat, plunge, shockwave on landing)
+		slam = 1; slam_t = 0.14; spin_t = 0.3; melee_cd = 0.3; combo = 0
+		Snd.play("melee_swing", -1, 0.05, 0.0); Snd.play("dash", -4, 0.0, 0.0, 0.8)
+	elif Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked and slam == 0:
 		combo = combo + 1 if combo_window > 0.0 and combo < 3 else 1
 		var fin := combo == 3
 		melee_cd = 0.6 if fin else 0.24; combo_window = 0.0 if fin else 0.6
