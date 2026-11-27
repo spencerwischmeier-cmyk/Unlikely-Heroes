@@ -527,6 +527,6 @@ static func traversal_cases(moves: Dictionary) -> Dictionary:
 	c["gd_hive2"] = [Vector3(h0.x, t0 + 0.1, h0.z), atan2(dh.x, dh.y), moves.dj, t1, Rect2(h1.x - 1.2, h1.z - 1.2, 2.4, 2.4)]
 	c["gd_bridge"] = [Vector3(TREE.x - 0.2, CROWN_Y + 0.1, TREE.y), PI, moves.run, CROWN_Y, Rect2(TREE.x - 1.2, LOOK.z + LOOK_R, 2.0, (TREE.y - CROWN_R) - (LOOK.z + LOOK_R))]
 	c["hooks_gd_grove"] = [Vector3(-60.6, CROWN_Y + 0.1, CHOOKS[0].z), PI / 2, moves.hooks2, GROVE_Y, GROVE]
-	c["gd_ledge_down"] = [Vector3(-38.8, Y + 0.1, WLEDGE.z), -PI / 2, moves.run, WLEDGE.y, Rect2(WLEDGE.x - 1.5, WLEDGE.z - 1.6, 3.0, 3.2)]
+	c["gd_ledge_down"] = [Vector3(-38.8, Y + 0.1, WLEDGE.z), -PI / 2, [[0.0, "move_forward", true], [0.5, "move_forward", false]], WLEDGE.y, Rect2(WLEDGE.x - 1.5, WLEDGE.z - 1.6, 3.0, 3.2)]
 	c["gd_ledge_up"] = [Vector3(WLEDGE.x - 0.6, WLEDGE.y + 0.1, WLEDGE.z), PI / 2, moves.dj, Y, Rect2(-40, -14, 20, 18)]
 	return c

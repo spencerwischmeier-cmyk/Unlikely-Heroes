@@ -55,6 +55,9 @@ func _ready() -> void:
 		state = "follow"
 	_place_start.call_deferred()
 	Game.zone_cleared.connect(_on_zone_cleared)
+	Game.progress_restored.connect(func(ids: Array):
+		if ids.has("dodger_launch") and state == "crashed":
+			state = "follow"; drone.tilt = Vector3.ZERO; drone.hover = 1.0; drone.dim = 0.0; drone.global_position = _target())
 	Game.zone_entered.connect(_on_zone_entered)
 	Game.bot_killed.connect(_on_kill)
 	Game.player_fell.connect(func(): if state == "follow": _bark("dodger", "fall", 0.8); _emote("surprised", 1.4))

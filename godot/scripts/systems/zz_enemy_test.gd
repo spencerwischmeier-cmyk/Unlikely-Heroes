@@ -19,6 +19,8 @@ extends Node
 ##   --et-skip1           tour: skip the phase 1 slam and go straight to the phase change
 ##   --et-cam             a fixed overview camera on the fight (for screenshots)
 ##   --et-jump            Vesk double-jumps over the sweeping jib (on in tour mode)
+##   --et-bot             a simple autoplayer fights: aims at the nearest bot, fires, strafes, dashes away
+##                        from fusing rollers and locked-on hornets, wrenches rollers that get close
 ##   --et-secs=<s>        quit after s game seconds (headless runs default to 240) with a summary line
 ##   --et-stay            don't quit by itself when the fight is over
 ##   --et-snap=a@t,b@t    save a screenshot t seconds into each boss state a, b... to --et-out=<prefix>
@@ -150,6 +152,7 @@ func _physics_process(dt: float) -> void:
 		var cs := "%s %d/%d builds %d barricades %d" % [c.state, c.members.size(), 3, c.builds, c.barricades.size()]
 		if c.get_meta("et_last", "") != cs:
 			c.set_meta("et_last", cs); print("[enemy-test] t=%.2f crew %s" % [float(n) / Engine.physics_ticks_per_second, cs])
+	if flags.has("bot"): _autoplay(dt)
 	if flags.has("wrench"):
 		for b in get_tree().get_nodes_in_group("bots"):
 			if b.dead or not b.has_method("_launch"): continue
@@ -159,6 +162,45 @@ func _physics_process(dt: float) -> void:
 				Game.combat.melee(Game.player.global_position, face)
 				print("[enemy-test] wrenched a roller")
 				break
+
+var ap_strafe := 1.0
+var ap_strafe_t := 0.0
+var ap_dash_cd := 0.0
+func _ap_hold(a: String, on: bool) -> void:
+	if on and not Input.is_action_pressed(a): Input.action_press(a)
+	elif not on and Input.is_action_pressed(a): Input.action_release(a)
+
+func _autoplay(dt: float) -> void:
+	var pl := Game.player
+	var pp := pl.global_position
+	var best: Node3D = null
+	var bd := INF
+	var threat := false
+	for b in get_tree().get_nodes_in_group("bots"):
+		if b.dead: continue
+		var d: float = (b.global_position - pp).length()
+		if d < bd: bd = d; best = b
+		if b.get("state") == "fuse" and d < 3.2: threat = true
+		if b.get("aiming") and float(b.get("fire_t")) < 0.3: threat = true
+	if best == null and boss and is_instance_valid(boss) and not boss.dead and boss.state not in ["off", "intro", "dying"]:
+		best = boss; bd = (boss.global_position - pp).length()
+	if best == null:
+		for a in ["fire", "move_left", "move_right", "move_back", "move_forward", "dash", "melee"]: _ap_hold(a, false)
+		return
+	var to: Vector3 = (best.center() - Game.cam.camera.global_position).normalized()
+	var k := 1.0 - exp(-7.0 * dt)
+	Game.cam.yaw += angle_difference(Game.cam.yaw, atan2(to.x, to.z)) * k
+	Game.cam.pitch = lerpf(Game.cam.pitch, asin(clampf(to.y, -1, 1)), k)
+	_ap_hold("fire", true)
+	ap_strafe_t -= dt
+	if ap_strafe_t <= 0.0: ap_strafe_t = randf_range(1.2, 2.6); ap_strafe = -ap_strafe
+	_ap_hold("move_left", ap_strafe < 0.0); _ap_hold("move_right", ap_strafe > 0.0)
+	var roller_close: bool = best.has_method("_launch") and bd < 5.0
+	_ap_hold("move_back", roller_close and best.get("state") != "fuse")
+	ap_dash_cd -= dt
+	_ap_hold("dash", false)
+	if threat and ap_dash_cd <= 0.0: Input.action_press("dash"); ap_dash_cd = 0.7
+	_ap_hold("melee", best.has_method("_launch") and bd < 2.3 and best.get("state") == "chase")
 
 func _overview(at: Vector3) -> void:
 	if cam == null:

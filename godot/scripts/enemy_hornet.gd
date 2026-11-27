@@ -26,6 +26,10 @@ var buzz_t := 0.0
 var wings: Array = []
 
 var beacon_mat: StandardMaterial3D
+var orbit_dir := 1.0      # circles one way, then sometimes turns round
+var orbit_spd := 0.35
+var dart_t := 0.0         # after a shot it darts sideways to a new spot
+var turn_t := 4.0
 
 func _ready() -> void:
 	hp = 4.0; max_hp = 4.0; nuts = 8
@@ -45,7 +49,7 @@ func _ready() -> void:
 		apply_variant(Color(1.05, 0.74, 0.6), 0.9)
 		add_prop(inner, cyl(0.07, 0.05, 0.09), Color(0.17, 0.19, 0.22), Vector3(0, 0.5, 0.3), Vector3.ZERO, 0.7)
 		beacon_mat = add_prop(inner, ball_mesh(0.065), Color(1, 0.45, 0.1), Vector3(0, 0.55, 0.3), Vector3.ZERO, 0.0, 4.0).material_override
-	fire_t = randf_range(1.8, 3.0); orbit_a = randf() * TAU; orbit_r = randf_range(8, 12); height = randf_range(3, 5.5)
+	fire_t = randf_range(1.8, 3.0); orbit_a = randf() * TAU; orbit_spd = randf_range(0.28, 0.45); orbit_dir = 1.0 if randf() < 0.5 else -1.0; orbit_r = randf_range(8, 12); height = randf_range(3, 5.5)
 	eye_light = OmniLight3D.new(); eye_light.light_color = Color(1, 0.2, 0.1); eye_light.light_energy = 0.5; eye_light.omni_range = 4
 	add_child(eye_light)
 	aim_mat = StandardMaterial3D.new(); aim_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -76,7 +80,14 @@ func _physics_process(dt: float) -> void:
 	if spawn_t > 0.0 and spawn_t + 0.02 >= 1.0: Snd.at("chars_hornet_dive", global_position, -6, 0.12, 0.2)
 	var hp_ := player.global_position
 	var hero_c := hp_ + Vector3(0, 0.9, 0)
-	orbit_a += dt * 0.35
+	# a livelier circle: its own speed, an occasional change of direction or range, a dart after each shot
+	turn_t -= dt
+	if turn_t <= 0.0:
+		turn_t = randf_range(3.0, 6.0)
+		if randf() < 0.45: orbit_dir = -orbit_dir
+		orbit_r = clampf(orbit_r + randf_range(-2.5, 2.5), 7.0, 13.0); height = clampf(height + randf_range(-1.0, 1.0), 2.8, 6.0)
+	dart_t = maxf(0.0, dart_t - dt)
+	orbit_a += dt * orbit_spd * orbit_dir * (1.0 + dart_t * 5.0)
 	var want := Vector3(hp_.x + cos(orbit_a) * orbit_r, hp_.y + height + sin(t * 1.3) * 0.5, hp_.z + sin(orbit_a) * orbit_r)
 	var steer := (want - global_position) * (3.0 if spawn_t > 0.0 else 1.4)
 	var away := global_position - hero_c
@@ -118,6 +129,7 @@ func _physics_process(dt: float) -> void:
 		combat.enemy_shot(from, aim_at)
 		FX.sparks(from, Color(1, 0.35, 0.2), 6, 3.0)
 		velocity -= (aim_at - global_position).normalized() * 2.0   # recoil
+		dart_t = 0.5; if randf() < 0.35: orbit_dir = -orbit_dir
 
 ## Arrival: it dives in tucked up in a spin, snaps its wings open, brakes and boots its eyes on.
 func _arrive() -> void:

@@ -442,19 +442,27 @@ func _arc_line(a: Vector3, b: Vector3) -> void:
 	mi.global_basis = Basis(Quaternion(Vector3.UP, (b - a).normalized())).scaled(Vector3(0.6, a.distance_to(b), 0.6))
 	var tw := mi.create_tween(); tw.tween_interval(0.07); tw.tween_callback(mi.queue_free)
 
-func melee(origin: Vector3, facing: Vector3) -> bool:
+## Wrench swing. `step` is the combo step: 1 and 2 are quick swings in front, 3 is a spinning finisher
+## that hits all round, a little harder and further.
+func melee(origin: Vector3, facing: Vector3, step := 1) -> bool:
 	var any := false
+	var fin := step >= 3
+	var reach := 3.2 if fin else 2.6
 	for t in get_tree().get_nodes_in_group("targets"):
 		if t.dead: continue
 		var c: Vector3 = t.center()
 		var d := c - origin
 		var dy := d.y - 0.8
 		d.y = 0
-		if d.length() < 2.6 and absf(dy) < 1.8 and (d.length() < 0.8 or d.normalized().dot(facing) > -0.1):
-			t.damage(3.0 if t.is_in_group("boss") else 2.0, c, facing)
-			FX.sparks(c, Color(1, 0.95, 0.7), 16, 6)
+		if d.length() < reach and absf(dy) < 1.8 and (fin or d.length() < 0.8 or d.normalized().dot(facing) > -0.1):
+			var push := facing if not fin or d.length() < 0.1 else d.normalized()
+			t.damage((4.0 if fin else 3.0) if t.is_in_group("boss") else (3.0 if fin else 2.0), c, push)
+			FX.sparks(c, Color(1, 0.95, 0.7), 22 if fin else 16, 7 if fin else 6)
 			any = true
-	if any: FX.stop(0.06); FX.shake(0.5); Snd.play("melee_hit", -2)
+	if fin: FX.ring(origin + Vector3(0, 0.1, 0), Color(1, 0.85, 0.45), 0.8)
+	if any:
+		FX.stop(0.09 if fin else 0.05); FX.shake(0.8 if fin else 0.45)
+		Snd.play("melee_hit", 0 if fin else -2, 0.08, 0.0)
 	return any
 
 func nearest_target(origin: Vector3, max_d: float) -> Node3D:
@@ -490,9 +498,15 @@ func hurt_player(n: int, from = null, force := false) -> void:
 		var k: Vector3 = (player.global_position - from); k.y = 0
 		player.velocity += k.normalized() * 6.0
 	if hull <= 0:
-		hull = MAX_HULL
-		hull_changed.emit(hull, true)
-		if player: player.respawn()
+		hull = 0
+		if Game.player_downed.get_connections().is_empty(): revive()
+		else: Game.player_downed.emit()
+
+## Back on your feet at the last checkpoint with a full hull.
+func revive() -> void:
+	hull = MAX_HULL; invuln = 1.5
+	hull_changed.emit(hull, true)
+	if player: player.respawn()
 
 func heal(n: int) -> void:
 	hull = mini(MAX_HULL, hull + n); hull_changed.emit(hull, true)

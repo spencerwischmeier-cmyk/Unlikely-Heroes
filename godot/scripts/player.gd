@@ -17,9 +17,14 @@ var cam: Node3D
 var combat: Node3D
 var melee_cd := 0.0
 var melee_hit := 0.0
+var combo := 0               # wrench combo step: 1, 2, then 3 is a spinning finisher
+var combo_window := 0.0      # time left to chain the next swing
+var spin_t := 0.0            # finisher spin (adds a full turn to the model's facing)
+var twist := 0.0             # swing wind-up: the first swing comes from the right, the second backhands from the left
 var aim_point := Vector3.ZERO
 var level: Node3D
 var respawn_pos := Vector3.ZERO
+var respawn_yaw := NAN          # camera yaw to face after a respawn (NAN: keep the current one)
 var model: Node3D
 var body: Node3D
 var skel: Skeleton3D
@@ -67,6 +72,11 @@ var face_yaw := PI
 var turn_rate := 0.0
 var aim_hold := 0.0
 var using_pad := false
+var ledge_used := false      # one ledge assist per time in the air
+var ledge_t := 0.0           # > 0 while popping up onto a ledge (keeps the forward push going)
+var ledge_dir := Vector3.ZERO
+var _no_ledge := OS.get_cmdline_user_args().has("--no-ledge")
+const LEDGE_MAX := 0.85      # highest lip (above Vesk's feet) a missed jump still pulls him onto
 
 # rails and hooks
 var riding := false
@@ -93,6 +103,8 @@ const HERO_SCALE := 0.9
 var arm_hold := 1.0          # 0..1: how much the right arm is posed to hold the blaster forward
 var arm_bones := []          # [upper, fore, hand] bone ids (right arm)
 var anim_t := 0.0
+var hurt_t := 0.0            # flinch + red flash when hit
+var fur_mats: Array = []
 
 func _ready() -> void:
 	var cs := CollisionShape3D.new()
@@ -133,6 +145,7 @@ func _ready() -> void:
 	rope.top_level = true; rope.visible = false
 	add_child(rope)
 	level = get_parent().get_node_or_null("Level") if get_parent() else null
+	Game.player_hurt.connect(func(_h): hurt_t = 0.35)
 
 ## Vesk's fur: a soft rim sheen and a touch of subsurface so he doesn't read as plastic (--no-fur to compare)
 func _fur(n: Node) -> void:
@@ -205,6 +218,7 @@ func _physics_process(dt: float) -> void:
 		var dir := wish.normalized() if wish.length() > 0.8 else Vector3(sin(face_yaw), 0, cos(face_yaw))
 		velocity.x = dir.x * 18.0; velocity.z = dir.z * 18.0
 		dash_t = 0.16; dash_cd = 0.6; since_dash = 0.0; Snd.play("dash", -3)
+		if combat: combat.invuln = maxf(combat.invuln, 0.25)   # a dash slips through shots and blasts
 
 	var hs := Vector2(velocity.x, velocity.z).length()
 	if dash_t > 0.0:
@@ -256,10 +270,16 @@ func _physics_process(dt: float) -> void:
 	if gliding: velocity.y = maxf(velocity.y, -3.0)
 	velocity.y = maxf(velocity.y, -30.0)
 
+	if ledge_t > 0.0:
+		ledge_t -= dt
+		velocity.x = ledge_dir.x * 3.2; velocity.z = ledge_dir.z * 3.2
 	var vy_before := velocity.y
 	var was_grounded := grounded
 	move_and_slide()
 	grounded = is_on_floor()
+	if not grounded and not _no_ledge: _ledge_assist(wish)
+	else: ledge_used = false
+	if grounded: _edge_slip(dt, wish)
 	if grounded:
 		if not was_grounded:
 			if vy_before < -6.0: land_t = clampf(-vy_before / 20.0, 0.3, 1.0)
@@ -293,8 +313,53 @@ func _physics_process(dt: float) -> void:
 		if step_t <= 0.0: step_t = 0.3; Snd.play("step_metal", -12, 0.12)
 	_post(dt)
 
+## A jump that comes up just short of a ledge (double jump already spent, Vesk pressed against its face
+## and heading for it, the lip within LEDGE_MAX of his feet) pops him up onto it instead of sliding down.
+func _ledge_assist(wish: Vector3) -> void:
+	if ledge_used or jumps < 2 or riding or swing_hook or velocity.y > 0.5 or not is_on_wall() or level == null: return
+	var n := get_wall_normal(); n.y = 0.0
+	if n.length() < 0.5 or wish.length() < 2.0: return
+	var into := -n.normalized()
+	if wish.normalized().dot(into) < 0.55: return
+	var space := get_world_3d().direct_space_state
+	# only when he'd otherwise drop: with floor just below his feet he is simply walking into a step
+	var q0 := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 0.1, 0), global_position - Vector3(0, 1.4, 0)); q0.collision_mask = 1; q0.exclude = [get_rid()]
+	if not space.intersect_ray(q0).is_empty(): return
+	var top := global_position + into * 0.62 + Vector3(0, LEDGE_MAX + 0.15, 0)
+	var q := PhysicsRayQueryParameters3D.create(top, top - Vector3(0, LEDGE_MAX + 0.1, 0)); q.collision_mask = 1; q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit.is_empty() or hit.normal.y < 0.75: return
+	var h: float = hit.position.y - global_position.y
+	if h < 0.2 or h > LEDGE_MAX: return
+	# room to stand: nothing in the way from the lip up to head height, and nothing above Vesk's own head
+	var q2 := PhysicsRayQueryParameters3D.create(hit.position + Vector3(0, 0.05, 0), hit.position + Vector3(0, 1.8, 0)); q2.collision_mask = 1; q2.exclude = [get_rid()]
+	if not space.intersect_ray(q2).is_empty(): return
+	var q3 := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.6, 0), global_position + Vector3(0, 1.75 + h, 0)); q3.collision_mask = 1; q3.exclude = [get_rid()]
+	if not space.intersect_ray(q3).is_empty(): return
+	ledge_used = true; ledge_t = 0.16; ledge_dir = into
+	if OS.get_cmdline_user_args().has("--trace"): print("   LEDGE h=%.2f at %s vy=%.2f jumps=%d" % [h, global_position, velocity.y, jumps])
+	velocity.y = sqrt(2.0 * GRAV * (h + 0.3)); jump_cut = true; long_jump = false
+	land_t = 0.25
+	Snd.play("land", -10)
+
+## Perched on a lip by the round bottom of his capsule (nothing under his middle): instead of hovering
+## there, step him off it if he is heading out, otherwise settle him back onto the ledge (forgiving landings).
+func _edge_slip(dt: float, wish: Vector3) -> void:
+	var n := get_floor_normal()
+	if n.y > 0.985 or riding: return
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 0.3, 0), global_position - Vector3(0, 0.3, 0)); q.collision_mask = 1; q.exclude = [get_rid()]
+	if not get_world_3d().direct_space_state.intersect_ray(q).is_empty(): return
+	var nh := Vector3(n.x, 0, n.z)
+	if nh.length() < 0.05: return
+	nh = nh.normalized()
+	if wish.length() > 1.0 and wish.normalized().dot(nh) > 0.3: global_position += nh * 3.5 * dt
+	else: move_and_collide(-nh * 2.5 * dt)
+
 func respawn() -> void:
 	global_position = respawn_pos; velocity = Vector3.ZERO; riding = false; swing_hook = null; rope.visible = false
+	dash_t = 0.0; long_jump = false; jumps = 0
+	if not is_nan(respawn_yaw): cam.yaw = respawn_yaw; face_yaw = respawn_yaw
+	if cam.has_method("snap"): cam.snap(self)
 	Game.player_respawned.emit(respawn_pos)
 
 func _muzzle() -> Vector3:
@@ -318,18 +383,32 @@ func _combat(dt: float, wish: Vector3) -> void:
 	if combat.try_fire(dt, Input.is_action_pressed("fire") and swing_hook == null and not Game.input_locked, _muzzle(), aim_point, dir):
 		weapon_kick = 1.0
 	# melee: a wide swing with a small lunge toward the nearest bot
-	melee_cd -= dt
+	melee_cd -= dt; combo_window -= dt
 	if Input.is_action_just_pressed("melee") and melee_cd <= 0.0 and not Game.input_locked:
-		melee_cd = 0.42; melee_hit = 0.1; melee_t = 0.4; Snd.play("melee_swing", -3)
-		var nt: Node3D = combat.nearest_target(global_position, 3.2)
+		combo = combo + 1 if combo_window > 0.0 and combo < 3 else 1
+		var fin := combo == 3
+		melee_cd = 0.6 if fin else 0.24; combo_window = 0.0 if fin else 0.6
+		melee_hit = 0.12 if fin else 0.09; melee_t = 0.42 if fin else 0.32
+		if fin: spin_t = 0.3
+		else: twist = 0.55 if combo == 1 else -0.65
+		anim.play("melee", 0.04); anim.seek(0.0, true); cur_anim = "melee"
+		Snd.play("melee_swing", -3 + (1.0 if fin else 0.0), 0.08, 0.0)
+		var nt: Node3D = combat.nearest_target(global_position, 4.0 if fin else 3.4)
 		if nt:
 			var d: Vector3 = nt.center() - global_position
 			face_yaw = atan2(d.x, d.z)
-		velocity += Vector3(sin(face_yaw), 0, cos(face_yaw)) * 5.0
+		var lunge := 7.5 if fin else (5.0 if combo == 1 else 5.8)
+		var fwd := Vector3(sin(face_yaw), 0, cos(face_yaw))
+		if grounded:
+			var keep := Vector3(velocity.x, 0, velocity.z).dot(fwd)
+			velocity.x = fwd.x * maxf(keep, 0.0) * 0.4 + fwd.x * lunge; velocity.z = fwd.z * maxf(keep, 0.0) * 0.4 + fwd.z * lunge
+		else:
+			velocity += fwd * lunge * 0.6
+			if velocity.y < 0.0: velocity.y *= 0.4   # swings hang Vesk in the air a moment
 	if melee_hit > 0.0:
 		melee_hit -= dt
 		if melee_hit <= 0.0:
-			combat.melee(global_position, Vector3(sin(face_yaw), 0, cos(face_yaw)))
+			combat.melee(global_position, Vector3(sin(face_yaw), 0, cos(face_yaw)), combo)
 
 func _post(dt: float) -> void:
 	Snd.loop("grind_loop", riding, -6)
@@ -446,7 +525,9 @@ func _face(dt: float) -> void:
 	var prev := face_yaw
 	face_yaw += angle_difference(face_yaw, target) * (1.0 - exp(-(20.0 if aiming else 13.0) * dt))
 	turn_rate = lerpf(turn_rate, angle_difference(prev, face_yaw) / maxf(dt, 1e-4), 1.0 - exp(-10.0 * dt))
-	model.rotation.y = face_yaw
+	spin_t = maxf(0.0, spin_t - dt)
+	twist = lerpf(twist, 0.0, 1.0 - exp(-11.0 * dt))
+	model.rotation.y = face_yaw + twist - TAU * (1.0 - smoothstep(0.0, 0.3, spin_t)) * (1.0 if spin_t > 0.0 else 0.0)
 
 ## Holds the blaster out front with the right arm (the animation set has no gun-holding clips):
 ## the upper arm hangs slightly forward and the forearm and hand point where Vesk aims.
@@ -514,7 +595,11 @@ func _animate(dt: float) -> void:
 	# body: bank into turns, squash on landing
 	lean = lerpf(lean, clampf(-turn_rate * 0.09 * maxf(run, 0.3), -0.35, 0.35), 1.0 - exp(-10.0 * dt))
 	if riding or swing_hook: lean = lerpf(lean, 0.0, 1.0 - exp(-12.0 * dt))
-	body.rotation = Vector3(0, 0, lean)
+	# flinch: rock back away from the hit and flash red for a moment
+	hurt_t = maxf(0.0, hurt_t - dt)
+	var fl := sin(clampf(hurt_t / 0.35, 0.0, 1.0) * PI) * 0.35
+	for m in fur_mats: (m as StandardMaterial3D).emission_energy_multiplier = (hurt_t / 0.35) * 1.6
+	body.rotation = Vector3(-fl, 0, lean)
 	body.scale = Vector3(1 + land_t * 0.08, 1 - land_t * 0.1, 1 + land_t * 0.08)
 	_update_weapon(dt)
 	_update_jets(dt)
