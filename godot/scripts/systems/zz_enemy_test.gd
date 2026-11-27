@@ -66,6 +66,7 @@ func _ready() -> void:
 	Game.player_hurt.connect(func(h): hurts += 1; print("[enemy-test] vesk hurt, hull ", h, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.bot_killed.connect(func(b, _p, k): kills += 1; print("[enemy-test] killed ", k, " returned_to_sender=", b.get_meta("returned_to_sender", false)))
 	Game.slam_landed.connect(func(hit): print("[enemy-test] slam landed hit=", hit, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
+	Game.shot_parried.connect(func(): print("[enemy-test] parry t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.close_call.connect(func(): print("[enemy-test] close call t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.boss_health.connect(func(nm, f): print("[enemy-test] boss_health ", nm, " ", snappedf(f, 0.01)))
 	_setup.call_deferred()
@@ -213,6 +214,19 @@ func _autoplay(dt: float) -> void:
 	_ap_hold("move_back", roller_close and best.get("state") != "fuse")
 	ap_dash_cd -= dt
 	_ap_hold("dash", false)
+	# --et-parry: swing the wrench just as an enemy shot arrives
+	if flags.has("parry"):
+		var incoming := false
+		for sh in Game.combat.shots:
+			var to_me: Vector3 = pp + Vector3(0, 0.9, 0) - sh.node.global_position
+			if to_me.length() < 3.2 and to_me.dot(sh.vel) > 0.0 and not sh.get("reflected", false): incoming = true
+			if incoming:
+				var ty := atan2(-to_me.x, -to_me.z)
+				pl.face_yaw = ty
+				break
+		_ap_hold("melee", incoming)
+		_ap_hold("fire", false)
+		return
 	# --et-dodge: dash just as an enemy shot is about to arrive (exercises the close-call dodge)
 	if flags.has("dodge"):
 		threat = false
