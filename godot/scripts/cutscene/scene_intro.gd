@@ -607,10 +607,11 @@ func _haywire_fx(dur: float) -> void:
 	var i := 0
 	while C.ct < end and C.playing != "":
 		if C.ct >= next:
-			next += 0.55
+			next += 0.4
 			var p: Vector3 = S.at(spots[i % spots.size()]); i += 1
 			C.fx(func():
-				FX.sparks(p, Color(1, 0.72, 0.3), 10, 4.0)
+				FX.sparks(p, Color(1, 0.72, 0.3), 22, 6.5)
+				FX.sparks(p + Vector3(0, 0.2, 0), Color(0.5, 0.85, 1.0), 8, 4.0)   # a blue arc in the mix
 				if i % 2 == 0: FX.puff(p + Vector3(0, 0.3, 0), Color(0.45, 0.42, 0.4)))
 		await (C as Node).get_tree().process_frame
 
