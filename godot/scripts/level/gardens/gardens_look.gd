@@ -27,9 +27,9 @@ const STEEL_SHADER := "res://shaders/painted_steel.gdshader"
 const TIERS := [
 	[0.3, 16, 0.9, false],
 	[0.7, 40, 0.72, false],
-	[1.3, 120, 0.5, true],
-	[2.2, 240, 0.38, true],
-	[99.0, 420, 0.3, true],
+	[1.3, 96, 0.54, false],
+	[2.2, 190, 0.4, true],
+	[99.0, 330, 0.32, true],
 ]
 const CELL := 24.0           # foliage is batched per 24 m cell so off-screen cells are culled
 
