@@ -73,6 +73,7 @@ func _launch(d: Vector3) -> void:
 	collision_layer = 0
 	state = "launched"; st_t = 1.0
 	if warn: warn.queue_free(); warn = null
+	d = _sender_aim(d)
 	launch_dir = d
 	velocity = d * LAUNCH_SPEED + Vector3(0, 3.5, 0)
 	flash = 1.0; pop = 1.0
@@ -155,6 +156,22 @@ func _spin(dt: float) -> void:
 	if cap and state != "fuse":
 		cap.rotation.x = tilt
 		cap.position.y = 0.55 + absf(sin(t * sp * 2.2)) * 0.035 * minf(1.0, sp / 3.0)
+
+## Return to Sender aims itself a little: if a bot or the boss is roughly where it was knocked, it flies at that.
+func _sender_aim(d: Vector3) -> Vector3:
+	var best: Node3D = null
+	var bs := 0.82   # cos of ~35 degrees
+	for b in get_tree().get_nodes_in_group("bots") + get_tree().get_nodes_in_group("boss"):
+		if b == self or b.get("dead") or not (b is Node3D): continue
+		var to: Vector3 = (b.center() if b.has_method("center") else (b as Node3D).global_position) - center()
+		to.y = 0
+		var l := to.length()
+		if l < 1.5 or l > 26.0: continue
+		var c := to.normalized().dot(d) + (0.05 if b.is_in_group("boss") else 0.0)
+		if c > bs: bs = c; best = b
+	if best == null: return d
+	var to2: Vector3 = (best.center() if best.has_method("center") else best.global_position) - center(); to2.y = 0
+	return to2.normalized()
 
 func _separation() -> Vector3:
 	var push := Vector3.ZERO

@@ -206,6 +206,11 @@ func _physics_process(dt: float) -> void:
 			velocity.y = maxf(velocity.y, 0.0) + JUMP; jumps = 1; jump_cut = true; long_jump = false
 			Snd.play("jump", -4)
 		else:
+			# dash on a rail: a burst of speed (it eases back to the rail's normal top speed)
+			dash_cd -= dt
+			if Input.is_action_just_pressed("dash") and dash_cd <= 0.0:
+				rail_speed = minf(rail_speed + 7.0, 29.0); dash_cd = 0.6; jet_burst = 1.0
+				Snd.play("dash", -4); FX.sparks(global_position, Color(1, 0.8, 0.4), 10, 4.0)
 			_step_rail(dt)
 			_post(dt); return
 	elif rail_cool <= 0.0 and level:
@@ -475,7 +480,8 @@ func _rail_tangent() -> Vector3:
 
 func _step_rail(dt: float) -> void:
 	var tan := _rail_tangent()
-	rail_speed = clampf(rail_speed - tan.y * rail_dir * 14.0 * dt, 10.0, 22.0)
+	rail_speed = clampf(rail_speed - tan.y * rail_dir * 14.0 * dt, 10.0, 29.0)
+	if rail_speed > 22.0: rail_speed = lerpf(rail_speed, 22.0, 1.0 - exp(-1.2 * dt))
 	rail_off += rail_dir * rail_speed * dt
 	var done: bool = rail_off <= 0.0 or rail_off >= rail.length
 	var q: Vector3 = rail.path.to_global(rail.curve.sample_baked(clampf(rail_off, 0, rail.length)))
