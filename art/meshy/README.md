@@ -26,3 +26,10 @@ one livery: mustard yellow and charcoal grey, brick-red trim, hazard stripes, a 
 - `chars/scrap_bits.glb` (art/scrap_bits.py): sprockets, bolts, nuts, springs and plates for break-apart deaths
   (`scripts/chars/scrap_burst.gd`).
 Quick looks without the level: `scripts/chars/char_preview.gd` (see its header), or `sheet.py` in Blender.
+
+# Dodger J1 (2026-11-27)
+Spencer picked concept J1 (side jet pods instead of rotors) with eye K1 (one glowing lens, no pupil, no brows).
+Concept: Meshy image-to-image (nano-banana-pro) from a render of the old Dodger -> `dodger_concept.png` (clean, jets off)
+-> image-to-3d (`chars.py i23d dodger_j1`) -> `build_chars.py -- dodger` (eye-glass centre on the origin, old shell size).
+The lens, eyelids, jet flames and moods are code (godot/scripts/cutscene/drone_actor.gd). Old shell: chars/dodger_body_old.glb.
+Quick look: char_preview.gd `--set=dodger_moods|dodger_turn|dodger_close`.
