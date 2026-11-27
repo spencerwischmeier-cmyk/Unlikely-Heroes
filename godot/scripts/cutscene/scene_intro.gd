@@ -466,7 +466,8 @@ func run() -> void:
 	var fwd := Vector3(sin(vesk.rotation.y), 0, cos(vesk.rotation.y))
 	var side := fwd.cross(Vector3.UP)
 	vesk.look_target = null; vesk.look_point = chair_pos
-	C.tw(dodger, "global_position", dodger.global_position + Vector3(0, 1.1, 0), 0.8)   # he backs off, out of the shot
+	# he's backed off out of the shot (placed before the cut, so the close-up doesn't have to swing around him)
+	C.setv(dodger, "global_position", dodger.global_position + Vector3(0, 1.6, 0) - fwd * 1.2)
 	_cu(-50.0, 2.4, 50.0, 0.0)          # off to the side, so the roller isn't between us and him
 	_push(-50.0, 1.5, 4.0)
 	C.lens(35.0, 4.0)
@@ -639,7 +640,7 @@ func _dodge_az(az: float, dist: float, dy: float, body: bool) -> float:
 	if not is_instance_valid(_dodger) or not _dodger.visible: return az
 	var e: Vector3 = C.head_of(_vesk).global_position
 	var dp := _dodger.global_position
-	for off in [0.0, 12.0, -12.0, 24.0, -24.0, 36.0, -36.0, 50.0, -50.0, 70.0, -70.0]:
+	for off in [0.0, 12.0, -12.0, 24.0, -24.0, 36.0, -36.0, 48.0, -48.0]:
 		var d: Vector3 = _body_dir(az + off) if body else _gaze_dir(az + off)
 		var cam := e + d * dist + Vector3(0, dy, 0)
 		# Dodger's distance to the sight line, and to the lens
