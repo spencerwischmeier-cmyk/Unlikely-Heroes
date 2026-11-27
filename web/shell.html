@@ -53,7 +53,15 @@ function fail(msg) {
 
 // The game data is split into parts (pack.json) so no single file is too big for the host.
 async function fetchPack(onProgress) {
-  const info = await (await fetch('pack.json', { cache: 'no-cache' })).json();
+  const all = await (await fetch('pack.json', { cache: 'no-cache' })).json();
+  // computers read S3TC textures, phones and tablets ETC2/ASTC: load the copy this device can draw
+  let variant = 'mobile';
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ext = gl ? gl.getSupportedExtensions() : [];
+    if (ext.includes('WEBGL_compressed_texture_s3tc') && !ext.includes('WEBGL_compressed_texture_etc') && all.variants.desktop) variant = 'desktop';
+  } catch (e) {}
+  const info = all.variants ? all.variants[variant] : all;
   const out = new Uint8Array(info.size);
   let done = 0, at = 0;
   for (const part of info.parts) {

@@ -40,7 +40,7 @@ body { touch-action: none; overscroll-behavior: none; -webkit-user-select: none;
 <div id="rotate">Turn your phone sideways to play.</div>
 <script src="index.js"></script>
 <script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":124918716,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":124918844,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 const statusEl = document.getElementById('status');
@@ -56,7 +56,15 @@ function fail(msg) {
 
 // The game data is split into parts (pack.json) so no single file is too big for the host.
 async function fetchPack(onProgress) {
-  const info = await (await fetch('pack.json', { cache: 'no-cache' })).json();
+  const all = await (await fetch('pack.json', { cache: 'no-cache' })).json();
+  // computers read S3TC textures, phones and tablets ETC2/ASTC: load the copy this device can draw
+  let variant = 'mobile';
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ext = gl ? gl.getSupportedExtensions() : [];
+    if (ext.includes('WEBGL_compressed_texture_s3tc') && !ext.includes('WEBGL_compressed_texture_etc') && all.variants.desktop) variant = 'desktop';
+  } catch (e) {}
+  const info = all.variants ? all.variants[variant] : all;
   const out = new Uint8Array(info.size);
   let done = 0, at = 0;
   for (const part of info.parts) {

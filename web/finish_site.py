@@ -10,16 +10,25 @@ import hashlib, json, os, re, subprocess, sys, time
 
 out = sys.argv[1]
 PART = 45 * 1024 * 1024
-pck = os.path.join(out, "index.pck")
-data = open(pck, "rb").read()
-digest = hashlib.sha256(data).hexdigest()[:10]
-parts = []
-for i in range(0, len(data), PART):
-    name = f"game.{digest}.{i // PART:02d}.part"
-    open(os.path.join(out, name), "wb").write(data[i:i + PART])
-    parts.append({"file": name, "size": len(data[i:i + PART])})
-os.remove(pck)
-json.dump({"version": digest, "size": len(data), "parts": parts}, open(os.path.join(out, "pack.json"), "w"))
+def split(pck, prefix):
+    data = open(pck, "rb").read()
+    digest = hashlib.sha256(data).hexdigest()[:10]
+    parts = []
+    for i in range(0, len(data), PART):
+        name = f"{prefix}.{digest}.{i // PART:02d}.part"
+        open(os.path.join(out, name), "wb").write(data[i:i + PART])
+        parts.append({"file": name, "size": len(data[i:i + PART])})
+    os.remove(pck)
+    return {"version": digest, "size": len(data), "parts": parts}
+
+# phones (ETC2/ASTC textures) and computers (S3TC textures) each get their own copy of the game data
+variants = {"mobile": split(os.path.join(out, "index.pck"), "game")}
+if os.path.exists(os.path.join(out, "index.desktop.pck")):
+    variants["desktop"] = split(os.path.join(out, "index.desktop.pck"), "game-pc")
+json.dump({"variants": variants}, open(os.path.join(out, "pack.json"), "w"))
+parts = [p for v in variants.values() for p in v["parts"]]
+digest = "+".join(v["version"] for v in variants.values())
+data = b"x" * sum(v["size"] for v in variants.values())
 
 sw = os.path.join(out, "index.service.worker.js")
 s = open(sw).read()
@@ -35,4 +44,4 @@ sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=Tru
 json.dump({"built": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()), "commit": sha, "pack": digest,
            "files": {f: os.path.getsize(os.path.join(out, f)) for f in sorted(os.listdir(out))}},
           open(os.path.join(out, "build.json"), "w"), indent=1)
-print(f"[site] {len(parts)} parts, {len(data) / 1e6:.1f} MB game data, build {sha}")
+print(f"[site] {len(parts)} parts, " + ", ".join(f"{k} {v['size'] / 1e6:.1f} MB" for k, v in variants.items()) + f", build {sha}")
