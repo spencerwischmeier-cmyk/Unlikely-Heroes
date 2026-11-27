@@ -19,7 +19,7 @@ const CYAN := Color(0.45, 0.95, 1.0)
 const GOLD := Color(1.0, 0.82, 0.3)
 const PAUSE_SIZE := Vector2(1160, 640)
 
-var settings := { look = 100.0, invert_y = false, master = 100.0, music = 80.0, sfx = 100.0, voice = 100.0, subtitles = true }
+var settings := { look = 100.0, invert_y = false, aim_assist = true, master = 100.0, music = 80.0, sfx = 100.0, voice = 100.0, subtitles = true }
 
 var layer: CanvasLayer
 var font: Font
@@ -103,6 +103,7 @@ func _apply_settings() -> void:
 		Game.cam.mouse_sens = 0.0024 * settings.look / 100.0
 		Game.cam.pad_sens = settings.look / 100.0
 		Game.cam.invert_y = settings.invert_y
+		if "aim_assist" in Game.cam: Game.cam.aim_assist = settings.get("aim_assist", true)
 	if Game.hud and "subtitles" in Game.hud: Game.hud.subtitles = settings.subtitles
 	_route_snd()
 
@@ -420,12 +421,13 @@ func _build_ui() -> void:
 	var dim2 := ColorRect.new(); dim2.color = Color(0.0, 0.02, 0.05, 0.65); _full(dim2); dim2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	settings_root.add_child(dim2)
 	var sp := PanelContainer.new(); sp.add_theme_stylebox_override("panel", _panel_box())
-	_center(sp, Vector2(780, 600)); settings_root.add_child(sp)
+	_center(sp, Vector2(780, 650)); settings_root.add_child(sp)
 	sp.draw.connect(_draw_card.bind(sp))
 	var sv := VBoxContainer.new(); sv.add_theme_constant_override("separation", 10); sp.add_child(sv)
 	var st := _label(44, Color(1, 0.72, 0.25)); st.text = "SETTINGS"; st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sv.add_child(st)
 	_slider_row(sv, "look", "LOOK SENSITIVITY", 20, 250)
 	_check_row(sv, "invert_y", "INVERT LOOK Y")
+	_check_row(sv, "aim_assist", "CONTROLLER AIM ASSIST")
 	_slider_row(sv, "master", "MASTER VOLUME", 0, 100)
 	_slider_row(sv, "music", "MUSIC VOLUME", 0, 100)
 	_slider_row(sv, "sfx", "EFFECTS VOLUME", 0, 100)
