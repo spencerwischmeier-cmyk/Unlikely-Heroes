@@ -588,6 +588,7 @@ func _broadcast(at: Vector3, cam: Vector3, glow: OmniLight3D, dur: float) -> voi
 	# polls the cutscene clock instead of C.wait: a second waiter would also push the clock while seeking
 	var end: float = C.ct + dur
 	var next: float = C.ct
+	C.fx(func(): Snd.play("mast_dish_hum", -13, 0.0))   # heard close even on the long lens
 	while C.ct < end and C.playing != "":
 		if C.ct >= next:
 			next += 0.65
