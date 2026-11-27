@@ -364,6 +364,7 @@ func center() -> Vector3:
 
 func damage(amount: float, _point: Vector3, _dir: Vector3) -> bool:
 	if dead or state in ["off", "intro", "rip", "dying"]: return false
+	Game.bot_hit.emit(self, amount)
 	return _hurt(amount * (1.5 if stun_t > 0.0 else 1.0))
 
 func _hurt(amount: float) -> bool:
