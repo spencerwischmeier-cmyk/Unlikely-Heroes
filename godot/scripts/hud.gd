@@ -122,7 +122,7 @@ func _ready() -> void:
 	_place(waves, Vector2(0.5, 0), Rect2(-200, 96, 400, 50), _draw_waves)
 	_place(cross, Vector2(0.5, 0.5), Rect2(-160, -160, 320, 320), _draw_cross)
 	_place(prompt, Vector2(0.5, 0.5), Rect2(-320, 70, 640, 60), _draw_prompt)
-	_place(banner, Vector2(0.5, 0), Rect2(-640, 150, 1280, 150), _draw_banner)
+	_place(banner, Vector2(0.5, 0), Rect2(-640, 286, 1280, 150), _draw_banner)
 	_place(subs, Vector2(0.5, 1), Rect2(-520, -190, 1040, 170), _draw_subs)
 	flyer_layer.set_anchors_preset(Control.PRESET_FULL_RECT); flyer_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flyer_layer.draw.connect(_draw_flyers); root.add_child(flyer_layer)
@@ -830,5 +830,8 @@ func _draw_waves() -> void:
 	HD.panel(ci, r, BOSS_COL.lerp(GOLD, 0.4), 12, 0.0, 0.95)
 	HD.text(ci, head, Vector2(r.position.x + 20, 33), "WAVE %d/%d" % [wv, total], 20, Color(1, 0.88, 0.6), 0, 5)
 	HD.icon(ci, "boss", Vector2(r.end.x - 92, 25), 11, Color(1, 0.55, 0.45))
-	HD.text(ci, head, Vector2(r.end.x - 18, 33), "%d LEFT" % left, 20, Color(1, 1, 1) if left > 0 else Color(0.6, 1, 0.6), 2, 5)
+	var lt := "%d LEFT" % left
+	if left == 0: lt = "INCOMING!" if wv < total else "CLEAR!"
+	var lc := Color(1, 1, 1) if left > 0 else (Color(1, 0.75, 0.4).lerp(Color.WHITE, 0.5 + 0.5 * sin(t * 9.0)) if wv < total else Color(0.6, 1, 0.6))
+	HD.text(ci, head, Vector2(r.end.x - 18, 33), lt, 20, lc, 2, 5)
 	ci.draw_set_transform(Vector2.ZERO)
