@@ -32,9 +32,10 @@ float caustic(vec2 p) {
 
 void vertex() { wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 
-float scene_depth(vec2 suv) {
+// (INV_PROJECTION_MATRIX only exists inside fragment(), so it is passed in)
+float scene_depth(vec2 suv, mat4 ip) {
 	float d = textureLod(depth_tex, suv, 0.0).r;
-	vec4 vp = INV_PROJECTION_MATRIX * vec4(suv * 2.0 - 1.0, d, 1.0);
+	vec4 vp = ip * vec4(suv * 2.0 - 1.0, d, 1.0);
 	return -vp.z / vp.w;
 }
 
@@ -47,10 +48,10 @@ void fragment() {
 	NORMAL = normalize((VIEW_MATRIX * vec4(wn, 0.0)).xyz);
 	float surf = -VERTEX.z;
 	// how much water lies between the surface and whatever is behind it
-	float thick0 = max(scene_depth(SCREEN_UV) - surf, 0.0);
+	float thick0 = max(scene_depth(SCREEN_UV, INV_PROJECTION_MATRIX) - surf, 0.0);
 	vec2 off = g * refract_amt * clamp(thick0 * 2.0, 0.0, 1.0);
 	vec2 ruv = SCREEN_UV + off;
-	float thick = scene_depth(ruv) - surf;
+	float thick = scene_depth(ruv, INV_PROJECTION_MATRIX) - surf;
 	if (thick < 0.0) { ruv = SCREEN_UV; thick = thick0; }   // don't refract things in front of the water
 	float k = 1.0 - exp(-thick / clarity);
 	vec3 behind = textureLod(screen_tex, ruv, 0.0).rgb;
