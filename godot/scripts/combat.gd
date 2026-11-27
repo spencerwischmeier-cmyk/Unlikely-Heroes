@@ -528,7 +528,7 @@ func _parry(s: Dictionary, at: Vector3) -> void:
 		if l < bd and d.normalized().dot(back) > 0.3: bd = l; best = t
 	var dir := ((best.center() as Vector3) - at).normalized() if best else back
 	s.vel = dir * 30.0
-	if parry_mat == null: parry_mat = _glow(Color(1.0, 0.85, 0.3), 9.0)
+	if parry_mat == null: parry_mat = _glow(Color(1.0, 0.55, 0.08), 3.5)
 	s.node.material_override = parry_mat
 	s.node.global_basis = Basis(Quaternion(Vector3.UP, dir)).scaled(Vector3(1.4, 0.9, 1.4))
 	FX.sparks(at, Color(1, 0.95, 0.6), 16, 6); FX.ring(at, Color(1, 0.85, 0.4), 0.4)
