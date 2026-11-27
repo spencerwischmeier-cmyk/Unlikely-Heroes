@@ -62,6 +62,7 @@ func pivot() -> Vector3:
 var _probe := SphereShape3D.new()
 var _boom_len := 4.3
 var _occl_t := 0.0
+const OCCL_MIN := 2.0
 var _boom_q := PhysicsShapeQueryParameters3D.new()
 ## Camera distance after walls: pulls in at once when something is in the way, eases back out over
 ## about half a second once it clears.
@@ -72,7 +73,12 @@ func _boom(dt: float, want: float) -> float:
 	_boom_q.transform = Transform3D(Basis(), from)
 	_boom_q.motion = dir * want
 	_boom_q.collision_mask = 1
-	if target: _boom_q.exclude = [target.get_rid()]
+	# the player, bots and the boss never push the camera around (only the world does)
+	var ex: Array[RID] = []
+	if target: ex.append(target.get_rid())
+	for b in get_tree().get_nodes_in_group("targets"):
+		if b is CollisionObject3D: ex.append((b as CollisionObject3D).get_rid())
+	_boom_q.exclude = ex
 	var r := get_world_3d().direct_space_state.cast_motion(_boom_q)
 	var free := want * (r[0] if r.size() > 0 else 1.0)
 	free = maxf(free - 0.1, 0.3)
@@ -80,15 +86,20 @@ func _boom(dt: float, want: float) -> float:
 	# a moment: stay in front of it (checked at the wanted spot, so easing out never slides back behind it)
 	var want_len := free
 	if target:
-		var chest := target.global_position + Vector3(0, 1.0, 0)
 		var at := from + dir * free
-		var rq := PhysicsRayQueryParameters3D.create(chest, at); rq.collision_mask = 1; rq.exclude = [target.get_rid()]
-		var hit := get_world_3d().direct_space_state.intersect_ray(rq)
-		if hit:
+		# two sight lines (chest and head), so bars and lattices that one slips through still count
+		var hit := {}
+		for hy in [1.0, 1.6]:
+			var eye: Vector3 = target.global_position + Vector3(0, hy, 0)
+			var rq := PhysicsRayQueryParameters3D.create(eye, at); rq.collision_mask = 1; rq.exclude = ex
+			var h := get_world_3d().direct_space_state.intersect_ray(rq)
+			if h and (hit.is_empty() or eye.distance_to(h.position) > hit.d):
+				hit = { d = eye.distance_to(h.position), total = eye.distance_to(at) }
+		if not hit.is_empty():
 			_occl_t += dt
 			if _occl_t > 0.12:
-				var f := chest.distance_to(hit.position) / maxf(chest.distance_to(at), 0.01)
-				want_len = maxf(free * f - 0.35, 0.6)
+				# never closer than OCCL_MIN for this: a partly hidden Vesk beats a lens in his ear
+				want_len = maxf(free * hit.d / maxf(hit.total, 0.01) - 0.35, minf(OCCL_MIN, free))
 		else:
 			_occl_t = 0.0
 	if free < _boom_len: _boom_len = free                                   # a wall: at once
