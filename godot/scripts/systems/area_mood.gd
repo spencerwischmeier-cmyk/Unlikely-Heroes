@@ -75,6 +75,29 @@ const MOODS := {
 		"ssr": false,
 		"fill_energy": 0.24,
 	},
+	# the Roof Gardens: warm, bright golden hour; more haze so the sun cuts shafts through the canopies, a soft
+	# bloom on the lanterns and glow-pods, richer greens (scripts/level/gardens/gardens_look.gd dresses it)
+	"gardens": {
+		"rect": Rect2(-96, -74, 52, 80),
+		"fade": 8.0,
+		"env": {
+			"tonemap_exposure": 0.82,
+			"adjustment_contrast": 1.2,
+			"adjustment_saturation": 1.2,
+			"volumetric_fog_density": 0.0021,
+			"volumetric_fog_albedo": Color(1.0, 0.92, 0.78),
+			"volumetric_fog_anisotropy": 0.84,
+			"fog_light_color": Color(1.0, 0.84, 0.62),
+			"fog_sun_scatter": 0.32,
+			"ssao_intensity": 3.0,
+			"ssil_intensity": 1.3,
+			"glow_intensity": 0.95,
+			"glow_bloom": 0.14,
+		},
+		"sun_color": Color(1.0, 0.8, 0.56),
+		"ssr": false,
+		"fill_energy": 0.26,
+	},
 }
 
 var env: Environment
