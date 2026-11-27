@@ -488,6 +488,14 @@ func enemy_shot(from: Vector3, to: Vector3) -> void:
 	shots.append({ node = mi, vel = dir * 17.0, life = 3.0 })
 	Snd.at("hornet_shot", from, -4, 0.1, 0.02)
 
+func _close_call() -> void:
+	FX.slow(0.3, 0.35)
+	player.dash_cd = 0.0
+	invuln = maxf(invuln, 0.35)
+	FX.ring(player.global_position + Vector3(0, 0.15, 0), Color(0.45, 0.85, 1.0), 0.7)
+	Snd.play("dash", -1, 0.0, 0.0, 0.7)
+	Game.close_call.emit()
+
 func hurt_player(n: int, from = null, force := false) -> void:
 	if (invuln > 0.0 and not force) or hull <= 0: return
 	hull -= n; invuln = 0.9; Snd.play("hurt", -2); Game.player_hurt.emit(hull)
@@ -573,6 +581,13 @@ func _physics_process(dt: float) -> void:
 		var hit_hero := player and (from + seg * k).distance_to(hero_c) < 0.6
 		var q := PhysicsRayQueryParameters3D.create(from, to); q.collision_mask = 1
 		var hw := space.intersect_ray(q)
+		# a dash through a shot is a close call: it flies past, time slows for a breath and the dash
+		# is ready again, so a good read chains straight into the counter
+		if hit_hero and player.since_dash < 0.3:
+			hit_hero = false
+			if not s.get("dodged", false):
+				s.dodged = true
+				_close_call()
 		if hit_hero or hw or s.life <= 0.0:
 			if hit_hero: hurt_player(1, from)
 			FX.sparks(to, Color(1, 0.4, 0.25), 8, 4)

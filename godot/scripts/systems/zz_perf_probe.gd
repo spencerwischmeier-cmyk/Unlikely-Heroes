@@ -49,11 +49,14 @@ func _ready() -> void:
 		if a == "--perf-probe": on = true
 		elif a.begins_with("--perf-probe="): on = true; secs = float(a.substr(13))
 	set_process(on)
-	if on: _add_marks()
+	if on:
+		_add_marks()
+		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 
 func _process(dt: float) -> void:
 	if bisect: _bisect(dt); return
 	t += dt; acc_t += dt; frames += 1
+	_spike(dt)
 	if Game.cam and t > 2.0: Game.cam.yaw += dt * 0.35
 	if acc_t < 1.0: return
 	var fps := frames / acc_t
@@ -76,6 +79,23 @@ func _process(dt: float) -> void:
 		var avg := func(k): return rows.reduce(func(a, x): return a + float(x[k]), 0.0) / rows.size()
 		print("[perf] AVG fps %.1f min %.0f proc %.1fms phys %.1fms draws %.0f prims %.0fk" % [avg.call("fps"), rows.map(func(x): return x.fps).min(), avg.call("proc"), avg.call("phys"), avg.call("draws"), avg.call("prims") / 1000.0])
 		get_tree().quit()
+
+## A frame over 30 ms prints what it was made of: our scripts, physics (and how many physics steps
+## it had to catch up), the renderer's CPU and GPU time for the last frame, node count change, draws.
+var _last_nodes := 0
+var _last_pf := 0
+var _last_phys_us := 0
+func _spike(dt: float) -> void:
+	var nodes := int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+	var pf := Engine.get_physics_frames()
+	var ph_us := phys_us - _last_phys_us
+	if t > 3.0 and dt > 0.030:
+		var vp := get_viewport().get_viewport_rid()
+		print("[spike] t=%.2f frame %.1fms scripts %.1fms physics %.1fms (%d steps) render cpu %.1fms gpu %.1fms setup %.1fms nodes %+d draws %d" % [t, dt * 1000.0,
+			script_us / 1000.0, ph_us / 1000.0, pf - _last_pf,
+			RenderingServer.viewport_get_measured_render_time_cpu(vp), RenderingServer.viewport_get_measured_render_time_gpu(vp),
+			RenderingServer.get_frame_setup_time_cpu(), nodes - _last_nodes, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)])
+	_last_nodes = nodes; _last_pf = pf; _last_phys_us = phys_us
 
 ## Candidates are groups: every node running a given script's _process/_physics_process, plus all
 ## AnimationPlayers / AnimationTrees, all CPU particles, all Skeleton3Ds.

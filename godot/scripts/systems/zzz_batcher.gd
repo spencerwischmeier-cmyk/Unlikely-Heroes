@@ -163,13 +163,92 @@ func _batch_mat(key: String, m: StandardMaterial3D) -> StandardMaterial3D:
 	_world_mats[key] = w
 	return w
 
+var _jobs: Array = []
+var _arr_cache := {}
+
+## A surface's vertex data, fetched once per mesh. Primitive meshes (boxes, cylinders) generate it on
+## the CPU; reading an imported mesh back from the graphics card is slow, so each is read only once.
+func _arrays(m: Mesh, s: int) -> Array:
+	var key := "%d:%d" % [m.get_instance_id(), s]
+	if _arr_cache.has(key): return _arr_cache[key]
+	var a: Array = (m as PrimitiveMesh).get_mesh_arrays() if m is PrimitiveMesh else m.surface_get_arrays(s)
+	_arr_cache[key] = a
+	return a
+
+## Worker: one batch's arrays (positions, normals, uvs, optional tangents/colours, indices).
+func _build_job(i: int) -> void:
+	var job: Dictionary = _jobs[i]
+	var V := PackedVector3Array(); var N := PackedVector3Array(); var UV := PackedVector2Array()
+	var T := PackedFloat32Array(); var C := PackedColorArray(); var I := PackedInt32Array()
+	var want_t: bool = job.want_t
+	var want_c: bool = job.want_c
+	for p in job.parts:
+		var a: Array = p[0]
+		var xf: Transform3D = p[1]
+		var vs: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+		var n := vs.size()
+		if n == 0: continue
+		var base := V.size()
+		V.append_array(xf * vs)
+		var sc := xf.basis.get_scale()
+		var uniform := absf(sc.x - sc.y) < 1e-3 and absf(sc.y - sc.z) < 1e-3
+		var flip := xf.basis.determinant() < 0.0
+		var ns = a[Mesh.ARRAY_NORMAL]
+		if ns != null and (ns as PackedVector3Array).size() == n:
+			if uniform:
+				N.append_array(Transform3D(xf.basis.orthonormalized() if not flip else xf.basis.inverse().transposed().orthonormalized(), Vector3.ZERO) * (ns as PackedVector3Array))
+			else:
+				var nb := xf.basis.inverse().transposed()
+				for v in (ns as PackedVector3Array): N.append((nb * v).normalized())
+		else:
+			for k in n: N.append(Vector3.UP)
+		var uvs = a[Mesh.ARRAY_TEX_UV]
+		if uvs != null and (uvs as PackedVector2Array).size() == n: UV.append_array(uvs)
+		else:
+			UV.resize(UV.size() + n)
+		if want_t:
+			var ts = a[Mesh.ARRAY_TANGENT]
+			if ts != null and (ts as PackedFloat32Array).size() == n * 4:
+				var tsa: PackedFloat32Array = ts
+				for k in n:
+					var tv: Vector3 = (xf.basis * Vector3(tsa[k * 4], tsa[k * 4 + 1], tsa[k * 4 + 2])).normalized()
+					T.append(tv.x); T.append(tv.y); T.append(tv.z); T.append(-tsa[k * 4 + 3] if flip else tsa[k * 4 + 3])
+			else:
+				for k in n: T.append(1.0); T.append(0.0); T.append(0.0); T.append(1.0)
+		if want_c:
+			var cs = a[Mesh.ARRAY_COLOR]
+			if cs != null and (cs as PackedColorArray).size() == n: C.append_array(cs)
+			else:
+				for k in n: C.append(Color.WHITE)
+		var idx = a[Mesh.ARRAY_INDEX]
+		var ii: PackedInt32Array = idx if idx != null else PackedInt32Array()
+		if ii.is_empty():
+			ii.resize(n)
+			for k in n: ii[k] = k
+		var m := ii.size() - ii.size() % 3
+		var start := I.size()
+		I.resize(start + m)
+		if flip:
+			for k in range(0, m, 3):
+				I[start + k] = base + ii[k]; I[start + k + 1] = base + ii[k + 2]; I[start + k + 2] = base + ii[k + 1]
+		else:
+			for k in m: I[start + k] = base + ii[k]
+	if V.is_empty(): return
+	var arr := []; arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = V; arr[Mesh.ARRAY_NORMAL] = N; arr[Mesh.ARRAY_TEX_UV] = UV
+	if want_t: arr[Mesh.ARRAY_TANGENT] = T
+	if want_c: arr[Mesh.ARRAY_COLOR] = C
+	arr[Mesh.ARRAY_INDEX] = I
+	job.out = arr
+
 func _merge() -> void:
 	var t0 := Time.get_ticks_msec()
 	var groups := {}
 	var moved := 0
 	for c in cands:
+		if not is_instance_valid(c[0]): moved += 1; continue
 		var mi: MeshInstance3D = c[0]
-		if not is_instance_valid(mi) or not mi.is_inside_tree() or not mi.is_visible_in_tree(): moved += 1; continue
+		if not mi.is_inside_tree() or not mi.is_visible_in_tree(): moved += 1; continue
 		if not mi.global_transform.is_equal_approx(c[1]): moved += 1; continue
 		var xf := mi.global_transform
 		# pieces with a draw distance batch in smaller cells, so a batch fades as its pieces would
@@ -183,40 +262,64 @@ func _merge() -> void:
 			groups[ks].parts.append([mi, s])
 	# a group is built when it merges two or more pieces, or holds a surface of a multi-surface piece
 	# (so that piece can go entirely); single-surface pieces alone in their group stay as they are.
-	# The work is spread over frames (a few ms each) so it never causes a hitch.
+	var jobs: Array = []
+	var t_group := Time.get_ticks_msec() - t0
+	for ks in groups:
+		var g: Dictionary = groups[ks]
+		var build: bool = g.parts.size() >= 2
+		if not build:
+			for p in g.parts: if (p[0] as MeshInstance3D).mesh.get_surface_count() > 1: build = true
+		if not build: continue
+		var src: MeshInstance3D = g.src
+		var origin: Vector3 = src.global_position
+		var mat: StandardMaterial3D = g.mat
+		var job := { g = g, origin = origin, parts = [], out = null,
+			want_t = mat.normal_enabled and not mat.uv1_triplanar,
+			want_c = mat.vertex_color_use_as_albedo }
+		for p in g.parts:
+			var mi: MeshInstance3D = p[0]
+			job.parts.append([_arrays(mi.mesh, p[1]), Transform3D(Basis(), -origin) * mi.global_transform])
+		jobs.append(job)
+	var t_fetch := Time.get_ticks_msec() - t0 - t_group
+	# the heavy part (moving every vertex into the batch's space) runs on worker threads where the
+	# platform has them, otherwise a few ms per frame
+	_jobs = jobs
+	if OS.has_feature("threads") and not OS.get_cmdline_user_args().has("--batch-no-threads"):
+		var tid := WorkerThreadPool.add_group_task(_build_job, jobs.size(), -1, true, "batcher")
+		while not WorkerThreadPool.is_group_task_completed(tid): await get_tree().process_frame
+		WorkerThreadPool.wait_for_group_task_completion(tid)
+	else:
+		var st0 := Time.get_ticks_usec()
+		for i in jobs.size():
+			_build_job(i)
+			if Time.get_ticks_usec() - st0 > SLICE_US: await get_tree().process_frame; st0 = Time.get_ticks_usec()
+	var t_build := Time.get_ticks_msec() - t0 - t_group - t_fetch
+	# hand the meshes to the renderer and retire the originals, a slice per frame
 	var root := Node3D.new(); root.name = "StaticBatches"
 	Game.level.add_child(root)
 	var made := 0
 	var dropped := 0
 	var gone := {}
 	var slice_t := Time.get_ticks_usec()
-	for ks in groups:
+	for job in jobs:
 		if Time.get_ticks_usec() - slice_t > SLICE_US:
 			await get_tree().process_frame
 			slice_t = Time.get_ticks_usec()
-		var g: Dictionary = groups[ks]
-		var build: bool = g.parts.size() >= 2
-		if not build:
-			for p in g.parts: if (p[0] as MeshInstance3D).mesh.get_surface_count() > 1: build = true
-		if not build: continue
-		var ok := true
-		for p in g.parts: if not is_instance_valid(p[0]): ok = false
+		var g: Dictionary = job.g
+		var ok := job.out != null
+		for p in g.parts: if not is_instance_valid(p[0]) or not (p[0] as Node).is_inside_tree(): ok = false
 		if not ok: continue
 		var src: MeshInstance3D = g.src
-		var origin: Vector3 = src.global_position
-		var st := SurfaceTool.new()
-		for p in g.parts:
-			var mi: MeshInstance3D = p[0]
-			st.append_from(mi.mesh, p[1], Transform3D(Basis(), -origin) * mi.global_transform)
-		var am := st.commit()
-		if am == null or am.get_surface_count() == 0: continue
+		var am := ArrayMesh.new()
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, job.out)
 		am.surface_set_material(0, _batch_mat(g.mk, g.mat))
+		job.out = null; job.parts = []
 		var out := MeshInstance3D.new(); out.mesh = am; out.name = "Batch%d" % made
 		out.cast_shadow = src.cast_shadow; out.layers = src.layers; out.gi_mode = src.gi_mode
 		out.visibility_range_end = src.visibility_range_end
 		out.visibility_range_end_margin = src.visibility_range_end_margin
 		out.visibility_range_fade_mode = src.visibility_range_fade_mode
-		out.position = origin
+		out.position = job.origin
 		root.add_child(out)
 		made += 1
 		for p in g.parts:
@@ -227,5 +330,7 @@ func _merge() -> void:
 				# a piece that holds other nodes (its collision, child pieces) stays as an empty holder
 				if mi.get_child_count() > 0: mi.mesh = null
 				else: mi.queue_free()
+	_jobs = []; _arr_cache.clear()
+	if log_on: print("[batch] timings: group %d ms, fetch %d ms, build %d ms, upload %d ms" % [t_group, t_fetch, t_build, Time.get_ticks_msec() - t0 - t_group - t_fetch - t_build])
 	if log_on: print("[batch] %d batches replace %d of %d pieces (%d moved/hidden, skipped) in %d ms" % [made, dropped, cands.size(), moved, Time.get_ticks_msec() - t0])
 	done = true

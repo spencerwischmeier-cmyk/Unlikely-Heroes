@@ -5,6 +5,9 @@ extends Node3D
 
 var shake_request := 0.0
 var hitstop := 0.0
+## brief slow motion (scale, real seconds left), e.g. a close-call dodge
+var slow_scale := 1.0
+var slow_t := 0.0
 var _spark_mesh: Mesh
 var _fire_mesh: Mesh
 var _smoke_mesh: Mesh
@@ -115,6 +118,9 @@ func shake(n: float) -> void:
 
 func stop(t: float) -> void:
 	hitstop = maxf(hitstop, t)
+
+func slow(scale: float, t: float) -> void:
+	slow_scale = scale; slow_t = maxf(slow_t, t)
 
 ## Directional spark spray (hit reactions): sparks fly back along `dir` (the way the hit came from).
 func hit_sparks(pos: Vector3, dir: Vector3, color := Color(1, 0.85, 0.5), n := 10) -> void:

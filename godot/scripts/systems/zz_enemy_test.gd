@@ -65,6 +65,7 @@ func _ready() -> void:
 	print("[enemy-test] mode ", mode, " flags ", flags)
 	Game.player_hurt.connect(func(h): hurts += 1; print("[enemy-test] vesk hurt, hull ", h, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.bot_killed.connect(func(b, _p, k): kills += 1; print("[enemy-test] killed ", k, " returned_to_sender=", b.get_meta("returned_to_sender", false)))
+	Game.close_call.connect(func(): print("[enemy-test] close call t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.boss_health.connect(func(nm, f): print("[enemy-test] boss_health ", nm, " ", snappedf(f, 0.01)))
 	_setup.call_deferred()
 
