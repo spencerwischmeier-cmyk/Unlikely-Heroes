@@ -51,7 +51,7 @@ func setup(level: Node3D) -> void:
 		_make_arrays()
 		_make_mats()
 		_reskin(L)
-		if not args.has("--no-thresholds"): _thresholds()
+		if not args.has("--no-thresholds") and not OLD_FLOORS: _thresholds()
 	if stats:
 		print("[ground] floors=%d by style %s" % [floors.size(), counts])
 		var names: Array = L.islands.keys()
@@ -130,6 +130,11 @@ const TOUR := [
 	# Junkyard close-ups for the look pass
 	["junk_shack", Vector3(-1, 0.1, 86.5), 0.0, -0.12], ["junk_hull", Vector3(26.5, 0.1, 79.5), 0.84, -0.15],
 	["works_climb", Vector3(-34, 0.1, 104), -PI / 2, -0.05, true],
+	# where two areas' floors meet (thresholds)
+	["seam_halt", Vector3(1.5, 0.1, 88), 0.0, -0.32, true], ["seam_plaza_west", Vector3(-18, 0.1, 33), -PI / 2, -0.32, true],
+	["seam_market", Vector3(-53, 0.1, 31), -PI / 2, -0.3, true], ["seam_bazaar", Vector3(-75, 0.1, 42), -PI / 2, -0.32, true],
+	["seam_gangway", Vector3(17, 0.1, 31), PI / 2, -0.32, true], ["seam_approach", Vector3(-4, 0.1, 15), PI, -0.32, true],
+	["mast_terminal", Vector3(3, 6.7, -51), PI, -0.3, true],
 ]
 ## --tour-only=a,b,c limits the tour to those spots.
 var tour_only := PackedStringArray()
@@ -230,7 +235,8 @@ func _make_mats() -> void:
 	mats[PLANKS] = _mat({ layer = 5.0, side_layer = 0.0, tile_m = 6.0, side_m = 7.1, side_tint = Color(0.62, 0.66, 0.7), puddles = 0.35, oil = 0.25, moss = 0.15,
 		edge_grime = 0.5, grime_col = Color(0.4, 0.36, 0.32), nrm_depth = 1.2 })
 	# the Signal Mast's steel: tread plate in a weathered copper-bronze paint, so it never reads as the grey stock deck
-	mats[TREAD] = _mat({ layer = 6.0, side_layer = 6.0, tile_m = 3.0, side_m = 3.0, puddles = 0.2, oil = 0.3, edge_grime = 0.55,
+	mats[TREAD] = _mat({ layer = 6.0, side_layer = 6.0, tile_m = 3.0, side_m = 3.0, puddles = 0.2, oil = 0.3, edge_grime = 0.4,
+		metal = 0.6, rough_mul = 1.1, grime_col = Color(0.4, 0.38, 0.36) }) if OLD_FLOORS else _mat({ layer = 6.0, side_layer = 6.0, tile_m = 3.0, side_m = 3.0, puddles = 0.2, oil = 0.3, edge_grime = 0.55,
 		metal = 0.6, rough_mul = 1.1, grime_col = Color(0.32, 0.26, 0.22), tint = Color(0.86, 0.66, 0.5), side_tint = Color(0.62, 0.5, 0.42) })
 	mats[CONCRETE] = _mat({ layer = 7.0, side_layer = 7.0, tile_m = 5.0, side_m = 6.0, puddles = 0.55, oil = 0.8, moss = 0.08,
 		edge_grime = 0.55, grime_col = Color(0.42, 0.38, 0.34) })
@@ -245,10 +251,9 @@ func _make_mats() -> void:
 static func name_style(n: String) -> int:
 	# the routes between the areas: each keeps one surface end to end (see routes/routes_look.gd), and the
 	# steel gantries read as steel, not as junkyard dirt
-	if n in ["junk_viaduct", "plaza_viaduct"]: return COBBLE
-	if n == "plaza_bridge_west": return TIMBER
-	if n in ["junk_halt_gantry", "junk_works_gantry"]: return TREAD
-	if n.begins_with("causeway"): return CONCRETE
+	if not OLD_FLOORS:
+		var o := _route_style(n)
+		if o >= 0: return o
 	if n.begins_with("junk"): return JUNK
 	if n.begins_with("plaza") or n.begins_with("causeway"): return COBBLE
 	if n in ["bazaar", "wash_nook"]: return SAND
@@ -258,6 +263,16 @@ static func name_style(n: String) -> int:
 	if n == "depot" or n.begins_with("yard") or n == "arena": return CONCRETE
 	if n.begins_with("mast") or n == "gallery" or n == "dish_deck": return TREAD
 	return DECK
+
+## --old-floors: the floors as they were before the routes/transitions pass (for before shots)
+static var OLD_FLOORS := OS.get_cmdline_user_args().has("--old-floors")
+
+static func _route_style(n: String) -> int:
+	if n in ["junk_viaduct", "plaza_viaduct"]: return COBBLE
+	if n == "plaza_bridge_west": return TIMBER
+	if n in ["junk_halt_gantry", "junk_works_gantry"]: return TREAD
+	if n.begins_with("causeway"): return CONCRETE
+	return -1
 
 ## the island a point (x, floor top, z) belongs to: one at the same height under it, else the highest one
 ## under it, else the nearest one within 30 m. Returns [name, height] or ["", 0].
