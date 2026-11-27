@@ -182,6 +182,8 @@ func _autoplay(dt: float) -> void:
 		if d < bd: bd = d; best = b
 		if b.get("state") == "fuse" and d < 3.2: threat = true
 		if b.get("aiming") and float(b.get("fire_t")) < 0.3: threat = true
+	if best == null and boss and is_instance_valid(boss) and not boss.dead and boss.state not in ["off", "intro", "dying"]:
+		best = boss; bd = (boss.global_position - pp).length()
 	if best == null:
 		for a in ["fire", "move_left", "move_right", "move_back", "move_forward", "dash", "melee"]: _ap_hold(a, false)
 		return

@@ -103,6 +103,8 @@ const HERO_SCALE := 0.9
 var arm_hold := 1.0          # 0..1: how much the right arm is posed to hold the blaster forward
 var arm_bones := []          # [upper, fore, hand] bone ids (right arm)
 var anim_t := 0.0
+var hurt_t := 0.0            # flinch + red flash when hit
+var fur_mats: Array = []
 
 func _ready() -> void:
 	var cs := CollisionShape3D.new()
@@ -143,6 +145,7 @@ func _ready() -> void:
 	rope.top_level = true; rope.visible = false
 	add_child(rope)
 	level = get_parent().get_node_or_null("Level") if get_parent() else null
+	Game.player_hurt.connect(func(_h): hurt_t = 0.35)
 
 ## Vesk's fur: a soft rim sheen and a touch of subsurface so he doesn't read as plastic (--no-fur to compare)
 func _fur(n: Node) -> void:
@@ -276,7 +279,7 @@ func _physics_process(dt: float) -> void:
 	grounded = is_on_floor()
 	if not grounded and not _no_ledge: _ledge_assist(wish)
 	else: ledge_used = false
-	if grounded: _edge_slip(dt)
+	if grounded: _edge_slip(dt, wish)
 	if grounded:
 		if not was_grounded:
 			if vy_before < -6.0: land_t = clampf(-vy_before / 20.0, 0.3, 1.0)
@@ -339,16 +342,18 @@ func _ledge_assist(wish: Vector3) -> void:
 	land_t = 0.25
 	Snd.play("land", -10)
 
-## Perched on a lip by the round bottom of his capsule (nothing under his middle): slide him off it
-## instead of letting him hover on the edge.
-func _edge_slip(dt: float) -> void:
+## Perched on a lip by the round bottom of his capsule (nothing under his middle): instead of hovering
+## there, step him off it if he is heading out, otherwise settle him back onto the ledge (forgiving landings).
+func _edge_slip(dt: float, wish: Vector3) -> void:
 	var n := get_floor_normal()
 	if n.y > 0.985 or riding: return
 	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 0.3, 0), global_position - Vector3(0, 0.3, 0)); q.collision_mask = 1; q.exclude = [get_rid()]
 	if not get_world_3d().direct_space_state.intersect_ray(q).is_empty(): return
 	var nh := Vector3(n.x, 0, n.z)
 	if nh.length() < 0.05: return
-	global_position += nh.normalized() * 3.5 * dt
+	nh = nh.normalized()
+	if wish.length() > 1.0 and wish.normalized().dot(nh) > 0.3: global_position += nh * 3.5 * dt
+	else: move_and_collide(-nh * 2.5 * dt)
 
 func respawn() -> void:
 	global_position = respawn_pos; velocity = Vector3.ZERO; riding = false; swing_hook = null; rope.visible = false
@@ -590,7 +595,11 @@ func _animate(dt: float) -> void:
 	# body: bank into turns, squash on landing
 	lean = lerpf(lean, clampf(-turn_rate * 0.09 * maxf(run, 0.3), -0.35, 0.35), 1.0 - exp(-10.0 * dt))
 	if riding or swing_hook: lean = lerpf(lean, 0.0, 1.0 - exp(-12.0 * dt))
-	body.rotation = Vector3(0, 0, lean)
+	# flinch: rock back away from the hit and flash red for a moment
+	hurt_t = maxf(0.0, hurt_t - dt)
+	var fl := sin(clampf(hurt_t / 0.35, 0.0, 1.0) * PI) * 0.35
+	for m in fur_mats: (m as StandardMaterial3D).emission_energy_multiplier = (hurt_t / 0.35) * 1.6
+	body.rotation = Vector3(-fl, 0, lean)
 	body.scale = Vector3(1 + land_t * 0.08, 1 - land_t * 0.1, 1 + land_t * 0.08)
 	_update_weapon(dt)
 	_update_jets(dt)
