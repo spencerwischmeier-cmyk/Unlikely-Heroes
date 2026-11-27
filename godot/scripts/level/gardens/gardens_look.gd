@@ -43,6 +43,8 @@ static func build(L) -> void:
 	var t0 := Time.get_ticks_msec()
 	_beds(K, root)
 	var extra := _tree_crowns(root)
+	extra.append_array(_sky_tree_canopy())
+	extra.append_array(_arch_garlands(root))
 	var leaves := _foliage(K, root, extra)
 	var surf := _surfaces(K, root)
 	_grass_seed(L, K, root)
@@ -232,7 +234,8 @@ static func _tree_crowns(root: Node3D) -> Array:
 		if first: continue
 		var c := ab.get_center()
 		var w := maxf(ab.size.x, ab.size.z)
-		var crown_c := Vector3(c.x, ab.position.y + ab.size.y * 0.7, c.z)
+		# the kit's root sits under the layout spread's offset node: clumps go in its local space
+		var crown_c := root.to_local(Vector3(c.x, ab.position.y + ab.size.y * 0.7, c.z))
 		var cr := w * 0.42
 		for k in 7:
 			var d := Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.4, 0.8), rng.randf_range(-1, 1)).normalized() * cr * 0.55
@@ -240,6 +243,71 @@ static func _tree_crowns(root: Node3D) -> Array:
 			var r := cr * rng.randf_range(0.55, 0.7)
 			out.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(r, r * 0.85, r)), crown_c + d), Color(0.36, 0.64, 0.3) * rng.randf_range(0.9, 1.1)])
 	print("[gardens-look] tree crowns: %d clumps" % out.size())
+	return out
+
+## The Sky Tree is the gardens' landmark: a broad canopy spreading past the crown deck, a second tier above it,
+## and vines trailing down from the canopy's underside (kept clear of the rope bridge and the zipline).
+## Positions are the area file's original coordinates (the kit root's local space).
+static func _sky_tree_canopy() -> Array:
+	var G = load("res://scripts/level/areas/gardens.gd")
+	var T := Vector3(G.TREE.x, G.CROWN_Y, G.TREE.y)
+	var rng := RandomNumberGenerator.new(); rng.seed = 7272
+	var out := []
+	var leaf := Color(0.36, 0.66, 0.32)
+	for k in 9:
+		var a := k * TAU / 9 + rng.randf_range(-0.15, 0.15)
+		var p := T + Vector3(cos(a) * 5.4, 5.2 + rng.randf_range(-0.6, 0.9), sin(a) * 5.4)
+		var r := rng.randf_range(1.9, 2.5)
+		out.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(r, r * 0.72, r)), p), leaf * rng.randf_range(0.88, 1.08)])
+	for k in 5:
+		var a := k * TAU / 5 + 0.4
+		var p := T + Vector3(cos(a) * 2.6, 9.0 + rng.randf_range(-0.4, 0.6), sin(a) * 2.6)
+		var r := rng.randf_range(1.8, 2.3)
+		out.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(r, r * 0.8, r)), p), Color(0.42, 0.72, 0.34) * rng.randf_range(0.9, 1.05)])
+	# trailing vines; skip the bridge (north, -z) and the zipline (south-east)
+	var zip_a := atan2(G.ZIP[1].z - T.z, G.ZIP[1].x - T.x)
+	for k in 22:
+		var a := k * TAU / 22 + rng.randf_range(-0.1, 0.1)
+		if absf(angle_difference(a, -PI / 2)) < 0.5 or absf(angle_difference(a, zip_a)) < 0.45: continue
+		var rad := rng.randf_range(3.8, 6.2)
+		var top := T + Vector3(cos(a) * rad, 3.9 + rng.randf_range(0.0, 0.8), sin(a) * rad)
+		var len := rng.randf_range(2.5, 6.0)
+		var n := int(len / 0.26)
+		for i in n:
+			var u := float(i) / n
+			var q := top + Vector3(sin(u * 5.0 + k) * 0.08, -u * len, cos(u * 4.0 + k) * 0.08)
+			var r := lerpf(0.17, 0.09, u)
+			out.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(r, r * 1.3, r)), q), Color(0.3, 0.58, 0.28) * rng.randf_range(0.9, 1.1)])
+	return out
+
+## Leafy garlands over the promenade's vine arches, so they read as overgrown rather than smooth models.
+static func _arch_garlands(root: Node3D) -> Array:
+	var out := []
+	var rng := RandomNumberGenerator.new(); rng.seed = 8383
+	for h in root.get_children():
+		if not (h is Node3D) or (h is GeometryInstance3D) or h.get_child_count() == 0: continue
+		if not String(h.get_child(0).name).begins_with("vine_arch"): continue
+		var ab := AABB(); var first := true
+		for mi in (h as Node3D).find_children("*", "MeshInstance3D", true, false):
+			var a: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+			ab = a if first else ab.merge(a); first = false
+		if first: continue
+		var along_x := ab.size.x >= ab.size.z
+		var half := (ab.size.x if along_x else ab.size.z) * 0.45
+		var c := ab.get_center()
+		for i in 15:
+			var t := PI * (i + 0.5) / 15.0
+			var off := cos(t) * half
+			var y := ab.position.y + 0.25 + sin(t) * (ab.size.y - 0.45)
+			var g := Vector3(c.x + (off if along_x else rng.randf_range(-0.15, 0.15)), y, c.z + (rng.randf_range(-0.15, 0.15) if along_x else off))
+			var r := rng.randf_range(0.32, 0.46)
+			out.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(r, r * 0.85, r)), root.to_local(g)), Color(0.32, 0.6, 0.3) * rng.randf_range(0.9, 1.1)])
+			# a few short trailing strands from the top
+			if i % 3 == 1 and sin(t) > 0.6:
+				for k in 6:
+					var q := g + Vector3(0, -0.3 - k * 0.24, 0)
+					var rr := lerpf(0.14, 0.08, k / 6.0)
+					out.append([Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(rr, rr * 1.3, rr)), root.to_local(q)), Color(0.3, 0.58, 0.28)])
 	return out
 
 # ------------------------------------------------------------------ surfaces
@@ -309,10 +377,11 @@ static func _grass_seed(L: Node3D, K, root: Node3D) -> void:
 			for i in mm.instance_count:
 				var xf := mm.get_instance_transform(i)
 				var s := xf.basis.get_scale()
-				pave.append([Vector2(xf.origin.x, xf.origin.z), maxf(s.x, s.z) * (0.6 if c.name == "MM_stone" else 1.0) + 0.15])
+				var gp := root.global_transform * xf.origin
+				pave.append([Vector2(gp.x, gp.z), maxf(s.x, s.z) * (0.6 if c.name == "MM_stone" else 1.0) + 0.15])
 	var seeder := GrassSeeder.new(); seeder.name = "GardenGrass"
 	seeder.lawns = lawns; seeder.pave = pave
-	root.add_child(seeder)
+	L.add_child(seeder)            # world space: the tufts are placed at the raycast hits
 
 class GrassSeeder extends Node3D:
 	var lawns := []
