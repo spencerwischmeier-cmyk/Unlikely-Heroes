@@ -61,6 +61,7 @@ func pivot() -> Vector3:
 ## Jump straight to the target (after a respawn or teleport) instead of sweeping across the level.
 var _probe := SphereShape3D.new()
 var _boom_len := 4.3
+var _occl_t := 0.0
 var _boom_q := PhysicsShapeQueryParameters3D.new()
 ## Camera distance after walls: pulls in at once when something is in the way, eases back out over
 ## about half a second once it clears.
@@ -75,8 +76,24 @@ func _boom(dt: float, want: float) -> float:
 	var r := get_world_3d().direct_space_state.cast_motion(_boom_q)
 	var free := want * (r[0] if r.size() > 0 else 1.0)
 	free = maxf(free - 0.1, 0.3)
-	if free < _boom_len: _boom_len = free
-	else: _boom_len = lerpf(_boom_len, free, 1.0 - exp(-4.0 * dt))
+	# something thin (an upright, a railing) between where the lens wants to be and Vesk for more than
+	# a moment: stay in front of it (checked at the wanted spot, so easing out never slides back behind it)
+	var want_len := free
+	if target:
+		var chest := target.global_position + Vector3(0, 1.0, 0)
+		var at := from + dir * free
+		var rq := PhysicsRayQueryParameters3D.create(chest, at); rq.collision_mask = 1; rq.exclude = [target.get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(rq)
+		if hit:
+			_occl_t += dt
+			if _occl_t > 0.12:
+				var f := chest.distance_to(hit.position) / maxf(chest.distance_to(at), 0.01)
+				want_len = maxf(free * f - 0.35, 0.6)
+		else:
+			_occl_t = 0.0
+	if free < _boom_len: _boom_len = free                                   # a wall: at once
+	elif want_len < _boom_len: _boom_len = lerpf(_boom_len, want_len, 1.0 - exp(-9.0 * dt))
+	else: _boom_len = lerpf(_boom_len, want_len, 1.0 - exp(-4.0 * dt))
 	return _boom_len
 
 func snap(p: Node3D) -> void:
