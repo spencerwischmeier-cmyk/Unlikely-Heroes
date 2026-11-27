@@ -86,6 +86,10 @@ func _finish() -> void:
 	var ok: bool = r.grow(0.3).has_point(Vector2(pos.x, pos.z)) and absf(pos.y - c[3]) < 0.4
 	var line := "[traverse] %s %s  end=(%.1f, %.1f, %.1f) want y=%.1f in %s" % ["PASS" if ok else "FAIL", order[cur], pos.x, pos.y, pos.z, c[3], r]
 	print(line); results.append(ok)
+	if not ok:
+		var q := PhysicsRayQueryParameters3D.create(pos + Vector3(0, 0.5, 0), pos - Vector3(0, 2.0, 0)); q.exclude = [p.get_rid()]
+		var hit := p.get_world_3d().direct_space_state.intersect_ray(q)
+		if hit: print("   standing on ", (hit.collider as Node).get_path(), " at y=%.2f" % hit.position.y)
 
 func _limit(name: String) -> float:
 	var c: Array = cases[name]

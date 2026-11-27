@@ -13,6 +13,7 @@ extends Node3D
 ## - Cheap at a distance: people more than ACTIVE_D from Vesk freeze (no animation), past SHOW_D they hide.
 ## Debug: `-- --panic-map=out.png` writes the walk grids as an image and quits.
 
+const Device := preload("res://scripts/device.gd")
 const SPECIES := ["cit_frog", "cit_bird", "cit_mole", "cit_goat"]
 const BARK := {"cit_frog": "frog", "cit_bird": "bird", "cit_mole": "mole", "cit_goat": "goat"}
 const WHO := {"frog": "dockhand", "bird": "traveller", "mole": "shopkeeper", "goat": "tourist"}
@@ -76,6 +77,7 @@ func add_layer(name_: String, y: float, r: Rect2) -> int:
 
 ## a home area: `count` people of the given roles ("roam", "evac") start in it
 func add_zone(name_: String, layer: int, r: Rect2, count: int, roles := ["roam"]) -> void:
+	count = Device.scale(count)   # fewer people on phones and in browsers
 	zones.append({ name = name_, layer = layer, rect = r, count = count, roles = roles })
 
 func _ready() -> void:
@@ -243,7 +245,8 @@ func _spawn(zone: Dictionary, role: String) -> void:
 		yaw = rng.randf() * TAU, state = "react", t = rng.randf_range(0.2, 2.0), path = PackedVector3Array(), pi = 0,
 		speed = 5.0, anim = "", role = role, active = true, luggage = null, slot = -1, flee_from = Vector3.ZERO,
 		run_clip = "run" if rng.randf() < 0.6 else "run2", rate = rng.randf_range(0.9, 1.12), threat_t = rng.randf(), want_path = false,
-		dest = Vector2i(-1, -1), react = "look" }
+		dest = Vector2i(-1, -1), react = "look",
+		meshes = node.find_children("*", "MeshInstance3D", true, false), near = true, shad = true, adt = 0.0, phase = people.size() % 3 }
 	if role == "evac":
 		p.luggage = _luggage(node, 1.7)
 		p.luggage.visible = false
@@ -314,8 +317,12 @@ func _physics_process(dt: float) -> void:
 				for k in z.count: _spawn(z, z.roles[k % z.roles.size()])
 			for a in OS.get_cmdline_user_args():
 				if a.begins_with("--panic-map="): _dump_map(a.substr(12))
-		return
-	if paused: return
+
+## People move once per drawn frame, not per physics step: they have no bodies, and at 120 Hz physics a
+## slow frame ran the whole crowd (and its O(n^2) separation) four or five times over.
+func _process(dt: float) -> void:
+	if not ready_ or paused: return
+	dt = minf(dt, 0.05)
 	t += dt
 	var pl: Node3D = Game.player
 	var pp: Vector3 = pl.global_position if pl else Vector3(1e6, 0, 1e6)
@@ -331,6 +338,27 @@ func _physics_process(dt: float) -> void:
 	_boarding(dt)
 	_barks(dt, pp)
 
+## Level of detail for people: past SHADOW_D they stop casting shadows, past NEAR_D their animation
+## updates every other frame (staggered, with the time saved up so they don't slow down).
+const NEAR_D := 24.0
+const SHADOW_D := 36.0
+func _lod(p: Dictionary, d: float, dt: float) -> void:
+	var shad := d < SHADOW_D
+	if shad != p.shad:
+		p.shad = shad
+		for mi in p.meshes:
+			if is_instance_valid(mi): (mi as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shad else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if p.ap == null: return
+	var near := d < NEAR_D
+	if near != p.near:
+		p.near = near
+		p.ap.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE if near else AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+		p.adt = 0.0
+	if not near and p.active:
+		p.adt += dt
+		if Engine.get_process_frames() % 2 == p.phase % 2:
+			p.ap.advance(p.adt); p.adt = 0.0
+
 func _step(p: Dictionary, dt: float, pp: Vector3) -> void:
 	if p.state == "gone":
 		p.t -= dt
@@ -342,6 +370,7 @@ func _step(p: Dictionary, dt: float, pp: Vector3) -> void:
 		p.active = act
 		if p.ap: p.ap.active = act
 	p.node.visible = d < SHOW_D
+	_lod(p, d, dt)
 	# far away people stand still, except those on their way somewhere (evacuees must still reach the queue)
 	if not act and p.state != "walk": return
 	# threats: a bot close by makes people duck and run (queuers just flinch)

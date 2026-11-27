@@ -4,3 +4,7 @@ __pycache__/
 # Local secrets written by `elevenlabs onboard`
 /.env
 .claude/worktrees/
+build/
+site-test/
+web/node_modules/
+build_run.log

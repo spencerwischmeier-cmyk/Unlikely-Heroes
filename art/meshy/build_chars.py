@@ -161,6 +161,18 @@ def hornet(out):
     shrink_textures()
     export(out)
 
+def dodger(out):
+    """Dodger J1 (2026-11-27): egg shell with side jet pods and an empty eye socket. The eye (glowing lens, lids), the
+    jet flames and the expressions are built in code (godot/scripts/cutscene/drone_actor.gd), so the shell is placed
+    with its eye-glass centre on the origin and scaled to the old shell's size (raw glass centre z -0.025, radius
+    ~0.185, front y -0.50; scale 0.573 -> glass radius ~0.106 m, glass front 0.287 m in front of the origin)."""
+    clear(); o = load('dodger_j1')
+    s = 0.573
+    o.data.transform(Matrix.Diagonal((s, s, s, 1)) @ Matrix.Translation(Vector((0, 0, 0.025))))
+    o.data.update(); o.name = 'dodger'
+    shrink_textures()
+    export(out)
+
 JOBS = {
     'roller': lambda: roller('roller_head', f'{MODELS}/roller.glb', 0.55, 'Roller'),
     'crew_roller': lambda: roller('crew_head', f'{MODELS}/crew_roller.glb', 0.5, 'CrewRoller'),
@@ -169,7 +181,8 @@ JOBS = {
     'crane_cab': lambda: static('crane_cab', f'{MODELS}/chars/crane_cab.glb', width=3.0, yaw=math.pi / 2),
     'crane_base': lambda: static('crane_base', f'{MODELS}/chars/crane_base.glb', width=5.2, yaw=math.pi / 2),
     'barricade': lambda: static('barricade', f'{MODELS}/chars/crew_barricade.glb', width=2.5),
-    'dodger': lambda: static('dodger', f'{MODELS}/chars/dodger_body.glb', width=1.1, ground=False),
+    'dodger_old': lambda: static('dodger', f'{MODELS}/chars/dodger_body_old.glb', width=1.1, ground=False),
+    'dodger': lambda: dodger(f'{MODELS}/chars/dodger_body.glb'),
     'gizmart': lambda: static('gizmart', f'{MODELS}/chars/gizmart.glb', height=3.0),
 }
 if __name__ == '__main__':

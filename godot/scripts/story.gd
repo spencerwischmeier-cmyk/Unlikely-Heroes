@@ -39,6 +39,9 @@ var active := false      # a fight is running in zones[index]
 var wave := 0
 var alive: Array = []
 var wave_delay := 0.0
+var wave_age := 0.0
+var wave_size := 0
+var no_overlap := OS.get_cmdline_user_args().has("--no-wave-overlap")
 var boss: Node3D
 var relay: Node3D
 var switches: Array = []
@@ -72,7 +75,20 @@ func start() -> void:
 	Game.cutscene_started.emit("intro")
 	if Game.main.has_method("has_cutscenes") and Game.main.has_cutscenes():
 		await Game.cutscene_finished
+	_resume()
 	_advance()
+
+## Continue: zones already finished in the save are passed over silently (their rails, gates and
+## power come back on) so the story picks up where the player left off. The boss is never skipped.
+func _resume() -> void:
+	var done: Array = []
+	while index + 1 < zones.size():
+		var z: Dictionary = zones[index + 1]
+		if z.get("kind", "") == "boss" or not Game.is_complete(z.id): break
+		index += 1
+		_apply_effects(z, true); done.append(z.id)
+	if not done.is_empty(): Game.progress_restored.emit(done)
+	if index >= 0: print("[story] resumed after zone %d (%s)" % [index, zones[index].id])
 
 func current_id() -> String:
 	return zones[index].id if index >= 0 and index < zones.size() else ""
@@ -102,13 +118,19 @@ func _physics_process(dt: float) -> void:
 	alive = alive.filter(func(b): return is_instance_valid(b) and not b.dead)
 	var kind: String = z.get("kind", "")
 	if kind == "relay" or kind == "boss" or kind == "activate": return
-	if alive.is_empty():
+	var waves: Array = z.get("waves", [])
+	wave_age += dt
+	# the next wave rolls in while the last straggler of a big wave is still up, so a fight flows
+	# instead of stopping dead between waves (never for the final clear, which needs everyone down)
+	var straggler := alive.size() == 1 and wave < waves.size() and wave_age > 4.0 and wave_size >= 3 and not no_overlap
+	if alive.is_empty() or straggler:
 		wave_delay -= dt
 		if wave_delay > 0.0: return
-		var waves: Array = z.get("waves", [])
 		if wave < waves.size():
-			_spawn_wave(z, waves[wave]); wave += 1; wave_delay = 1.2
-		else:
+			_spawn_wave(z, waves[wave]); wave += 1; wave_delay = 1.2; wave_age = 0.0
+			var w: Dictionary = waves[wave - 1]
+			wave_size = int(w.get("roller", 0)) + int(w.get("hornet", 0)) + int(w.get("crew", 0)) * 3
+		elif alive.is_empty():
 			_clear(z)
 
 ## Reaching a later `skip_to` zone early skips the skippable zones in between (alternate routes).
@@ -127,7 +149,7 @@ func _check_skip(p: Vector3) -> void:
 		return
 
 func _begin(z: Dictionary) -> void:
-	active = true; wave_delay = 0.6
+	active = true; wave_delay = 0.6; wave_age = 0.0; wave_size = 0
 	Game.zone_entered.emit(z.id)
 	var cut_lines: bool = z.get("kind", "") == "boss" and _cuts_on()
 	if not cut_lines:
@@ -195,19 +217,50 @@ func _switched(z: Dictionary, sw: Node3D) -> void:
 
 func _spawn_in(r: Rect2, y: float, w: Dictionary) -> void:
 	var n := 0
+	var base := randf() * TAU
 	for kind in ["roller", "hornet", "crew"]:
 		for i in int(w.get(kind, 0)):
-			var a := TAU * float(n) / 5.0 + randf() * 0.6
-			var c := r.get_center() + Vector2(cos(a), sin(a)) * minf(r.size.x, r.size.y) * 0.3
-			alive.append(Game.main.spawn_bot(kind, Vector3(c.x, y, c.y), r)); n += 1
+			alive.append(Game.main.spawn_bot(kind, _spawn_spot(r, y, base + TAU * float(n) / 5.0), r)); n += 1
+
+## A drop-in spot in the zone: never right on top of Vesk, and where possible somewhere he is facing,
+## so bots arrive in view instead of behind him.
+func _spawn_spot(r: Rect2, y: float, a: float) -> Vector3:
+	var rad := minf(r.size.x, r.size.y) * 0.3
+	var c := r.get_center() + Vector2(cos(a), sin(a)) * rad
+	var p: Node3D = Game.player
+	if p == null or Game.cam == null: return Vector3(c.x, y, c.y)
+	var pp := Vector2(p.global_position.x, p.global_position.z)
+	var fwd: Vector3 = Game.cam.forward()
+	var best := c
+	var best_s := -INF
+	for k in 8:
+		var aa := a + randf_range(-0.9, 0.9) if k > 0 else a
+		var rr := rad * (randf_range(0.6, 1.2) if k > 0 else 1.0)
+		var q := r.get_center() + Vector2(cos(aa), sin(aa)) * rr
+		q = q.clamp(r.position + Vector2(1.5, 1.5), r.end - Vector2(1.5, 1.5))
+		var d := q - pp
+		var dist := d.length()
+		var s := -absf(dist - 11.0) * 0.3 + (d.normalized().dot(Vector2(fwd.x, fwd.z)) * 2.0 if dist > 0.1 else -9.0)
+		if dist < 6.0: s -= 10.0
+		if k > 0 and not _floor_at(Vector3(q.x, y, q.y)): continue
+		if s > best_s: best_s = s; best = q
+	return Vector3(best.x, y, best.y)
+
+## True when there is open floor at about height `p.y` under `p` (not a roof, a pit or a wall).
+func _floor_at(p: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(p + Vector3(0, 7.0, 0), p - Vector3(0, 1.5, 0)); q.collision_mask = 1
+	var hit := Game.main.get_world_3d().direct_space_state.intersect_ray(q)
+	return not hit.is_empty() and absf(hit.position.y - p.y) < 0.8 and hit.normal.y > 0.8
 
 func _spawn_wave(z: Dictionary, w: Dictionary) -> void:
 	_spawn_in(z.rect, z.get("y", 0.0), w)
 	if wave == 0 and randf() < 0.6: Snd.bark("dodger", "spawn")
 
 ## Unlocks, gates, power and grants of a zone (also applied when a zone is skipped).
-func _apply_effects(z: Dictionary) -> void:
-	for i in z.get("unlock_rails", []): Game.level.set_rail_locked(i, false); Snd.play("rail_unlock", -2)
+func _apply_effects(z: Dictionary, quiet := false) -> void:
+	for i in z.get("unlock_rails", []):
+		Game.level.set_rail_locked(i, false)
+		if not quiet: Snd.play("rail_unlock", -2)
 	for g in z.get("open_gates", []): if Game.level.has_method("open_gate"): Game.level.open_gate(g)
 	for m in z.get("power", []): if Game.level.has_method("power"): Game.level.power(m)
 	for it in z.get("grants", []): Game.unlock(it)

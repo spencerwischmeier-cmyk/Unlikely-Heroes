@@ -24,6 +24,8 @@ var player: CharacterBody3D
 var nuts := 0
 var hull := MAX_HULL
 var invuln := 0.0
+var nut_chain := 0
+var nut_last := 0
 
 const ORDER := ["arc_lancer", "scatter_bloom", "thump_lobber", "seeker_hive"]
 const WEAPONS := {
@@ -73,6 +75,7 @@ var ammo_mesh: BoxMesh
 var ammo_mat: StandardMaterial3D
 
 func _ready() -> void:
+	no_turns = OS.get_cmdline_user_args().has("--no-turns")
 	Game.nuts_changed.connect(_on_nuts)
 	Game.item_unlocked.connect(_on_unlocked)
 	# bots sometimes drop an ammo canister (only when an owned weapon is short)
@@ -442,19 +445,53 @@ func _arc_line(a: Vector3, b: Vector3) -> void:
 	mi.global_basis = Basis(Quaternion(Vector3.UP, (b - a).normalized())).scaled(Vector3(0.6, a.distance_to(b), 0.6))
 	var tw := mi.create_tween(); tw.tween_interval(0.07); tw.tween_callback(mi.queue_free)
 
-func melee(origin: Vector3, facing: Vector3) -> bool:
+## Wrench swing. `step` is the combo step: 1 and 2 are quick swings in front, 3 is a spinning finisher
+## that hits all round, a little harder and further.
+func melee(origin: Vector3, facing: Vector3, step := 1) -> bool:
 	var any := false
+	var fin := step >= 3
+	var reach := 3.2 if fin else 2.6
 	for t in get_tree().get_nodes_in_group("targets"):
 		if t.dead: continue
 		var c: Vector3 = t.center()
 		var d := c - origin
 		var dy := d.y - 0.8
 		d.y = 0
-		if d.length() < 2.6 and absf(dy) < 1.8 and (d.length() < 0.8 or d.normalized().dot(facing) > -0.1):
-			t.damage(3.0 if t.is_in_group("boss") else 2.0, c, facing)
-			FX.sparks(c, Color(1, 0.95, 0.7), 16, 6)
+		if d.length() < reach and absf(dy) < 1.8 and (fin or d.length() < 0.8 or d.normalized().dot(facing) > -0.1):
+			var push := facing if not fin or d.length() < 0.1 else d.normalized()
+			t.damage((4.0 if fin else 3.0) if t.is_in_group("boss") else (3.0 if fin else 2.0), c, push)
+			FX.sparks(c, Color(1, 0.95, 0.7), 22 if fin else 16, 7 if fin else 6)
 			any = true
-	if any: FX.stop(0.06); FX.shake(0.5); Snd.play("melee_hit", -2)
+	if fin: FX.ring(origin + Vector3(0, 0.1, 0), Color(1, 0.85, 0.45), 0.8)
+	if any:
+		FX.stop(0.09 if fin else 0.05); FX.shake(0.8 if fin else 0.45)
+		Snd.play("melee_hit", 0 if fin else -2, 0.08, 0.0)
+	return any
+
+## Vesk's air slam landing: everything on the ground within reach takes a knock outward.
+const SLAM_R := 3.8
+func slam_wave(origin: Vector3) -> bool:
+	var any := false
+	for t in get_tree().get_nodes_in_group("targets"):
+		if t.dead: continue
+		var c: Vector3 = t.center()
+		var d := c - origin
+		if absf(d.y - 0.6) > 1.6: continue
+		d.y = 0
+		var l := d.length()
+		if l > SLAM_R: continue
+		var out := d / l if l > 0.1 else Vector3.FORWARD
+		var dmg := 2.0 if t.is_in_group("boss") else lerpf(3.0, 2.0, l / SLAM_R)
+		t.damage(dmg, c, out)
+		damage_number(c, dmg, t.dead)
+		any = true
+	FX.ring(origin + Vector3(0, 0.1, 0), Color(1, 0.8, 0.4), 1.1)
+	FX.puff(origin + Vector3(0, 0.2, 0), Color(0.8, 0.75, 0.65))
+	FX.sparks(origin + Vector3(0, 0.2, 0), Color(1, 0.9, 0.6), 18, 6)
+	FX.shake(1.0 if any else 0.7)
+	if any: FX.stop(0.07)
+	Snd.play("land", 2); Snd.play("melee_hit", 0 if any else -6, 0.08, 0.0)
+	Game.slam_landed.emit(any)
 	return any
 
 func nearest_target(origin: Vector3, max_d: float) -> Node3D:
@@ -468,6 +505,41 @@ func nearest_target(origin: Vector3, max_d: float) -> Node3D:
 	return best
 
 # ---------- bots' shots ----------
+## Attack turns: at most MAX_AIMERS bots wind up a shot at once, shots are spaced by SHOT_GAP, and a bot
+## out of view waits its turn (up to OFFSCREEN_WAIT) so fights read clearly and Vesk isn't shot from
+## behind by a pile of bots firing on the same beat. Bosses don't ask.
+const MAX_AIMERS := 2
+const SHOT_GAP := 0.4
+const OFFSCREEN_WAIT := 2.5
+var aimers := {}          # instance id -> msec the turn ends
+var aim_wait := {}        # instance id -> msec it first asked
+var last_shot_ms := -10000
+var no_turns := false
+
+func claim_aim(who: Node3D, dur: float) -> bool:
+	if no_turns: return true
+	var now := Time.get_ticks_msec()
+	var id := who.get_instance_id()
+	for k in aimers.keys():
+		if aimers[k] < now or not is_instance_id_valid(k): aimers.erase(k)
+	if aim_wait.size() > 32:
+		for k in aim_wait.keys(): if not is_instance_id_valid(k): aim_wait.erase(k)
+	if aimers.has(id): return true
+	if not aim_wait.has(id): aim_wait[id] = now
+	var waited: float = (now - aim_wait[id]) / 1000.0
+	# low on hull: one shooter at a time, so a bad moment can be fought out of instead of piling on
+	var cap := 1 if hull <= 2 else MAX_AIMERS
+	var ok := aimers.size() < cap and now - last_shot_ms > int(SHOT_GAP * 1000.0)
+	var ends := now + int(dur * 1000.0)
+	for k in aimers: if absi(aimers[k] - ends) < int(SHOT_GAP * 1000.0): ok = false   # would fire on the same beat
+	if ok and waited < OFFSCREEN_WAIT:
+		var cam := get_viewport().get_camera_3d()
+		if cam and not cam.is_position_in_frustum(who.global_position): ok = false
+	if not ok: return false
+	aim_wait.erase(id)
+	aimers[id] = now + int(dur * 1000.0)
+	return true
+
 func enemy_shot(from: Vector3, to: Vector3) -> void:
 	var dir := (to - from).normalized()
 	var mi := MeshInstance3D.new(); mi.mesh = bolt_mesh; mi.material_override = shot_mat
@@ -476,11 +548,45 @@ func enemy_shot(from: Vector3, to: Vector3) -> void:
 	mi.global_basis = Basis(Quaternion(Vector3.UP, dir)).scaled(Vector3(1.4, 0.7, 1.4))
 	var l := OmniLight3D.new(); l.light_color = Color(1, 0.3, 0.2); l.light_energy = 2.0; l.omni_range = 3.5; mi.add_child(l)
 	shots.append({ node = mi, vel = dir * 17.0, life = 3.0 })
+	last_shot_ms = Time.get_ticks_msec(); if OS.get_cmdline_user_args().has("--shot-log"): print("[shot] t=%.2f aimers %d" % [last_shot_ms / 1000.0, aimers.size()])
 	Snd.at("hornet_shot", from, -4, 0.1, 0.02)
+
+## Sends an enemy shot back, homing on the nearest bot in front of Vesk (or straight back).
+var parry_mat: StandardMaterial3D
+func _parry(s: Dictionary, at: Vector3) -> void:
+	s.reflected = true; s.life = 2.0
+	var back: Vector3 = -(s.vel as Vector3).normalized()
+	var best: Node3D = null
+	var bd := 30.0
+	for t in get_tree().get_nodes_in_group("targets"):
+		if t.dead or t.is_in_group("crate"): continue
+		var d: Vector3 = (t.center() as Vector3) - at
+		var l := d.length()
+		if l < bd and d.normalized().dot(back) > 0.3: bd = l; best = t
+	var dir := ((best.center() as Vector3) - at).normalized() if best else back
+	s.vel = dir * 30.0
+	if parry_mat == null: parry_mat = _glow(Color(1.0, 0.55, 0.08), 3.5)
+	s.node.material_override = parry_mat
+	s.node.global_basis = Basis(Quaternion(Vector3.UP, dir)).scaled(Vector3(1.4, 0.9, 1.4))
+	FX.sparks(at, Color(1, 0.95, 0.6), 16, 6); FX.ring(at, Color(1, 0.85, 0.4), 0.4)
+	FX.stop(0.06); FX.shake(0.4)
+	Snd.play("melee_hit", 0, 0.05, 0.0, 1.25)
+	float_text(at + Vector3(0, 0.5, 0), "PARRY", Color(1.0, 0.85, 0.35), 40)
+	Game.shot_parried.emit()
+
+func _close_call() -> void:
+	FX.slow(0.3, 0.35)
+	player.dash_cd = 0.0
+	invuln = maxf(invuln, 0.35)
+	FX.ring(player.global_position + Vector3(0, 0.15, 0), Color(0.45, 0.85, 1.0), 0.7)
+	float_text(player.global_position + Vector3(0, 1.6, 0), "CLOSE CALL", Color(0.55, 0.9, 1.0), 40)
+	Snd.play("dash", -1, 0.0, 0.0, 0.7)
+	Game.close_call.emit()
 
 func hurt_player(n: int, from = null, force := false) -> void:
 	if (invuln > 0.0 and not force) or hull <= 0: return
 	hull -= n; invuln = 0.9; Snd.play("hurt", -2); Game.player_hurt.emit(hull)
+	if from is Vector3: Game.player_hit_from.emit(from)
 	if hull <= 2: Snd.bark("dodger", "low", 0.6)
 	else: Snd.bark("vesk", "hurt", 0.35)
 	FX.shake(1.0)
@@ -489,9 +595,15 @@ func hurt_player(n: int, from = null, force := false) -> void:
 		var k: Vector3 = (player.global_position - from); k.y = 0
 		player.velocity += k.normalized() * 6.0
 	if hull <= 0:
-		hull = MAX_HULL
-		hull_changed.emit(hull, true)
-		if player: player.respawn()
+		hull = 0
+		if Game.player_downed.get_connections().is_empty(): revive()
+		else: Game.player_downed.emit()
+
+## Back on your feet at the last checkpoint with a full hull.
+func revive() -> void:
+	hull = MAX_HULL; invuln = 1.5
+	hull_changed.emit(hull, true)
+	if player: player.respawn()
 
 func heal(n: int) -> void:
 	hull = mini(MAX_HULL, hull + n); hull_changed.emit(hull, true)
@@ -525,6 +637,17 @@ func _collect_ammo() -> void:
 	if got > 0 and Game.hud and Game.hud.has_method("toast_small"):
 		Game.hud.toast_small("+%d %s AMMO" % [got, WEAPONS[id].name], weapon_color(id))
 
+## A short word that rises and fades over a spot (same style as the damage numbers).
+func float_text(pos: Vector3, text: String, color: Color, size := 44) -> void:
+	var l := Label3D.new()
+	l.text = text; l.billboard = BaseMaterial3D.BILLBOARD_ENABLED; l.no_depth_test = true
+	l.font_size = size; l.outline_size = 12; l.modulate = color; l.pixel_size = 0.006
+	add_child(l); l.global_position = pos
+	var tw := create_tween().set_parallel().set_ignore_time_scale(true)
+	tw.tween_property(l, "global_position", pos + Vector3(0, 0.8, 0), 0.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(l, "modulate:a", 0.0, 0.6).set_delay(0.35)
+	tw.chain().tween_callback(l.queue_free)
+
 func damage_number(pos: Vector3, amount: float, kill: bool) -> void:
 	var l := Label3D.new()
 	l.text = str(snappedf(amount, 0.1)).trim_suffix(".0")
@@ -553,9 +676,36 @@ func _physics_process(dt: float) -> void:
 		s.life -= dt
 		var seg := to - from
 		var k := clampf((hero_c - from).dot(seg) / maxf(seg.length_squared(), 1e-6), 0, 1)
-		var hit_hero := player and (from + seg * k).distance_to(hero_c) < 0.6
+		var miss_d := (from + seg * k).distance_to(hero_c) if player else INF
+		var hit_hero := miss_d < 0.6
 		var q := PhysicsRayQueryParameters3D.create(from, to); q.collision_mask = 1
 		var hw := space.intersect_ray(q)
+		if s.get("reflected", false):
+			# a batted-back shot: it flies at the bots instead
+			var struck: Node = null
+			for t in get_tree().get_nodes_in_group("targets"):
+				if not t.dead and (t.center() as Vector3).distance_to(to) < (2.2 if t.is_in_group("boss") else 1.1): struck = t; break
+			if struck or hw or s.life <= 0.0:
+				if struck:
+					struck.damage(4.0 if struck.is_in_group("boss") else 3.0, to, s.vel.normalized())
+					damage_number(to, 4.0 if struck.is_in_group("boss") else 3.0, struck.dead)
+					FX.sparks(to, Color(1, 0.9, 0.5), 18, 6); Snd.at("melee_hit", to, 0)
+				else: FX.sparks(to, Color(1, 0.8, 0.4), 8, 4)
+				s.node.queue_free(); shots.remove_at(i); continue
+			s.node.global_position = to
+			continue
+		# a wrench swing in front of Vesk bats the shot back at the nearest bot (a parry)
+		if player and player.melee_t > 0.14 and to.distance_to(hero_c) < 2.1 \
+				and (to - hero_c).normalized().dot(Vector3(sin(player.face_yaw), 0, cos(player.face_yaw))) > -0.1:
+			_parry(s, to)
+			continue
+		# a dash through a shot is a close call: it flies past, time slows for a breath and the dash
+		# is ready again, so a good read chains straight into the counter
+		if miss_d < 1.4 and player.since_dash < 0.4:
+			hit_hero = false
+			if not s.get("dodged", false):
+				s.dodged = true
+				_close_call()
 		if hit_hero or hw or s.life <= 0.0:
 			if hit_hero: hurt_player(1, from)
 			FX.sparks(to, Color(1, 0.4, 0.25), 8, 4)
@@ -582,7 +732,12 @@ func _physics_process(dt: float) -> void:
 			p.node.rotation += p.spin * dt
 			if d < 0.75:
 				match p.kind:
-					"nut": Game.add_nuts(10); Snd.play("nut_pickup", -8, 0.15, 0.04)
+					"nut":
+						# a run of sprockets climbs in pitch, so scooping up a big pile sounds like it
+						var now := Time.get_ticks_msec()
+						nut_chain = nut_chain + 1 if now - nut_last < 450 else 0
+						nut_last = now
+						Game.add_nuts(10); Snd.play("nut_pickup", -8, 0.03, 0.03, 1.0 + minf(nut_chain, 12) * 0.045)
 					"ammo": _collect_ammo(); Snd.play("cell_pickup", -5, 0.1); Snd.play("weapon_switch", -10)
 					_: heal(1); Snd.play("cell_pickup", -3)
 				p.node.queue_free(); pickups.remove_at(i); continue

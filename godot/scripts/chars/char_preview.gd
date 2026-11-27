@@ -1,12 +1,14 @@
 extends SceneTree
 ## Character turntable shots in the game renderer, without loading the level (fast).
 ##   xvfb-run -a godot --path . --rendering-driver vulkan --resolution 960x540 -s res://scripts/chars/char_preview.gd -- \
-##       --out=/abs/shot.png --set=bots|gizmart|dodger|grudd|crane [--frames=40]
+##       --out=/abs/shot.png --set=bots|gizmart|dodger|dodger_moods|dodger_turn|grudd|crane [--frames=40]
 ## Lights the set like Skyharbor at golden hour (warm low sun, blue sky fill).
 
 var out := "/tmp/char_preview.png"
 var which := "bots"
 var frames := 40
+var seq := 0      # --seq=N: also save N more frames (every --step) as <out>_000.png.. for GIFs (run with --fixed-fps 30)
+var step := 2
 var n := 0
 var root3: Node3D
 var actors: Array = []
@@ -16,11 +18,14 @@ func _initialize() -> void:
 		if a.begins_with("--out="): out = a.substr(6)
 		elif a.begins_with("--set="): which = a.substr(6)
 		elif a.begins_with("--frames="): frames = int(a.substr(9))
+		elif a.begins_with("--seq="): seq = int(a.substr(6))
+		elif a.begins_with("--step="): step = int(a.substr(7))
 	root3 = Node3D.new(); root.add_child(root3)
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR; env.background_color = Color(0.55, 0.68, 0.82)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color = Color(0.6, 0.7, 0.85); env.ambient_light_energy = 0.7
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX; env.glow_enabled = true
+	if which.begins_with("dodger_"): env.tonemap_exposure = 0.9; env.tonemap_white = 6.0   # as in the game (main.gd)
 	var we := WorldEnvironment.new(); we.environment = env; root3.add_child(we)
 	var sun := DirectionalLight3D.new(); sun.light_color = Color(1, 0.84, 0.62); sun.light_energy = 1.6; sun.shadow_enabled = true
 	sun.rotation = Vector3(-0.6, 0.7, 0); root3.add_child(sun)
@@ -65,6 +70,20 @@ func _initialize() -> void:
 				d.position = Vector3((i - 1.5) * 0.62, 1.0, 0)
 				actors.append(d)
 			_aim(cam, Vector3(0, 1.05, 2.2), Vector3(0, 1.0, 0))
+		"dodger_close":
+			var d: Node3D = load("res://scripts/cutscene/drone_actor.gd").new(); root3.add_child(d)
+			d.position = Vector3(0, 1.0, 0); d.rotation.y = 0.35; actors.append(d)
+			_aim(cam, Vector3(0, 1.05, 1.6), Vector3(0, 1.0, 0))
+		"dodger_moods", "dodger_turn":
+			var n_ := 4 if which == "dodger_turn" else 7
+			for i in n_:
+				var d: Node3D = load("res://scripts/cutscene/drone_actor.gd").new(); root3.add_child(d)
+				if which == "dodger_turn":
+					d.position = Vector3((i - 1.5) * 1.25, 1.0, 0); d.rotation.y = [0.0, 0.8, PI * 0.5, PI][i]
+				else:
+					d.position = Vector3((i % 4 - 1.5) * 1.05 + (0.52 if i >= 4 else 0.0), 1.55 if i < 4 else 0.62, 0)
+				actors.append(d)
+			_aim(cam, Vector3(0, 1.15, 3.3) if which == "dodger_moods" else Vector3(0, 1.2, 3.6), Vector3(0, 1.08, 0))
 		"hornet_in":
 			var pl := CharacterBody3D.new(); root3.add_child(pl); pl.position = Vector3(0, 0, 6)
 			for i in 3:
@@ -100,6 +119,11 @@ func _process(_dt: float) -> bool:
 	if which == "dodger1" and n == 5:
 		var moods := ["neutral", "sleepy", "angry", "happy"]
 		for i in actors.size(): actors[i].emote(moods[i], 99.0)
+	if (which == "dodger_moods" or which == "dodger_turn") and n == 5:
+		var moods := ["neutral", "happy", "angry", "surprised", "sad", "smug", "sleepy"]
+		for i in actors.size():
+			actors[i].emote(moods[i] if which == "dodger_moods" else "neutral", 99.0)
+			actors[i].set("look_dir", Vector2(0.001, 0.0))
 	if which == "dodger" and n == 5:
 		var moods := ["happy", "angry", "sad"]
 		for i in actors.size(): if actors[i].has_method("emote"): actors[i].emote(moods[i], 99.0)
@@ -118,7 +142,13 @@ func _process(_dt: float) -> bool:
 		for a in actors: a.call("_burst")
 		for a in actors: a.visible = false
 	if which == "gizmart" and n == 5 and actors.size() > 0: actors[0].mood("hello", 99.0)
-	if n == frames:
+	if seq > 0 and n >= frames and (n - frames) % step == 0:
+		var k := (n - frames) / step
+		root.get_viewport().get_texture().get_image().save_png(out.get_basename() + "_%03d.png" % k)
+		if k + 1 >= seq:
+			print("saved ", seq, " frames")
+			return true
+	elif n == frames:
 		var img := root.get_viewport().get_texture().get_image()
 		img.save_png(out)
 		print("saved ", out)

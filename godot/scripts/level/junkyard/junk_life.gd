@@ -27,6 +27,8 @@ func _ready() -> void:
 	var g := get_node_or_null("/root/Game")
 	if g and g.has_signal("zone_cleared"):
 		g.zone_cleared.connect(func(id: String): if id == "junk_crash" or id == "dodger_launch": dodger_up = true)
+		if g.has_signal("progress_restored"):
+			g.progress_restored.connect(func(ids: Array): if ids.has("dodger_launch"): dodger_up = true)
 
 ## Lines that play the first time Vesk walks into `rect` (between heights y0 and y1).
 func talk(rect: Rect2, y0: float, y1: float, ids: Array) -> void:

@@ -19,6 +19,8 @@ extends Node
 ##   --et-skip1           tour: skip the phase 1 slam and go straight to the phase change
 ##   --et-cam             a fixed overview camera on the fight (for screenshots)
 ##   --et-jump            Vesk double-jumps over the sweeping jib (on in tour mode)
+##   --et-bot             a simple autoplayer fights: aims at the nearest bot, fires, strafes, dashes away
+##                        from fusing rollers and locked-on hornets, wrenches rollers that get close
 ##   --et-secs=<s>        quit after s game seconds (headless runs default to 240) with a summary line
 ##   --et-stay            don't quit by itself when the fight is over
 ##   --et-snap=a@t,b@t    save a screenshot t seconds into each boss state a, b... to --et-out=<prefix>
@@ -63,6 +65,9 @@ func _ready() -> void:
 	print("[enemy-test] mode ", mode, " flags ", flags)
 	Game.player_hurt.connect(func(h): hurts += 1; print("[enemy-test] vesk hurt, hull ", h, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.bot_killed.connect(func(b, _p, k): kills += 1; print("[enemy-test] killed ", k, " returned_to_sender=", b.get_meta("returned_to_sender", false)))
+	Game.slam_landed.connect(func(hit): print("[enemy-test] slam landed hit=", hit, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
+	Game.shot_parried.connect(func(): print("[enemy-test] parry t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
+	Game.close_call.connect(func(): print("[enemy-test] close call t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.boss_health.connect(func(nm, f): print("[enemy-test] boss_health ", nm, " ", snappedf(f, 0.01)))
 	_setup.call_deferred()
 
@@ -150,6 +155,16 @@ func _physics_process(dt: float) -> void:
 		var cs := "%s %d/%d builds %d barricades %d" % [c.state, c.members.size(), 3, c.builds, c.barricades.size()]
 		if c.get_meta("et_last", "") != cs:
 			c.set_meta("et_last", cs); print("[enemy-test] t=%.2f crew %s" % [float(n) / Engine.physics_ticks_per_second, cs])
+	if flags.has("bot"): _autoplay(dt)
+	if flags.has("stomp"):
+		stomp_t -= dt
+		if stomp_t <= 0.0:
+			stomp_t = 2.5
+			for b in get_tree().get_nodes_in_group("bots"):
+				if not b.dead and b.has_method("_launch") and b.state == "chase":
+					print("[enemy-test] drop vesk on a roller, hp ", b.hp)
+					Game.player.global_position = b.global_position + Vector3(0, 3.5, 0); Game.player.velocity = Vector3.ZERO
+					break
 	if flags.has("wrench"):
 		for b in get_tree().get_nodes_in_group("bots"):
 			if b.dead or not b.has_method("_launch"): continue
@@ -159,6 +174,82 @@ func _physics_process(dt: float) -> void:
 				Game.combat.melee(Game.player.global_position, face)
 				print("[enemy-test] wrenched a roller")
 				break
+
+var stomp_t := 3.0
+var ap_strafe := 1.0
+var ap_strafe_t := 0.0
+var ap_dash_cd := 0.0
+var ap_slam := 0
+var ap_slam_t := 0.0
+func _ap_hold(a: String, on: bool) -> void:
+	if on and not Input.is_action_pressed(a): Input.action_press(a)
+	elif not on and Input.is_action_pressed(a): Input.action_release(a)
+
+func _autoplay(dt: float) -> void:
+	var pl := Game.player
+	var pp := pl.global_position
+	var best: Node3D = null
+	var bd := INF
+	var threat := false
+	for b in get_tree().get_nodes_in_group("bots"):
+		if b.dead: continue
+		var d: float = (b.global_position - pp).length()
+		if d < bd: bd = d; best = b
+		if b.get("state") == "fuse" and d < 3.2: threat = true
+		if b.get("aiming") and float(b.get("fire_t")) < 0.3: threat = true
+	if best == null and boss and is_instance_valid(boss) and not boss.dead and boss.state not in ["off", "intro", "dying"]:
+		best = boss; bd = (boss.global_position - pp).length()
+	if best == null:
+		for a in ["fire", "move_left", "move_right", "move_back", "move_forward", "dash", "melee"]: _ap_hold(a, false)
+		return
+	var to: Vector3 = (best.center() - Game.cam.camera.global_position).normalized()
+	var k := 1.0 - exp(-7.0 * dt)
+	Game.cam.yaw += angle_difference(Game.cam.yaw, atan2(to.x, to.z)) * k
+	Game.cam.pitch = lerpf(Game.cam.pitch, asin(clampf(to.y, -1, 1)), k)
+	_ap_hold("fire", not flags.has("dodge") and not flags.has("slam"))
+	ap_strafe_t -= dt
+	if ap_strafe_t <= 0.0: ap_strafe_t = randf_range(1.2, 2.6); ap_strafe = -ap_strafe
+	_ap_hold("move_left", ap_strafe < 0.0); _ap_hold("move_right", ap_strafe > 0.0)
+	var roller_close: bool = best.has_method("_launch") and bd < 5.0
+	_ap_hold("move_back", roller_close and best.get("state") != "fuse")
+	ap_dash_cd -= dt
+	_ap_hold("dash", false)
+	# --et-parry: swing the wrench just as an enemy shot arrives
+	if flags.has("parry"):
+		var incoming := false
+		for sh in Game.combat.shots:
+			var to_me: Vector3 = pp + Vector3(0, 0.9, 0) - sh.node.global_position
+			if to_me.length() < 3.2 and to_me.dot(sh.vel) > 0.0 and not sh.get("reflected", false): incoming = true
+			if incoming:
+				var ty := atan2(-to_me.x, -to_me.z)
+				pl.face_yaw = ty
+				break
+		_ap_hold("melee", incoming)
+		_ap_hold("fire", false)
+		return
+	# --et-dodge: dash just as an enemy shot is about to arrive (exercises the close-call dodge)
+	if flags.has("dodge"):
+		threat = false
+		for sh in Game.combat.shots:
+			var to_me: Vector3 = pp + Vector3(0, 0.9, 0) - sh.node.global_position
+			if to_me.length() < 3.0 and to_me.dot(sh.vel) > 0.0: threat = true
+	if threat and ap_dash_cd <= 0.0: Input.action_press("dash"); ap_dash_cd = 0.7
+	# --et-slam: every few seconds near a ground bot: jump, double jump, slam down onto it
+	if flags.has("slam"):
+		ap_slam_t -= dt
+		match ap_slam:
+			0:
+				if ap_slam_t <= 0.0 and pl.grounded and bd < 6.0 and best.has_method("_launch"): Input.action_press("jump"); ap_slam = 1; ap_slam_t = 0.35
+			1:
+				if ap_slam_t <= 0.0: Input.action_release("jump"); Input.action_press("jump"); ap_slam = 2; ap_slam_t = 0.3
+			2:
+				if pl.velocity.y < 0.0:
+					Input.action_release("jump"); Input.action_press("melee"); ap_slam = 3; ap_slam_t = 0.1
+					print("[enemy-test] slam press, height %.1f" % pl._air_height())
+			3:
+				if ap_slam_t <= 0.0: Input.action_release("melee"); ap_slam = 0; ap_slam_t = 3.0
+		return
+	_ap_hold("melee", best.has_method("_launch") and bd < 2.3 and best.get("state") == "chase")
 
 func _overview(at: Vector3) -> void:
 	if cam == null:

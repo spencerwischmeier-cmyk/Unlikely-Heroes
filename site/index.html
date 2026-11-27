@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Unlikely Heroes</title>
+<style>
+html, body, #canvas { margin: 0; padding: 0; border: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1f33; color: #fff; }
+body { touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#canvas { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; outline: none; }
+#canvas:focus { outline: none; }
+#boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: radial-gradient(ellipse at 50% 35%, #3c5a8c 0%, #1a1f33 70%); z-index: 2; text-align: center; padding: 20px; box-sizing: border-box; }
+#boot h1 { margin: 0; font-size: clamp(30px, 7vw, 64px); letter-spacing: 1px; color: #ffd45a; text-shadow: 0 4px 0 #a5531d, 0 8px 18px rgba(0,0,0,.45); font-weight: 900; }
+#boot p { margin: 0; opacity: .85; font-size: 15px; max-width: 560px; }
+#bar { width: min(420px, 80vw); height: 14px; border-radius: 9px; background: rgba(255,255,255,.12); overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,.4); }
+#fill { width: 0%; height: 100%; background: linear-gradient(#ffe07a, #f0a92c); border-radius: 9px; transition: width .2s; }
+#play { display: none; font: inherit; font-size: 22px; font-weight: 800; padding: 14px 42px; border-radius: 40px; border: 0; color: #3a1c06;
+  background: linear-gradient(#ffe07a, #f0a92c); box-shadow: 0 5px 0 #a5531d, 0 10px 24px rgba(0,0,0,.4); }
+#play:active { transform: translateY(3px); box-shadow: 0 2px 0 #a5531d; }
+#rotate { display: none; position: fixed; inset: 0; z-index: 3; background: #1a1f33; align-items: center; justify-content: center; font-size: 20px; text-align: center; padding: 30px; }
+@media (orientation: portrait) and (pointer: coarse) { body.running #rotate { display: flex; } }
+</style>
+<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+<link rel="manifest" href="index.manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#1a1f33"><style>body{background:#1a1f33;touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}</style>
+</head>
+<body>
+<canvas id="canvas">Your browser does not support the canvas tag.</canvas>
+<noscript>Your browser does not support JavaScript.</noscript>
+<div id="boot">
+  <h1>UNLIKELY HEROES</h1>
+  <div id="bar"><div id="fill"></div></div>
+  <p id="status">Loading Skyharbor...</p>
+  <button id="play">PLAY</button>
+</div>
+<div id="rotate">Turn your phone sideways to play.</div>
+<script src="index.js"></script>
+<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":124999228,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
+const statusEl = document.getElementById('status');
+const fill = document.getElementById('fill');
+const playBtn = document.getElementById('play');
+const boot = document.getElementById('boot');
+
+function fail(msg) {
+  statusEl.textContent = msg;
+  fill.style.background = '#e0533a';
+  console.error(msg);
+}
+
+// The game data is split into parts (pack.json) so no single file is too big for the host.
+async function fetchPack(onProgress) {
+  const all = await (await fetch('pack.json', { cache: 'no-cache' })).json();
+  // computers read S3TC textures, phones and tablets ETC2/ASTC: load the copy this device can draw
+  let variant = 'mobile';
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ext = gl ? gl.getSupportedExtensions() : [];
+    if (ext.includes('WEBGL_compressed_texture_s3tc') && !ext.includes('WEBGL_compressed_texture_etc') && all.variants.desktop) variant = 'desktop';
+  } catch (e) {}
+  const info = all.variants ? all.variants[variant] : all;
+  const out = new Uint8Array(info.size);
+  let done = 0, at = 0;
+  for (const part of info.parts) {
+    const res = await fetch(part.file);
+    if (!res.ok) throw new Error('Could not download ' + part.file + ' (' + res.status + ')');
+    const reader = res.body.getReader();
+    for (;;) {
+      const { done: end, value } = await reader.read();
+      if (end) break;
+      out.set(value, at); at += value.length; done += value.length;
+      onProgress(done, info.size);
+    }
+  }
+  if (at !== info.size) throw new Error('Game data incomplete, please reload.');
+  return out.buffer;
+}
+
+(async () => {
+  const missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
+  if (missing.length) { fail('This browser is missing: ' + missing.join(', ')); return; }
+  try {
+    let wasmFrac = 0, packFrac = 0;
+    const show = () => { fill.style.width = Math.round((wasmFrac * 0.25 + packFrac * 0.75) * 100) + '%'; };
+    const initP = engine.init(GODOT_CONFIG.executable).then(() => { wasmFrac = 1; show(); });
+    const pack = await fetchPack((d, t) => {
+      packFrac = d / t; show();
+      statusEl.textContent = 'Loading Skyharbor... ' + Math.round(d / 1e6) + ' / ' + Math.round(t / 1e6) + ' MB';
+    });
+    await initP;
+    await engine.preloadFile(pack, GODOT_CONFIG.mainPack || 'index.pck');
+    statusEl.textContent = 'Ready! Best played sideways with sound on.';
+    fill.style.width = '100%';
+    playBtn.style.display = 'block';
+  } catch (e) {
+    fail(String(e && e.message || e));
+  }
+})();
+
+// A tap starts the game: browsers only allow sound (and full screen on Android) after a tap.
+playBtn.addEventListener('click', async () => {
+  playBtn.disabled = true;
+  statusEl.textContent = 'Starting...';
+  const el = document.documentElement;
+  try { if (el.requestFullscreen && matchMedia('(pointer: coarse)').matches) await el.requestFullscreen({ navigationUI: 'hide' }); } catch (e) {}
+  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) {}
+  try {
+    await engine.start({ args: ['--main-pack', GODOT_CONFIG.mainPack || 'index.pck'], canvas: document.getElementById('canvas') });
+    boot.remove();
+    document.body.classList.add('running');
+  } catch (e) {
+    playBtn.disabled = false;
+    fail(String(e && e.message || e));
+  }
+});
+</script>
+</body>
+</html>
+

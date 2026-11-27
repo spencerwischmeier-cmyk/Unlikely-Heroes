@@ -54,6 +54,8 @@ func setup(level: Node3D) -> void:
 	set_physics_process(dress and not off)
 	for a in args:
 		if a.begins_with("--ground-tour="): tour_prefix = a.substr(14)
+		if a.begins_with("--tour-only="): tour_only = a.substr(12).split(",")
+		if a == "--tour-fast": tour_fast = true
 	set_process(tour_prefix != "")
 
 func _physics_process(_dt: float) -> void:
@@ -80,7 +82,14 @@ const TOUR := [
 	["gangway", Vector3(24, 0.1, 30), PI / 2, -0.2, true], ["approach", Vector3(-6, 0.1, 0), PI, -0.2, true],
 	["haul_span", Vector3(-6, 0.1, -40), PI, -0.2, true], ["cableway", Vector3(-27, 6.7, -40), PI / 2, -0.2, true],
 	["barge", Vector3(58, 3.1, -34), -PI / 2, -0.2, true],
+	# Junkyard close-ups for the look pass
+	["junk_shack", Vector3(-1, 0.1, 86.5), 0.0, -0.12], ["junk_hull", Vector3(26.5, 0.1, 79.5), 0.84, -0.15],
+	["works_climb", Vector3(-34, 0.1, 104), -PI / 2, -0.05, true],
 ]
+## --tour-only=a,b,c limits the tour to those spots.
+var tour_only := PackedStringArray()
+## --tour-fast: fewer frames per spot (slow software renderers in the cloud).
+var tour_fast := false
 var tour_prefix := ""
 var _ti := -1
 var _tf := 0
@@ -95,9 +104,15 @@ func _process(dt: float) -> void:
 	var p = game.player
 	var cam = game.get("cam")
 	_tf += 1
-	if _ti < 0 and _tf < 90: return
-	if _ti < 0 or _tf > 110:
+	var fw := 20 if tour_fast else 90
+	var fe := 24 if tour_fast else 110
+	if _ti < 0 and _tf < fw: return
+	# wait for the static batcher (scripts/systems/zzz_batcher.gd) so the shots show the final scene
+	var bt: Node = game.main.get_node_or_null("ZzzBatcher") if game.get("main") else null
+	if _ti < 0 and bt and not OS.get_cmdline_user_args().has("--no-batch") and not bt.get("done"): return
+	if _ti < 0 or _tf > fe:
 		_ti += 1; _tf = 0; _ft = 0.0; _fn = 0
+		while not tour_only.is_empty() and _ti < TOUR.size() and not tour_only.has(TOUR[_ti][0]): _ti += 1
 		if _ti >= TOUR.size():
 			var tot := 0.0
 			for f in tour_fps: tot += f
@@ -109,8 +124,8 @@ func _process(dt: float) -> void:
 		if cam: cam.yaw = s[2]; cam.pitch = s[3]; cam.global_position = s[1] + Vector3(0, 1.55, 0); cam.cam_y = s[1].y
 		return
 	if cam: cam.yaw = TOUR[_ti][2]; cam.pitch = TOUR[_ti][3]
-	if _tf > 40: _ft += dt; _fn += 1
-	if _tf == 105:
+	if _tf > (8 if tour_fast else 40): _ft += dt; _fn += 1
+	if _tf == (22 if tour_fast else 105):
 		var fps := _fn / maxf(_ft, 0.001)
 		tour_fps.append(fps)
 		print("[ground-tour] %s fps %.1f" % [TOUR[_ti][0], fps])
@@ -155,8 +170,12 @@ func _mat(p: Dictionary) -> ShaderMaterial:
 func _make_mats() -> void:
 	mats[DECK] = _mat({ layer = 0.0, side_layer = 0.0, tile_m = 7.1, side_m = 7.1, tint = Color(0.82, 0.86, 0.9), side_tint = Color(0.82, 0.86, 0.9),
 		metal = 0.4, edge_grime = 0.3, puddles = 0.1, oil = 0.15, variation = 0.6, grime_col = Color(0.45, 0.42, 0.4) })
-	mats[JUNK] = _mat({ layer = 1.0, side_layer = 1.0, tile_m = 9.0, side_m = 6.0, organic = 1.0, puddles = 0.55, oil = 0.6, moss = 0.2,
-		edge_grime = 0.6, grime_col = Color(0.42, 0.32, 0.24), nrm_depth = 1.2 })
+	if OS.get_cmdline_user_args().has("--no-hd-scrap"):   # the look before the Junkyard quality pass
+		mats[JUNK] = _mat({ layer = 1.0, side_layer = 1.0, tile_m = 9.0, side_m = 6.0, organic = 1.0, puddles = 0.55, oil = 0.6, moss = 0.2,
+			edge_grime = 0.6, grime_col = Color(0.42, 0.32, 0.24), nrm_depth = 1.2 })
+	else:
+		mats[JUNK] = _mat({ layer = 1.0, side_layer = 1.0, tile_m = 9.0, side_m = 6.0, organic = 1.0, puddles = 0.55, oil = 0.75, moss = 0.2,
+			edge_grime = 0.75, grime_col = Color(0.34, 0.24, 0.17), nrm_depth = 1.5, tint = Color(0.78, 0.68, 0.58) })
 	mats[COBBLE] = _mat({ layer = 2.0, side_layer = 8.0, tile_m = 3.5, side_m = 3.2, organic = 0.7, puddles = 0.3, moss = 0.45,
 		edge_grime = 0.45, nrm_depth = 1.3, side_tint = Color(1.0, 0.96, 0.9) })
 	mats[TERRA] = _mat({ layer = 3.0, side_layer = 8.0, tile_m = 5.4, side_m = 3.2, puddles = 0.0, moss = 0.15, edge_grime = 0.4,

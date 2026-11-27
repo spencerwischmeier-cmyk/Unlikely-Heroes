@@ -55,6 +55,9 @@ func _ready() -> void:
 		state = "follow"
 	_place_start.call_deferred()
 	Game.zone_cleared.connect(_on_zone_cleared)
+	Game.progress_restored.connect(func(ids: Array):
+		if ids.has("dodger_launch") and state == "crashed":
+			state = "follow"; drone.tilt = Vector3.ZERO; drone.hover = 1.0; drone.dim = 0.0; drone.global_position = _target())
 	Game.zone_entered.connect(_on_zone_entered)
 	Game.bot_killed.connect(_on_kill)
 	Game.player_fell.connect(func(): if state == "follow": _bark("dodger", "fall", 0.8); _emote("surprised", 1.4))
@@ -263,7 +266,7 @@ func _build_ui() -> void:
 	font = preload("res://scripts/ui/hud_draw.gd").head_font()
 	layer = CanvasLayer.new(); layer.layer = 5; add_child(layer)
 	meter = Control.new(); meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	meter.draw.connect(_draw_meter); meter.set_meta("pop", 0.0)
+	meter.draw.connect(_draw_meter); meter.set_meta("pop", 0.0); meter.modulate.a = 0.0   # hidden until a combo starts (also while paused on the title)
 	layer.add_child(meter)
 	_anchor(meter, Vector2(1, 0.5), Rect2(-190, -150, 160, 160))
 	pop_label = _label(54, Color(1, 0.85, 0.3)); pop_sub = _label(20, Color(0.6, 0.95, 1))

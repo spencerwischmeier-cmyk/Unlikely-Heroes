@@ -23,6 +23,10 @@ var launch_dir := Vector3.ZERO
 var eye_mat: StandardMaterial3D
 var tilt := 0.0           # head leans into the roll
 var bulb_mat: StandardMaterial3D
+var flank := 0.0          # each roller curves in from its own side instead of queueing up in a line
+var pace := 1.0           # and rolls at its own pace
+var sep_t := 0.0
+var sep := Vector3.ZERO   # push away from nearby bots (refreshed a few times a second)
 
 func _ready() -> void:
 	hp = 2.0; max_hp = 2.0; nuts = 4
@@ -48,6 +52,7 @@ func _ready() -> void:
 		add_prop(ant, cyl(0.014, 0.16), Color(0.6, 0.62, 0.66), Vector3(0.05, 0.47, 0), Vector3(0, 0, -0.7), 0.85)
 		bulb_mat = add_prop(ant, ball_mesh(0.05), Color(1, 0.25, 0.12), Vector3(0.1, 0.54, 0), Vector3.ZERO, 0.0, 3.0).material_override
 	roll_snd = randf_range(0.5, 2.0)
+	flank = randf_range(-1.0, 1.0); pace = randf_range(0.9, 1.12); sep_t = randf() * 0.2
 
 func center() -> Vector3:
 	return global_position + Vector3(0, 0.55, 0)
@@ -58,6 +63,7 @@ func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 	if amount >= 2.0 and player and global_position.distance_to(player.global_position) < 3.6:
 		var d := dir; d.y = 0
 		if d.length() < 0.01: d = global_position - player.global_position; d.y = 0
+		Game.bot_hit.emit(self, amount)
 		_launch(d.normalized())
 		return true
 	return super.damage(amount, point, dir)
@@ -68,6 +74,7 @@ func _launch(d: Vector3) -> void:
 	collision_layer = 0
 	state = "launched"; st_t = 1.0
 	if warn: warn.queue_free(); warn = null
+	d = _sender_aim(d)
 	launch_dir = d
 	velocity = d * LAUNCH_SPEED + Vector3(0, 3.5, 0)
 	flash = 1.0; pop = 1.0
@@ -101,7 +108,12 @@ func _physics_process(dt: float) -> void:
 				if model: model.rotation.y = 0
 		"chase":
 			if is_on_floor() and stun <= 0.0:
-				var want := to.normalized() * SPEED
+				sep_t -= dt
+				if sep_t <= 0.0: sep_t = 0.2; sep = _separation()
+				# far off it swings wide to its side, closing in it straightens up and commits
+				var dirn := to.normalized()
+				var side := Vector3(-dirn.z, 0, dirn.x) * flank * clampf((dist - 3.0) / 6.0, 0.0, 0.8)
+				var want := (dirn + side + sep).normalized() * SPEED * pace * (1.15 if dist < 5.0 else 1.0)
 				velocity.x = lerpf(velocity.x, want.x, 1.0 - exp(-2.5 * dt))
 				velocity.z = lerpf(velocity.z, want.z, 1.0 - exp(-2.5 * dt))
 			roll_snd -= dt
@@ -145,6 +157,31 @@ func _spin(dt: float) -> void:
 	if cap and state != "fuse":
 		cap.rotation.x = tilt
 		cap.position.y = 0.55 + absf(sin(t * sp * 2.2)) * 0.035 * minf(1.0, sp / 3.0)
+
+## Return to Sender aims itself a little: if a bot or the boss is roughly where it was knocked, it flies at that.
+func _sender_aim(d: Vector3) -> Vector3:
+	var best: Node3D = null
+	var bs := 0.82   # cos of ~35 degrees
+	for b in get_tree().get_nodes_in_group("bots") + get_tree().get_nodes_in_group("boss"):
+		if b == self or b.get("dead") or not (b is Node3D): continue
+		var to: Vector3 = (b.center() if b.has_method("center") else (b as Node3D).global_position) - center()
+		to.y = 0
+		var l := to.length()
+		if l < 1.5 or l > 26.0: continue
+		var c := to.normalized().dot(d) + (0.05 if b.is_in_group("boss") else 0.0)
+		if c > bs: bs = c; best = b
+	if best == null: return d
+	var to2: Vector3 = (best.center() if best.has_method("center") else best.global_position) - center(); to2.y = 0
+	return to2.normalized()
+
+func _separation() -> Vector3:
+	var push := Vector3.ZERO
+	for b in get_tree().get_nodes_in_group("bots"):
+		if b == self or not (b is Node3D) or b.get("dead"): continue
+		var d: Vector3 = global_position - (b as Node3D).global_position; d.y = 0
+		var l := d.length()
+		if l < 2.2 and l > 0.01: push += d / l * (2.2 - l) / 2.2
+	return push.limit_length(1.0) * 1.2
 
 ## Return to Sender: fly until hitting a bot, the boss or a wall, then blow up on them.
 func _fly(dt: float) -> void:

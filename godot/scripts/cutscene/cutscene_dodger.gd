@@ -1,7 +1,7 @@
 extends "res://scripts/cutscene/drone_actor.gd"
 ## Dodger for the cutscenes: the shared drone body (drone_actor.gd, also used by the follower) plus
 ## acting on top of it, kept in this file so the body script stays free for the character work:
-##   look_target  turns him (model yaw/pitch) toward a node and aims his pupil when he has one
+##   look_target  turns him (model yaw/pitch) toward a node
 ##   talk         0..1 while he speaks: eye pulse, chatter bob
 ##   act(name)    body beats "spin", "hop", "shock", "squint", "sad", "nod", "shake"; also pulls a
 ##                matching eye face through drone_actor's emote() when that exists
@@ -44,7 +44,7 @@ func _process(dt: float) -> void:
 		var d := to_local(look_target.global_position)
 		want = Vector2(clampf(atan2(d.x, d.z), -1.4, 1.4), clampf(-atan2(d.y, Vector2(d.x, d.z).length()), -0.6, 0.6))
 	_look = _look.lerp(want, 1.0 - exp(-5.0 * dt))
-	if "look_dir" in self and is_instance_valid(look_target): set("look_dir", Vector2(0.02, clampf(want.y * -1.5, -1.0, 1.0)))
+	if is_instance_valid(look_target): look_dir = Vector2(0.001, 0.0)   # no pupil: the head turn above does the looking (stops the idle glances)
 	var r := Vector3(_look.y, _look.x, 0)
 	var p := Vector3.ZERO
 	var u := act_t
