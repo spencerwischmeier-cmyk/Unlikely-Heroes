@@ -65,6 +65,15 @@ var nut_gain_t := 0.0
 var gear_rot := 0.0
 var gear_spin := 0.0
 var wallet_pop := 0.0
+var dmg_arrows: Array = []              # { pos: Vector3, t } recent hits, drawn as arrows round the crosshair
+var kill_t := 0.0
+var heal_t := 0.0
+var swap_t := 0.0
+var prev_wpn := ""
+var shown_wpn := ""
+var waves := Control.new()
+var wave_pop := 0.0
+var wave_last := -1
 var wallet_idle := 0.0                  # sprockets + collectibles tuck away after a while with no change
 var wallet_slide := 0.0
 var collect_counts: Array = []       # [kind, colour, found, total]
@@ -110,9 +119,10 @@ func _ready() -> void:
 	_place(boss, Vector2(0.5, 0), Rect2(-340, 10, 680, 84), _draw_boss)
 	_place(weapon, Vector2(1, 1), Rect2(-470, -156, 452, 140), _draw_weapon)
 	_place(wstrip, Vector2(1, 1), Rect2(-470, -206, 452, 50), _draw_wstrip)
-	_place(cross, Vector2(0.5, 0.5), Rect2(-40, -40, 80, 80), _draw_cross)
+	_place(waves, Vector2(0.5, 0), Rect2(-200, 96, 400, 50), _draw_waves)
+	_place(cross, Vector2(0.5, 0.5), Rect2(-160, -160, 320, 320), _draw_cross)
 	_place(prompt, Vector2(0.5, 0.5), Rect2(-320, 70, 640, 60), _draw_prompt)
-	_place(banner, Vector2(0.5, 0), Rect2(-640, 150, 1280, 150), _draw_banner)
+	_place(banner, Vector2(0.5, 0), Rect2(-640, 286, 1280, 150), _draw_banner)
 	_place(subs, Vector2(0.5, 1), Rect2(-520, -190, 1040, 170), _draw_subs)
 	flyer_layer.set_anchors_preset(Control.PRESET_FULL_RECT); flyer_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flyer_layer.draw.connect(_draw_flyers); root.add_child(flyer_layer)
@@ -130,10 +140,11 @@ func _ready() -> void:
 	Game.objective_set.connect(func(_id, text): _set_objective(text))
 	Game.collectible_found.connect(func(_k, _id): _refresh_collect(); collect_pop = 1.0; wallet_idle = 0.0)
 	Game.player_hurt.connect(func(_h): vig_a = 0.75)
+	if Game.has_signal("player_hit_from"): Game.player_hit_from.connect(func(p): dmg_arrows.append({ pos = p, t = 0.0 }))
 	combat.nuts_changed.connect(_nuts)
 	combat.hull_changed.connect(_hull)
-	combat.hit_marker.connect(func(k): hit_t = 0.18; hit_kill = k)
-	combat.weapon_changed.connect(func(_id): wpn_pop = 1.0; strip_t = 2.5)
+	combat.hit_marker.connect(func(k): hit_t = 0.18; hit_kill = k; if k: kill_t = 1.0)
+	combat.weapon_changed.connect(func(id): wpn_pop = 1.0; strip_t = 2.5; prev_wpn = shown_wpn; swap_t = 1.0; shown_wpn = id)
 	combat.ammo_changed.connect(func(_id, _a, _m): ammo_pop = 1.0)
 	combat.weapon_level_up.connect(_level_up)
 	if "hull" in combat: hull = combat.hull
@@ -152,6 +163,15 @@ func _demo() -> void:
 	await get_tree().create_timer(0.2).timeout
 	set_boss("CRANE BOT", 0.62)
 	show_prompt("E   SHOP AT GIZMART")
+	# keep the combat feedback going so any screenshot frame catches it
+	while is_inside_tree():
+		var cam := get_viewport().get_camera_3d()
+		if cam and player:
+			var b := cam.global_transform.basis
+			Game.player_hit_from.emit(player.global_position + b.x * 6.0 - b.z * 3.0)
+			Game.player_hit_from.emit(player.global_position - b.x * 5.0 + b.z * 4.0)
+		combat.hit_marker.emit(true)
+		await get_tree().create_timer(0.9).timeout
 
 func _place(c: Control, anchor: Vector2, r: Rect2, fn: Callable) -> void:
 	c.anchor_left = anchor.x; c.anchor_right = anchor.x; c.anchor_top = anchor.y; c.anchor_bottom = anchor.y
@@ -198,6 +218,7 @@ func _hull(h: int, healed: bool) -> void:
 		if (i < hull) != (i < h): cell_flash[i] = 1.0
 	hull = h
 	if not healed: hull_pop = 1.0
+	elif h > 0: heal_t = 1.0
 
 func _level_up(id: String, lv: int) -> void:
 	lvl_pop = 1.0
@@ -313,7 +334,14 @@ func _process(dt: float) -> void:
 	banner_t -= dt
 	sub_t -= dt
 	sub_a = move_toward(sub_a, 1.0 if sub_t > 0.0 and subtitles and sub_text != "" else 0.0, dt * (8.0 if sub_t > 0.0 else 3.0))
-	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs]: c.queue_redraw()
+	kill_t = maxf(0.0, kill_t - dt * 2.5)
+	heal_t = maxf(0.0, heal_t - dt * 1.4)
+	swap_t = maxf(0.0, swap_t - dt * 3.0)
+	wave_pop = maxf(0.0, wave_pop - dt * 2.0)
+	for d in dmg_arrows: d.t += dt
+	dmg_arrows = dmg_arrows.filter(func(d): return d.t < 1.4)
+	if shown_wpn == "" and combat: shown_wpn = combat.current
+	for c in [vitals, objective, wallet, collect, weapon, boss, cross, prompt, banner, subs, waves]: c.queue_redraw()
 	for c in toast_box.get_children(): c.queue_redraw()
 	strip_t = maxf(0.0, strip_t - dt)
 	wstrip.queue_redraw()
@@ -370,6 +398,10 @@ func _draw_vitals() -> void:
 			ci.draw_colored_polygon(pts, HD.SLOT)
 		if cell_flash[i] > 0.0:
 			ci.draw_colored_polygon(pts, Color(1, 1, 1, cell_flash[i] * 0.9))
+	if heal_t > 0.0:
+		var sweep := a0 + span * (1.0 - heal_t)
+		ci.draw_arc(c, 66, a0, sweep, 32, Color(0.6, 1, 0.75, 0.55 * heal_t), 18, true)
+		ci.draw_circle(c + Vector2(cos(sweep), sin(sweep)) * 66, 9 * heal_t + 3, Color(0.85, 1, 0.9, heal_t), true, -1, true)
 	# Vesk's portrait in the middle
 	var bs := _spring(hull_pop)
 	HD.badge(ci, c, 46 * bs, acc)
@@ -561,8 +593,14 @@ func _draw_weapon() -> void:
 	for i in 12:
 		var a := -PI / 2 + TAU * i / 12.0
 		ci.draw_line(mc + Vector2(cos(a), sin(a)) * 58.5, mc + Vector2(cos(a), sin(a)) * 67.5, Color(HD.INK, 0.7), 2.0)
-	HD.badge(ci, mc, 46, wc)
-	HD.icon(ci, HD.weapon_icon(id), mc, 27, wc)
+	# swap: the medallion flips over, showing the old emblem until it is edge-on
+	var flip := absf(cos(swap_t * PI)) if swap_t > 0.0 else 1.0
+	var show_id := prev_wpn if swap_t > 0.5 and prev_wpn != "" else id
+	var sc: Color = combat.weapon_color(show_id)
+	ci.draw_set_transform(Vector2(400, 80) * (1.0 - s) + mc * s * (1.0 - flip) * Vector2(1, 0), 0.0, Vector2(s * maxf(0.05, flip), s))
+	HD.badge(ci, mc, 46, sc)
+	HD.icon(ci, HD.weapon_icon(show_id), mc, 27, sc)
+	ci.draw_set_transform(Vector2(400, 80) * (1.0 - s), 0.0, Vector2(s, s))
 	var ls := 1.0 + 0.3 * sin(lvl_pop * PI)
 	var lr := Rect2(mc.x - 30 * ls, mc.y + 36, 60 * ls, 28 * ls)
 	HD.panel(ci, lr, GOLD if maxed else Color.WHITE, 9, 0.0, 1.0, Color(0.55, 0.4, 0.08, 0.97) if maxed else HD.PANEL_TOP, Color(0.3, 0.2, 0.04, 0.97) if maxed else HD.PANEL_BOT)
@@ -616,6 +654,32 @@ func _draw_cross() -> void:
 		for d in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
 			cross.draw_line(c + d.normalized() * 10.0, c + d.normalized() * 19.0, Color(HD.INK, 0.7), 6.0, true)
 			cross.draw_line(c + d.normalized() * 10.0, c + d.normalized() * 19.0, hc, 3.0, true)
+	# kill burst: an expanding ring and four shards
+	if kill_t > 0.0:
+		var k := 1.0 - kill_t
+		var rr := 14.0 + k * 34.0
+		cross.draw_arc(c, rr, 0, TAU, 32, Color(1, 0.45, 0.3, kill_t), 3.0 + 3.0 * kill_t, true)
+		for i in 4:
+			var a := PI / 4 + i * PI / 2
+			var d := Vector2(cos(a), sin(a))
+			cross.draw_line(c + d * (rr + 4), c + d * (rr + 14), Color(1, 0.85, 0.4, kill_t), 3.0, true)
+	# damage arrows: a red wedge pointing toward whoever hit Vesk
+	var cam := get_viewport().get_camera_3d()
+	if cam and player:
+		for dm in dmg_arrows:
+			var to: Vector3 = dm.pos - player.global_position
+			var loc: Vector3 = cam.global_transform.basis.inverse() * to
+			var ang := atan2(loc.x, -loc.z)          # 0 = straight ahead = up on screen
+			var al: float = clampf(1.0 - (dm.t - 0.6) / 0.8, 0.0, 1.0) * clampf(dm.t / 0.08, 0.0, 1.0)
+			var dir := Vector2(sin(ang), -cos(ang))
+			var side := Vector2(-dir.y, dir.x)
+			var r0 := 92.0 + 8.0 * sin(dm.t * 12.0)
+			var tip := c + dir * (r0 + 34)
+			var pts := PackedVector2Array([tip, c + dir * r0 + side * 26, c + dir * (r0 + 8), c + dir * r0 - side * 26])
+			cross.draw_colored_polygon(PackedVector2Array([tip + dir * 4, c + dir * (r0 - 3) + side * 31, c + dir * (r0 + 6), c + dir * (r0 - 3) - side * 31]), Color(HD.INK, 0.8 * al))
+			cross.draw_colored_polygon(pts, Color(1, 0.25, 0.18, 0.9 * al))
+			cross.draw_line(c + dir * (r0 + 6) + side * 16, tip - dir * 6, Color(1, 0.75, 0.65, 0.8 * al), 2.0, true)
+
 
 func _draw_prompt() -> void:
 	if prompt_a <= 0.0 or prompt_text == "": return
@@ -742,3 +806,32 @@ func _draw_flyers() -> void:
 		var mid: Vector2 = (f.from + to) * 0.5 + Vector2(f.side * 160.0, -140.0)
 		var p: Vector2 = (f.from.lerp(mid, e)).lerp(mid.lerp(to, e), e)
 		HD.icon(flyer_layer, "sprocket", p, lerpf(13.0, 8.0, e), GOLD, 1.0 - maxf(0.0, (k - 0.85) / 0.15), t * 8.0 + f.side)
+
+# ---------------------------------------------------------------- draw: wave tracker
+## During a fight: "WAVE 2/3" and how many bots are still up. Hidden for bosses and outside fights.
+func _draw_waves() -> void:
+	var st = Game.story
+	if st == null or not st.get("active"): return
+	var zs = st.get("zones")
+	var idx: int = int(st.get("index"))
+	if not (zs is Array) or idx < 0 or idx >= zs.size(): return
+	var z: Dictionary = zs[idx]
+	if z.get("kind", "") != "": return
+	var total: int = (z.get("waves", []) as Array).size()
+	var left := 0
+	for b in st.get("alive"):
+		if is_instance_valid(b) and not b.get("dead"): left += 1
+	var wv: int = clampi(int(st.get("wave")), 1, maxi(1, total))
+	if wv != wave_last: wave_pop = 1.0; wave_last = wv
+	var ci := waves
+	var s := _spring(wave_pop)
+	ci.draw_set_transform(Vector2(200, 25) * (1.0 - s), 0.0, Vector2(s, s))
+	var r := Rect2(70, 6, 260, 38)
+	HD.panel(ci, r, BOSS_COL.lerp(GOLD, 0.4), 12, 0.0, 0.95)
+	HD.text(ci, head, Vector2(r.position.x + 20, 33), "WAVE %d/%d" % [wv, total], 20, Color(1, 0.88, 0.6), 0, 5)
+	HD.icon(ci, "boss", Vector2(r.end.x - 92, 25), 11, Color(1, 0.55, 0.45))
+	var lt := "%d LEFT" % left
+	if left == 0: lt = "INCOMING!" if wv < total else "CLEAR!"
+	var lc := Color(1, 1, 1) if left > 0 else (Color(1, 0.75, 0.4).lerp(Color.WHITE, 0.5 + 0.5 * sin(t * 9.0)) if wv < total else Color(0.6, 1, 0.6))
+	HD.text(ci, head, Vector2(r.end.x - 18, 33), lt, 20, lc, 2, 5)
+	ci.draw_set_transform(Vector2.ZERO)

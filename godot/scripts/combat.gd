@@ -481,6 +481,7 @@ func enemy_shot(from: Vector3, to: Vector3) -> void:
 func hurt_player(n: int, from = null, force := false) -> void:
 	if (invuln > 0.0 and not force) or hull <= 0: return
 	hull -= n; invuln = 0.9; Snd.play("hurt", -2); Game.player_hurt.emit(hull)
+	if from is Vector3: Game.player_hit_from.emit(from)
 	if hull <= 2: Snd.bark("dodger", "low", 0.6)
 	else: Snd.bark("vesk", "hurt", 0.35)
 	FX.shake(1.0)
