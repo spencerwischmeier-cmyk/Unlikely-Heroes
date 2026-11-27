@@ -219,7 +219,7 @@ static func _terrace() -> void:
 	put("terrace", "mk_crate_spill", Vector3(-66.2, 0, 46.4), 2.4)
 	put("terrace", "mk_baskets", Vector3(-77.6, 0, 45.6), 1.2)
 	put("terrace", "mk_tarp_pile", Vector3(-78.4, 0, 48.6), 0.1, { col = true })
-	put("terrace", "mk_rug_rolls", Vector3(-58.9, 0, 46.2), -PI / 2, { col = true })
+	put("terrace", "mk_jars", Vector3(-58.9, 0, 46.6), -0.4)
 	# by the entrance arch and along the north lane
 	put("terrace", "mk_crate_fruit", Vector3(-59.4, 0, 38.5), 0.3, { col = true })
 	put("terrace", "mk_crate_spill", Vector3(-60.4, 0, 36.6), -1.2)

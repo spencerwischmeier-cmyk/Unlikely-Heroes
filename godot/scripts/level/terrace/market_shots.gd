@@ -6,10 +6,10 @@ var prefix := ""
 ## [name, player position, look-at point, camera pitch]; a 5th element = a free camera at that position
 const SPOTS := [
 	["entrance", Vector3(-55.5, 0.1, 33.0), Vector3(-90, 0, 37), -0.08],
-	["houses", Vector3(-67.0, 0.1, 35.5), Vector3(-68, 3.0, 22), 0.12],
-	["lane", Vector3(-58.6, 0.1, 47.6), Vector3(-80, 0, 44), -0.08],
+	["houses", Vector3(-70.5, 0.1, 33.0), Vector3(-68, 3.0, 22), 0.14],
+	["lane", Vector3(-60.0, 0.1, 46.0), Vector3(-80, 0, 44), -0.08],
 	["bazaar", Vector3(-80.5, 0.1, 37.0), Vector3(-104, 0, 46), -0.1],
-	["bazaar_south", Vector3(-106.5, 0.1, 41.0), Vector3(-86, 0, 49), -0.1],
+	["bazaar_south", Vector3(-106.0, 0.1, 49.0), Vector3(-84, 0, 40), -0.1],
 	["over", Vector3(-70.0, 0.1, 34.0), Vector3(-84, 0, 38), 0.0, Vector3(-48, 24, 66)],
 ]
 var only := []
