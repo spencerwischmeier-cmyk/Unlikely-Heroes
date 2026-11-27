@@ -65,6 +65,8 @@ var nut_gain_t := 0.0
 var gear_rot := 0.0
 var gear_spin := 0.0
 var wallet_pop := 0.0
+var wallet_idle := 0.0                  # sprockets + collectibles tuck away after a while with no change
+var wallet_slide := 0.0
 var collect_counts: Array = []       # [kind, colour, found, total]
 var collect_pop := 0.0
 var obj_text := ""
@@ -101,8 +103,8 @@ func _ready() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT); root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 	_build_vignette()
-	_place(vitals, Vector2(0, 0), Rect2(18, 14, 420, 104), _draw_vitals)
-	_place(objective, Vector2(0, 0), Rect2(18, 122, 640, 104), _draw_objective)
+	_place(vitals, Vector2(0, 0), Rect2(14, 8, 440, 170), _draw_vitals)
+	_place(objective, Vector2(0, 0), Rect2(18, 178, 640, 104), _draw_objective)
 	_place(wallet, Vector2(1, 0), Rect2(-300, 14, 282, 76), _draw_wallet)
 	_place(collect, Vector2(1, 0), Rect2(-300, 92, 282, 46), _draw_collect)
 	_place(boss, Vector2(0.5, 0), Rect2(-340, 10, 680, 84), _draw_boss)
@@ -126,7 +128,7 @@ func _ready() -> void:
 	Game.boss_health.connect(func(n, f): set_boss(n, f))
 	Game.boss_defeated.connect(func(_n): set_boss("", 0.0))
 	Game.objective_set.connect(func(_id, text): _set_objective(text))
-	Game.collectible_found.connect(func(_k, _id): _refresh_collect(); collect_pop = 1.0)
+	Game.collectible_found.connect(func(_k, _id): _refresh_collect(); collect_pop = 1.0; wallet_idle = 0.0)
 	Game.player_hurt.connect(func(_h): vig_a = 0.75)
 	combat.nuts_changed.connect(_nuts)
 	combat.hull_changed.connect(_hull)
@@ -185,7 +187,7 @@ func _set_objective(text: String) -> void:
 func _nuts(n: int) -> void:
 	nuts = n
 	if nut_last >= 0 and n > nut_last:
-		nut_gain_n += n - nut_last; nut_gain_t = 1.6; gear_spin = 1.0; wallet_pop = 1.0
+		nut_gain_n += n - nut_last; nut_gain_t = 1.6; gear_spin = 1.0; wallet_pop = 1.0; wallet_idle = 0.0
 		_spawn_flyers(n - nut_last)
 	elif nut_last < 0:
 		nut_shown = n
@@ -275,10 +277,12 @@ func _guess_icon(title: String) -> String:
 func _process(dt: float) -> void:
 	t += dt
 	hit_t -= dt
-	hull_pop = maxf(0.0, hull_pop - dt * 4.0)
+	hull_pop = maxf(0.0, hull_pop - dt * 2.2)
 	for i in cell_flash.size(): cell_flash[i] = maxf(0.0, cell_flash[i] - dt * 2.5)
-	wallet_pop = maxf(0.0, wallet_pop - dt * 5.0)
-	wpn_pop = maxf(0.0, wpn_pop - dt * 4.0)
+	wallet_pop = maxf(0.0, wallet_pop - dt * 2.5)
+	wallet_idle += dt
+	wallet_slide = move_toward(wallet_slide, 1.0 if wallet_idle > 7.0 else 0.0, dt * (1.6 if wallet_idle > 7.0 else 5.0))
+	wpn_pop = maxf(0.0, wpn_pop - dt * 2.5)
 	lvl_pop = maxf(0.0, lvl_pop - dt * 2.0)
 	ammo_pop = maxf(0.0, ammo_pop - dt * 6.0)
 	collect_pop = maxf(0.0, collect_pop - dt * 1.5)
@@ -321,54 +325,64 @@ func _pad() -> bool:
 	return player != null and player.get("using_pad") == true
 
 func _pop_scale(p: float) -> float:
-	return 1.0 + 0.18 * sin(p * PI) * p
+	return _spring(p)
 
 # ---------------------------------------------------------------- draw: vitals (hull + jet)
 func _draw_vitals() -> void:
 	var ci := vitals
 	var low := hull <= 2
 	var pulse := 0.5 + 0.5 * sin(t * 7.0)
-	var acc := HULL_COL.lerp(LOW_COL, pulse if low else 0.0) if low else HULL_COL
+	var acc := HULL_COL.lerp(LOW_COL, pulse) if low else HULL_COL
 	var shake := Vector2(sin(t * 60.0), cos(t * 47.0)) * 3.0 * hull_pop
 	ci.draw_set_transform(shake)
-	# hull panel
-	var pr := Rect2(52, 10, 352, 54)
-	HD.panel(ci, pr, acc, 14, -0.2)
-	HD.text(ci, head, Vector2(92, 31), "HULL", 17, acc, 0, 5)
-	var hp := "%d/%d" % [hull, hull_max]
-	HD.text(ci, body, Vector2(384, 31), hp, 15, Color(0.85, 0.9, 1.0), 2, 4)
+	var c := Vector2(84, 84)
+	# name plate: HULL and the count
+	var pr := Rect2(166, 32, 222, 44)
+	HD.panel(ci, pr, acc, 12, -0.2)
+	HD.text(ci, head, Vector2(186, 62), "HULL", 22, acc, 0, 6)
+	var hs := _spring(hull_pop)
+	ci.draw_set_transform(shake + Vector2(368, 56) * (1.0 - hs), 0.0, Vector2(hs, hs))
+	HD.text(ci, head, Vector2(368, 64), "%d/%d" % [hull, hull_max], 24, Color(1, 0.75, 0.7) if low else Color(1, 1, 1), 2, 6)
+	ci.draw_set_transform(shake)
+	# hull cells in a ring around the portrait (270 degrees, open at the bottom)
 	var n := cell_flash.size()
-	var cw := 30.0
-	var gap := 5.0
+	var a0 := PI * 0.75
+	var span := PI * 1.5
+	var seg := span / n
 	for i in n:
-		var r := Rect2(88 + i * (cw + gap), 37, cw, 17)
 		var full := i < hull
-		var pts := HD.rrect(r, 5, -0.35)
-		ci.draw_colored_polygon(HD.rrect(r.grow(2), 6, -0.35), HD.INK)
+		var s0 := a0 + i * seg + 0.035
+		var s1 := a0 + (i + 1) * seg - 0.035
+		var grow: float = 1.0 + (0.08 * pulse if full and low else 0.0) + float(cell_flash[i]) * 0.12
+		var r1 := 58.0
+		var r2: float = 58.0 + 16.0 * grow
+		ci.draw_colored_polygon(_arc_poly(c, r1 - 2.5, r2 + 2.5, s0 - 0.02, s1 + 0.02), HD.INK)
+		var pts := _arc_poly(c, r1, r2, s0, s1)
 		if full:
-			var col := LOW_COL.lerp(Color(1, 0.6, 0.5), pulse * 0.5) if low else HULL_COL
+			var col := LOW_COL.lerp(Color(1, 0.65, 0.55), pulse * 0.5) if low else HULL_COL
 			var cols := PackedColorArray()
-			for p in pts: cols.append(col.lightened(0.4).lerp(col.darkened(0.1), clampf((p.y - r.position.y) / r.size.y, 0, 1)))
+			for p in pts:
+				var k := clampf(((p - c).length() - r1) / (r2 - r1), 0.0, 1.0)
+				cols.append(col.darkened(0.2).lerp(col.lightened(0.45), k))
 			ci.draw_polygon(pts, cols)
-			ci.draw_line(Vector2(r.position.x + 5, r.position.y + 4), Vector2(r.end.x - 7, r.position.y + 4), Color(1, 1, 1, 0.55), 2.0, true)
+			ci.draw_arc(c, r2 - 3.0, s0 + 0.04, s1 - 0.04, 6, Color(1, 1, 1, 0.5), 2.0, true)
 		else:
 			ci.draw_colored_polygon(pts, HD.SLOT)
 		if cell_flash[i] > 0.0:
 			ci.draw_colored_polygon(pts, Color(1, 1, 1, cell_flash[i] * 0.9))
-	# shield badge over the left end
-	var bc := Vector2(44, 38)
-	var bs := 1.0 + 0.15 * hull_pop
-	HD.badge(ci, bc, 33 * bs, acc)
-	HD.icon(ci, "hull", bc, 19 * bs, acc)
+	# Vesk's portrait in the middle
+	var bs := _spring(hull_pop)
+	HD.badge(ci, c, 46 * bs, acc)
+	HD.icon(ci, "vesk", c + Vector2(0, 4), 31 * bs, acc)
 	ci.draw_set_transform(Vector2.ZERO)
-	# jetpack + dash strip, tucked under the hull panel
-	var jr := Rect2(78, 70, 246, 32)
+	# jetpack + dash strip
+	var jr := Rect2(176, 92, 232, 32)
 	HD.panel(ci, jr, JET_COL, 10, -0.2, 1.0)
 	if low:
 		var la := 0.55 + 0.45 * sin(t * 8.0)
-		var lr := Rect2(332, 70, 74, 26)
-		HD.panel(ci, lr, LOW_COL, 9, -0.2, la, Color(0.45, 0.06, 0.05, 0.95), Color(0.25, 0.02, 0.02, 0.95))
-		HD.text(ci, head, Vector2(lr.get_center().x, 89), "REPAIR!", 15, Color(1, 0.9, 0.85), 1, 4, la)
+		var lr := Rect2(110, 136, 92, 28)
+		HD.panel(ci, lr, LOW_COL, 9, 0.0, la, Color(0.45, 0.06, 0.05, 0.95), Color(0.25, 0.02, 0.02, 0.95))
+		HD.text(ci, head, Vector2(lr.get_center().x, lr.position.y + 21), "REPAIR!", 17, Color(1, 0.9, 0.85), 1, 4, la)
 	var jets := 0
 	var gliding := false
 	var dash_frac := 1.0
@@ -380,16 +394,29 @@ func _draw_vitals() -> void:
 		if dcd != null: dash_frac = clampf(1.0 - float(dcd) / 0.6, 0.0, 1.0)
 	var jet_ready := jets < 2
 	var jc := JET_COL if jet_ready else Color(0.45, 0.48, 0.58)
-	HD.icon(ci, "jet", Vector2(102, 86), 13, jc)
+	HD.icon(ci, "jet", Vector2(198, 108), 13, jc)
 	var jl := "GLIDE" if gliding else ("JET READY" if jet_ready else "JET USED")
-	HD.text(ci, head, Vector2(120, 93), jl, 15, jc.lightened(0.2) if jet_ready or gliding else jc, 0, 4)
+	HD.text(ci, head, Vector2(216, 115), jl, 15, jc.lightened(0.2) if jet_ready or gliding else jc, 0, 4)
 	var dc := Color(0.45, 0.85, 1.0) if dash_frac >= 1.0 else Color(0.45, 0.48, 0.58)
-	HD.icon(ci, "dash", Vector2(228, 86), 10, dc)
-	HD.text(ci, head, Vector2(242, 93), "DASH", 15, dc, 0, 4)
-	var bx := 284.0
-	ci.draw_colored_polygon(HD.rrect(Rect2(bx, 81, 28, 10), 4, -0.3), HD.SLOT)
+	HD.icon(ci, "dash", Vector2(318, 108), 10, dc)
+	HD.text(ci, head, Vector2(332, 115), "DASH", 15, dc, 0, 4)
+	var bx := 372.0
+	ci.draw_colored_polygon(HD.rrect(Rect2(bx, 103, 26, 10), 4, -0.3), HD.SLOT)
 	if dash_frac > 0.01:
-		ci.draw_colored_polygon(HD.rrect(Rect2(bx, 81, 28 * dash_frac, 10), 4, -0.3), dc)
+		ci.draw_colored_polygon(HD.rrect(Rect2(bx, 103, 26 * dash_frac, 10), 4, -0.3), dc)
+
+## A ring segment polygon between radii r1 and r2 from angle a0 to a1.
+func _arc_poly(c: Vector2, r1: float, r2: float, a0: float, a1: float, steps := 6) -> PackedVector2Array:
+	var p := PackedVector2Array()
+	for i in steps + 1:
+		var a := lerpf(a0, a1, float(i) / steps); p.append(c + Vector2(cos(a), sin(a)) * r2)
+	for i in steps + 1:
+		var a := lerpf(a1, a0, float(i) / steps); p.append(c + Vector2(cos(a), sin(a)) * r1)
+	return p
+
+## Springy scale for pops: overshoots, then wobbles back to 1 as p falls from 1 to 0.
+func _spring(p: float) -> float:
+	return 1.0 + 0.22 * p * cos((1.0 - p) * 13.0)
 
 # ---------------------------------------------------------------- draw: objective
 func _draw_objective() -> void:
@@ -423,7 +450,8 @@ func _draw_objective() -> void:
 func _draw_wallet() -> void:
 	var ci := wallet
 	var s := _pop_scale(wallet_pop)
-	ci.draw_set_transform(Vector2(282, 38) * (1.0 - s), 0.0, Vector2(s, s))
+	var ox := _slide_x()
+	ci.draw_set_transform(Vector2(282, 38) * (1.0 - s) + Vector2(ox, 0), 0.0, Vector2(s, s))
 	var r := Rect2(48, 10, 222, 56)
 	HD.panel(ci, r, GOLD, 14, 0.2)
 	HD.text(ci, head, Vector2(86, 32), "SPROCKETS", 14, GOLD, 0, 4)
@@ -433,6 +461,7 @@ func _draw_wallet() -> void:
 	HD.icon(ci, "sprocket", bc, 22, GOLD, 1.0, gear_rot)
 	ci.draw_set_transform(Vector2.ZERO)
 	# "+N" chip to the left while sprockets pour in
+	ci.draw_set_transform(Vector2(ox, 0))
 	var ga := clampf(nut_gain_t / 0.4, 0.0, 1.0)
 	if nut_gain_n > 0 and ga > 0.0:
 		var txt := "+%d" % nut_gain_n
@@ -440,6 +469,11 @@ func _draw_wallet() -> void:
 		var gr := Rect2(8 - w, 22, w, 34)
 		HD.panel(ci, gr, GOLD, 10, 0.2, ga, Color(0.55, 0.4, 0.1, 0.95), Color(0.3, 0.2, 0.05, 0.95))
 		HD.text(ci, head, Vector2(gr.get_center().x, 48), txt, 24, Color(1, 0.95, 0.6), 1, 5, ga)
+
+## How far the sprocket/collectible panels have tucked off the right edge.
+func _slide_x() -> float:
+	var e := wallet_slide * wallet_slide * (3.0 - 2.0 * wallet_slide)
+	return e * 330.0
 
 func _thousands(n: int) -> String:
 	var s := str(n)
@@ -455,6 +489,7 @@ func _draw_collect() -> void:
 	var w := 24.0 + item_w * collect_counts.size()
 	var r := Rect2(270 - w, 6, w, 34)
 	var acc := Color(0.75, 0.8, 0.95).lerp(GOLD, collect_pop)
+	ci.draw_set_transform(Vector2(_slide_x() * 1.1, 0))
 	HD.panel(ci, r, acc, 10, 0.2, 0.92)
 	var x := r.position.x + 22
 	for c in collect_counts:
@@ -476,7 +511,7 @@ func _draw_weapon() -> void:
 	var r := Rect2(16, 26, 368, 100)
 	HD.panel(ci, r, wc, 16, 0.12)
 	# name
-	HD.text(ci, head, Vector2(332, 60), combat.weapon_name(id), 27, wc.lightened(0.15), 2, 7)
+	HD.text(ci, head, Vector2(312, 60), combat.weapon_name(id), 27, wc.lightened(0.15), 2, 7)
 	var lancer: bool = not combat.uses_ammo(id)
 	if lancer:
 		# heat gauge: ten segments, cyan to orange to red
@@ -485,7 +520,7 @@ func _draw_weapon() -> void:
 		HD.icon(ci, "heat", Vector2(70, 84), 12, hc if heat_shown > 0.05 else Color(0.55, 0.6, 0.7))
 		var segs := 10
 		for i in segs:
-			var sr := Rect2(92 + i * 24, 75, 20, 16)
+			var sr := Rect2(92 + i * 22, 75, 18, 16)
 			var on := heat_shown * segs > i + 0.15
 			ci.draw_colored_polygon(HD.rrect(sr.grow(1.5), 4, 0.25), HD.INK)
 			var cc := (Color(1, 0.3, 0.2) if hot else Color(0.45, 0.95, 1.0).lerp(Color(1, 0.4, 0.15), float(i) / segs)) if on else HD.SLOT
@@ -498,22 +533,36 @@ func _draw_weapon() -> void:
 		var ac := Color(1, 0.4, 0.3) if a <= 0 else (Color(1, 0.8, 0.4) if a * 4 <= m else Color(1, 1, 1))
 		var as_ := 1.0 + 0.12 * ammo_pop
 		HD.icon(ci, "ammo", Vector2(70, 86), 13, wc)
-		var mw := HD.text(ci, head, Vector2(332, 100), " / %d" % m, 19, Color(0.7, 0.76, 0.9), 2, 5)
-		ci.draw_set_transform(Vector2(400, 80) * (1.0 - s) + Vector2(332 - mw, 100) * (1.0 - as_) * s, 0.0, Vector2(s * as_, s * as_))
-		HD.text(ci, head, Vector2(332 - mw, 100), str(a), 36, ac, 2, 7)
+		var mw := HD.text(ci, head, Vector2(312, 100), " / %d" % m, 19, Color(0.7, 0.76, 0.9), 2, 5)
+		ci.draw_set_transform(Vector2(400, 80) * (1.0 - s) + Vector2(312 - mw, 100) * (1.0 - as_) * s, 0.0, Vector2(s * as_, s * as_))
+		HD.text(ci, head, Vector2(312 - mw, 100), str(a), 36, ac, 2, 7)
 		ci.draw_set_transform(Vector2(400, 80) * (1.0 - s), 0.0, Vector2(s, s))
 		HD.text(ci, body, Vector2(92, 92), "EMPTY" if a <= 0 else "AMMO", 13, ac if a <= 0 else Color(0.75, 0.82, 0.95), 0, 4)
 	# weapon XP bar along the bottom
-	var xr := Rect2(56, 114, 278, 6)
+	var xr := Rect2(56, 114, 254, 6)
 	ci.draw_colored_polygon(HD.rrect(xr.grow(1.5), 4, 0.12), HD.INK)
 	ci.draw_colored_polygon(HD.rrect(xr, 3, 0.12), HD.SLOT)
 	var xf: float = 1.0 if maxed else combat.xp_frac(id)
 	if xf > 0.01: ci.draw_colored_polygon(HD.rrect(Rect2(xr.position, Vector2(xr.size.x * xf, xr.size.y)), 3, 0.12), GOLD if maxed else wc)
 	HD.text(ci, head, Vector2(24, 122), "XP", 13, GOLD, 0, 4)
 	# emblem medallion + level chip
-	var mc := Vector2(396, 74)
-	HD.badge(ci, mc, 50, wc)
-	HD.icon(ci, HD.weapon_icon(id), mc, 28, wc)
+	var mc := Vector2(392, 74)
+	# ammo (or heat) ring around the medallion, filling clockwise from the top
+	var rf := heat_shown if not combat.uses_ammo(id) else float(combat.ammo(id)) / maxf(1.0, combat.max_ammo(id))
+	var rc := wc
+	if not combat.uses_ammo(id):
+		rc = Color(1, 0.3, 0.2) if combat.overheated else Color(0.45, 0.95, 1.0).lerp(Color(1, 0.45, 0.15), clampf(heat_shown * 1.3 - 0.2, 0, 1))
+	elif rf <= 0.25: rc = Color(1, 0.45, 0.3).lerp(Color.WHITE, 0.3 * (0.5 + 0.5 * sin(t * 10.0)))
+	ci.draw_arc(mc, 63, 0, TAU, 64, HD.INK, 13, true)
+	ci.draw_arc(mc, 63, 0, TAU, 64, HD.SLOT, 8, true)
+	if rf > 0.005:
+		ci.draw_arc(mc, 63, -PI / 2, -PI / 2 + TAU * clampf(rf, 0, 1), maxi(8, int(64 * rf)), rc, 8, true)
+		ci.draw_arc(mc, 65, -PI / 2, -PI / 2 + TAU * clampf(rf, 0, 1), maxi(8, int(64 * rf)), Color(1, 1, 1, 0.35), 2, true)
+	for i in 12:
+		var a := -PI / 2 + TAU * i / 12.0
+		ci.draw_line(mc + Vector2(cos(a), sin(a)) * 58.5, mc + Vector2(cos(a), sin(a)) * 67.5, Color(HD.INK, 0.7), 2.0)
+	HD.badge(ci, mc, 46, wc)
+	HD.icon(ci, HD.weapon_icon(id), mc, 27, wc)
 	var ls := 1.0 + 0.3 * sin(lvl_pop * PI)
 	var lr := Rect2(mc.x - 30 * ls, mc.y + 36, 60 * ls, 28 * ls)
 	HD.panel(ci, lr, GOLD if maxed else Color.WHITE, 9, 0.0, 1.0, Color(0.55, 0.4, 0.08, 0.97) if maxed else HD.PANEL_TOP, Color(0.3, 0.2, 0.04, 0.97) if maxed else HD.PANEL_BOT)

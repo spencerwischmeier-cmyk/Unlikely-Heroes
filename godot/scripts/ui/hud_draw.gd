@@ -69,8 +69,12 @@ static func _fade(c: Color, a: float) -> Color:
 static func panel(ci: CanvasItem, r: Rect2, accent: Color, rad := 14.0, skew := 0.0, alpha := 1.0, top := PANEL_TOP, bot := PANEL_BOT) -> void:
 	var py := r.get_center().y
 	ci.draw_colored_polygon(rrect(Rect2(r.position + Vector2(2, 5), r.size), rad, skew, py + 5), Color(0, 0, 0, 0.32 * alpha))
-	var outer := rrect(r.grow(2.5), rad + 2.5, skew, py)
+	# ink edge, a brushed-metal rim lit from the top left, then a thin ink seam
+	var outer := rrect(r.grow(6.0), rad + 6.0, skew, py)
 	ci.draw_colored_polygon(outer, _fade(INK, alpha))
+	var rim := rrect(r.grow(4.5), rad + 4.5, skew, py)
+	ci.draw_polygon(rim, _metal_cols(rim, r.grow(4.5), alpha))
+	ci.draw_colored_polygon(rrect(r.grow(1.2), rad + 1.2, skew, py), _fade(INK, alpha))
 	var body := rrect(r, rad, skew, py)
 	var cols := PackedColorArray()
 	for p in body:
@@ -93,10 +97,22 @@ static func panel(ci: CanvasItem, r: Rect2, accent: Color, rad := 14.0, skew := 
 	var bx := r.position.x + rad + (py - by) * skew
 	ci.draw_line(Vector2(bx, by), Vector2(bx + bw, by), _fade(accent, alpha), 3.0, true)
 
+## Brushed steel shading for rims: bright at the top left, dark at the bottom right, with a soft band.
+static func _metal_cols(pts: PackedVector2Array, bounds: Rect2, alpha: float) -> PackedColorArray:
+	var cols := PackedColorArray()
+	for p in pts:
+		var u := clampf(((p.x - bounds.position.x) / maxf(1.0, bounds.size.x) * 0.35 + (p.y - bounds.position.y) / maxf(1.0, bounds.size.y) * 0.65), 0.0, 1.0)
+		var c := Color(0.86, 0.9, 0.97).lerp(Color(0.42, 0.47, 0.58), smoothstep(0.0, 0.55, u)).lerp(Color(0.2, 0.23, 0.32), smoothstep(0.55, 1.0, u))
+		cols.append(_fade(c, alpha))
+	return cols
+
 ## A round emblem: shadow, ink rim, accent ring, dark glass centre and a highlight arc.
 static func badge(ci: CanvasItem, c: Vector2, r: float, accent: Color, alpha := 1.0) -> void:
-	ci.draw_circle(c + Vector2(1.5, 4.5), r + 3.0, Color(0, 0, 0, 0.32 * alpha), true, -1, true)
-	ci.draw_circle(c, r + 3.0, _fade(INK, alpha), true, -1, true)
+	ci.draw_circle(c + Vector2(1.5, 5.5), r + 6.0, Color(0, 0, 0, 0.32 * alpha), true, -1, true)
+	ci.draw_circle(c, r + 6.5, _fade(INK, alpha), true, -1, true)
+	var ring := PackedVector2Array(_circle_pts(40, r + 5.0, c))
+	ci.draw_polygon(ring, _metal_cols(ring, Rect2(c - Vector2(r + 5, r + 5), Vector2(r + 5, r + 5) * 2.0), alpha))
+	ci.draw_circle(c, r + 1.5, _fade(INK, alpha), true, -1, true)
 	ci.draw_circle(c, r, _fade(accent.darkened(0.25), alpha), true, -1, true)
 	ci.draw_circle(c, r * 0.8, _fade(PANEL_BOT, alpha), true, -1, true)
 	for i in 5:
@@ -247,6 +263,24 @@ static func icon(ci: CanvasItem, kind: String, c: Vector2, s: float, col: Color,
 		"chat":   # speech bubble
 			_shape(ci, c, s, [Vector2(-0.05, 0.4), Vector2(-0.55, 0.95), Vector2(-0.55, 0.4)], col, alpha)
 			_shape(ci, c, s, rrect(Rect2(-0.95, -0.8, 1.9, 1.25), 0.4, 0.0, INF, 4), col, alpha)
+		"vesk":   # Vesk's portrait: round furry head, ears, muzzle, a grumpy brow and his glowing eyepiece
+			var fur := Color(0.66, 0.44, 0.28)
+			for sx in [-1.0, 1.0]:
+				_disc(ci, c + Vector2(sx * 0.62, -0.62) * s, s * 0.3, fur.darkened(0.1), alpha)
+				ci.draw_circle(c + Vector2(sx * 0.62, -0.62) * s, s * 0.15, _fade(Color(0.85, 0.6, 0.5), alpha), true, -1, true)
+			_disc(ci, c, s * 0.86, fur, alpha)
+			ci.draw_circle(c + Vector2(0, 0.34) * s, s * 0.4, _fade(Color(0.93, 0.8, 0.62), alpha), true, -1, true)
+			ci.draw_circle(c + Vector2(0, 0.2) * s, s * 0.13, _fade(INK, alpha), true, -1, true)
+			ci.draw_arc(c + Vector2(0, 0.42) * s, s * 0.16, 0.4, PI - 0.4, 8, _fade(INK, alpha), maxf(1.5, s * 0.07), true)
+			# left eye + grumpy brow
+			ci.draw_circle(c + Vector2(-0.34, -0.14) * s, s * 0.09, _fade(INK, alpha), true, -1, true)
+			ci.draw_line(c + Vector2(-0.52, -0.36) * s, c + Vector2(-0.16, -0.26) * s, _fade(INK, alpha), maxf(2.0, s * 0.1), true)
+			# eyepiece over the right eye: gunmetal frame, cyan lens, strap
+			ci.draw_line(c + Vector2(0.3, -0.18) * s, c + Vector2(0.86, -0.38) * s, _fade(Color(0.25, 0.27, 0.33), alpha), maxf(2.0, s * 0.12), true)
+			ci.draw_circle(c + Vector2(0.34, -0.16) * s, s * 0.25, _fade(INK, alpha), true, -1, true)
+			ci.draw_circle(c + Vector2(0.34, -0.16) * s, s * 0.2, _fade(Color(0.45, 0.5, 0.58), alpha), true, -1, true)
+			ci.draw_circle(c + Vector2(0.34, -0.16) * s, s * 0.13, _fade(Color(0.4, 1.0, 0.95), alpha), true, -1, true)
+			ci.draw_circle(c + Vector2(0.3, -0.2) * s, s * 0.05, Color(1, 1, 1, 0.9 * alpha), true, -1, true)
 		"xp":   # small star
 			icon(ci, "star", c, s, col, alpha)
 		_:   # "star"
