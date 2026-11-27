@@ -91,7 +91,9 @@ func _tune(n: Node) -> void:
 	if n is OmniLight3D or n is SpotLight3D:
 		var l := n as Light3D
 		if phone: l.shadow_enabled = false
-		elif l.shadow_enabled and l is OmniLight3D: (l as OmniLight3D).omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
+		# the Compatibility renderer has no dual-paraboloid omni shadows (it logged an error and drew none);
+		# cube shadows cost six passes per light, so browsers keep omni lights shadowless
+		elif l.shadow_enabled and l is OmniLight3D: l.shadow_enabled = false
 		l.distance_fade_enabled = true
 		var far := 34.0 if phone else 55.0
 		if l.distance_fade_begin <= 0.0 or l.distance_fade_begin > far: l.distance_fade_begin = far
