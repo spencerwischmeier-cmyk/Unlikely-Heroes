@@ -11,9 +11,9 @@ render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform float sway = 0.07;
 uniform float flutter = 0.025;
-uniform float translucency = 0.55;
+uniform float translucency = 0.3;
 uniform vec3 sun_tint : source_color = vec3(1.0, 0.86, 0.45);
-uniform float leaf_width = 0.17;
+uniform float leaf_width = 0.2;
 
 varying vec3 tint;
 varying vec2 info;
@@ -57,9 +57,11 @@ void fragment() {
 	ALPHA = m;
 	ALPHA_SCISSOR_THRESHOLD = 0.5;
 	// colour: instance tint, per-card hue jitter, darker toward the clump's core, sunlit tips warmer
-	float ao = mix(0.38, 1.0, smoothstep(0.0, 1.0, info.x));
-	vec3 c = tint * (0.82 + 0.36 * rnd);
-	c = mix(c, c * vec3(1.12, 1.08, 0.72), fract(rnd * 13.7) * 0.35);
+	float ao = mix(0.22, 1.0, smoothstep(0.15, 1.0, info.x));
+	vec3 c = tint * (0.68 + 0.3 * rnd);
+	// deeper, more saturated greens than the old flat foliage
+	c = mix(vec3(dot(c, vec3(0.3, 0.55, 0.15))), c, 1.25);
+	c = mix(c, c * vec3(1.12, 1.08, 0.72), fract(rnd * 13.7) * 0.25);
 	// a lighter midrib
 	float rib = 1.0 - smoothstep(0.0, 0.03, abs(uv.x - 0.5));
 	c *= 1.0 + rib * 0.15;

@@ -10,7 +10,7 @@ extends RefCounted
 ##     moss at the soil line, mossy limestone, furrowed bark; the green ironwork becomes chipped painted
 ##     steel (shaders/painted_steel.gdshader)
 ##   - air: waterfall mist, pollen and dust motes hanging in the sun shafts, ash drifting over from the fires
-##   - panic: smoke columns climbing out of the burning city past the island edges, a sky car down in the
+##   - panic: smoke pouring up past the grove's edge from a fire below, a sky car down in the
 ##     orchard, a hedge on fire at the entrance, picnics dropped mid-run
 ## The grade (warm golden hour, thicker haze for light shafts) is the "gardens" entry in systems/area_mood.gd.
 ## Gameplay geometry and colliders are untouched.
@@ -25,11 +25,11 @@ const STEEL_SHADER := "res://shaders/painted_steel.gdshader"
 
 ## clump tiers: [max radius (m), cards, card size in unit-sphere space, casts shadow]
 const TIERS := [
-	[0.3, 9, 0.95, false],
-	[0.7, 22, 0.72, false],
-	[1.3, 56, 0.46, true],
-	[2.2, 120, 0.31, true],
-	[99.0, 230, 0.21, true],
+	[0.3, 16, 0.9, false],
+	[0.7, 40, 0.72, false],
+	[1.3, 120, 0.5, true],
+	[2.2, 240, 0.38, true],
+	[99.0, 420, 0.3, true],
 ]
 const CELL := 24.0           # foliage is batched per 24 m cell so off-screen cells are culled
 
@@ -124,7 +124,11 @@ static func _foliage(root: Node3D) -> int:
 		if mm == null: continue
 		if mmi.name == "MM_leaf":
 			for i in mm.instance_count:
-				add.call(mm.get_instance_transform(i), mm.get_instance_color(i))
+				var xf := mm.get_instance_transform(i)
+				var sc := xf.basis.get_scale()
+				# the flattened tufts along lawn borders: the grass tufts take over there
+				if sc.y < 0.5 * maxf(sc.x, sc.z) and sc.x < 0.4: continue
+				add.call(xf, mm.get_instance_color(i))
 				count += 1
 			mmi.visible = false
 			mmi.queue_free()
@@ -263,7 +267,7 @@ class GrassSeeder extends Node3D:
 			var n := int(sz.x * sz.y * DENSITY)
 			var xfs := []
 			for i in n:
-				var p := Vector3(c.x + rng.randf_range(-0.46, 0.46) * sz.x, deck, c.z + rng.randf_range(-0.46, 0.46) * sz.y)
+				var p := Vector3(c.x + rng.randf_range(-0.485, 0.485) * sz.x, deck, c.z + rng.randf_range(-0.485, 0.485) * sz.y)
 				var q := Vector2(p.x, p.z)
 				var blocked := false
 				for pv in pave:
@@ -400,9 +404,9 @@ static func _air(L: Node3D) -> void:
 static func _panic(L: Node3D) -> void:
 	var C: Node3D = Chaos.make(L, "gardens_panic")
 	C.center = Vector3(-68, 10, -32); C.radius = 90.0
-	# the city under the gardens is burning: two columns climb past the island edges into the sunset
-	for col in [[Vector3(-122, -26, -52), 2.2, 78.0, 0.22], [Vector3(-104, -30, 22), 1.8, 66.0, 0.28], [Vector3(-46, -32, -96), 1.6, 60.0, 0.2]]:
-		C.column(col[0], col[1], col[2], col[3])
+	# smoke pouring up past the Hive Grove's east edge from a fire on the deck below (kept narrow: a FogVolume
+	# darkens everything seen through it, and the sky behind it is not fogged)
+	C.column(Vector3(-54.0, -2.0, -66.0), 0.8, 30.0, 0.24)
 	for f in C.fires: (f.light as OmniLight3D).shadow_enabled = false
 	# a hedge caught fire by the entrance arch (sparks from a crash on the promenade)
 	C.fire(Vector3(-59.0, 9.9, -13.55), 0.6)
