@@ -14,11 +14,19 @@ extends Node
 
 const SETTINGS_PATH := "user://settings.cfg"
 const BUSES := ["Music", "SFX", "Voice"]
+const HD := preload("res://scripts/ui/hud_draw.gd")
+const CYAN := Color(0.45, 0.95, 1.0)
+const GOLD := Color(1.0, 0.82, 0.3)
+const PAUSE_SIZE := Vector2(1160, 640)
 
 var settings := { look = 100.0, invert_y = false, master = 100.0, music = 80.0, sfx = 100.0, voice = 100.0, subtitles = true }
 
 var layer: CanvasLayer
-var font: SystemFont
+var font: Font
+var body: Font
+var pause_art: Control
+var all_buttons: Array = []
+var ui_t := 0.0
 var title_root: Control
 var pause_root: Control
 var settings_root: Control
@@ -98,6 +106,13 @@ func _apply_settings() -> void:
 	_route_snd()
 
 func _process(dt: float) -> void:
+	ui_t += dt
+	for b in all_buttons:
+		var bb := b as Button
+		if not bb.is_visible_in_tree(): continue
+		bb.set_meta("f", move_toward(float(bb.get_meta("f")), 1.0 if bb.has_focus() else 0.0, dt * 8.0))
+		bb.queue_redraw()
+	if state == "pause" and pause_art: pause_art.queue_redraw()
 	route_t -= dt
 	if route_t <= 0.0: route_t = 0.5; _route_snd()
 	# the cutscene player has its own subtitle label: hide it when subtitles are off
@@ -206,7 +221,10 @@ func open_pause() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	pause_root.visible = true
 	pause_root.modulate.a = 0.0
-	pause_root.create_tween().tween_property(pause_root, "modulate:a", 1.0, 0.12)
+	pause_art.scale = Vector2(0.94, 0.94)
+	var tw := pause_root.create_tween().set_parallel()
+	tw.tween_property(pause_root, "modulate:a", 1.0, 0.12)
+	tw.tween_property(pause_art, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	pause_buttons.get_child(0).grab_focus()
 	Snd.play("pause_in", -4)
 
@@ -269,7 +287,7 @@ func _set_opt(k: String, v) -> void:
 # ---------------------------------------------------------------- UI
 func _label(size: int, color: Color, bold := true) -> Label:
 	var l := Label.new()
-	if bold: l.add_theme_font_override("font", font)
+	l.add_theme_font_override("font", font if bold else body)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color(0, 0.04, 0.1, 0.9))
@@ -283,23 +301,49 @@ func _box(bg: Color, border: Color, r := 14, bw := 3) -> StyleBoxFlat:
 	s.skew = Vector2(-0.12, 0)
 	return s
 
-func _button(text: String, cb: Callable) -> Button:
+func _button(text: String, cb: Callable, icon := "") -> Button:
 	var b := Button.new(); b.text = text
-	b.custom_minimum_size = Vector2(380, 58)
-	b.add_theme_font_override("font", font); b.add_theme_font_size_override("font_size", 28)
-	b.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0))
-	b.add_theme_color_override("font_focus_color", Color(0.05, 0.08, 0.12))
-	b.add_theme_color_override("font_hover_color", Color(1, 1, 1))
-	b.add_theme_color_override("font_disabled_color", Color(0.5, 0.55, 0.6, 0.6))
-	b.add_theme_stylebox_override("normal", _box(Color(0.04, 0.09, 0.15, 0.82), Color(0.37, 0.95, 1.0, 0.4), 12, 2))
-	b.add_theme_stylebox_override("hover", _box(Color(0.08, 0.16, 0.25, 0.9), Color(0.37, 0.95, 1.0, 0.9), 12, 2))
-	b.add_theme_stylebox_override("focus", _box(Color(1, 0.72, 0.25, 0.98), Color(1, 0.95, 0.75), 12, 3))
-	b.add_theme_stylebox_override("pressed", _box(Color(1, 0.85, 0.4, 1.0), Color(1, 1, 1), 12, 3))
-	b.add_theme_stylebox_override("disabled", _box(Color(0.04, 0.07, 0.1, 0.6), Color(0.3, 0.35, 0.4, 0.4), 12, 2))
+	b.custom_minimum_size = Vector2(400, 62)
+	b.add_theme_font_override("font", font); b.add_theme_font_size_override("font_size", 26)
+	# the button is drawn by _draw_button in the HUD style; its own text and boxes stay invisible
+	for k in ["font_color", "font_focus_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_disabled_color"]:
+		b.add_theme_color_override(k, Color(0, 0, 0, 0))
+	var e := StyleBoxEmpty.new()
+	for k in ["normal", "hover", "focus", "pressed", "disabled", "hover_pressed"]: b.add_theme_stylebox_override(k, e)
+	b.set_meta("icon", icon); b.set_meta("f", 0.0)
+	b.draw.connect(_draw_button.bind(b))
 	b.pressed.connect(cb)
 	b.focus_entered.connect(func(): if state != "": Snd.play("ui_move", -10, 0.0, 0.0))
 	b.mouse_entered.connect(func(): if not b.disabled: b.grab_focus())
+	all_buttons.append(b)
 	return b
+
+## A menu button: a glossy slanted plate with an icon badge. The focused one slides right, warms to
+## gold and gets a light sweep and a chevron.
+func _draw_button(b: Button) -> void:
+	var f: float = b.get_meta("f")
+	var foc := b.has_focus()
+	var a := 0.45 if b.disabled else 1.0
+	var acc := CYAN.lerp(GOLD, f)
+	var r := Rect2(Vector2(10 + 14.0 * f, 6), b.size - Vector2(34, 12))
+	HD.panel(b, r, acc, 12, 0.12, a, HD.PANEL_TOP.lerp(Color(0.6, 0.4, 0.1, 0.97), f), HD.PANEL_BOT.lerp(Color(0.3, 0.17, 0.03, 0.97), f))
+	var cy := r.get_center().y
+	if foc:
+		var sw := fposmod(ui_t * 0.7, 1.5)
+		if sw < 1.0:
+			var x := r.position.x + 40 + (r.size.x - 80) * sw
+			b.draw_colored_polygon(PackedVector2Array([Vector2(x - 10, r.end.y - 3), Vector2(x + 14, r.end.y - 3), Vector2(x + 24, r.position.y + 3), Vector2(x, r.position.y + 3)]), Color(1, 1, 1, 0.16 * sin(sw * PI)))
+	var tx := r.position.x + 26
+	var ic: String = b.get_meta("icon")
+	if ic != "":
+		var bc := Vector2(r.position.x + 26, cy)
+		HD.badge(b, bc, 18, acc, a)
+		HD.icon(b, ic, bc, 10.5, acc.lightened(0.2), a)
+		tx = r.position.x + 58
+	HD.text(b, font, Vector2(tx, cy + 9), b.text, 25, Color(0.86, 0.95, 1.0).lerp(Color(1, 0.97, 0.88), f), 0, 6, a)
+	if f > 0.05:
+		var bob := sin(ui_t * 6.0) * 3.0
+		HD.icon(b, "dash", Vector2(r.end.x - 26 + bob, cy), 9, GOLD, f * a)
 
 static func _full(c: Control) -> void:
 	c.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -310,8 +354,8 @@ static func _center(c: Control, size: Vector2, off := Vector2.ZERO) -> void:
 	c.offset_top = -size.y / 2 + off.y; c.offset_bottom = size.y / 2 + off.y
 
 func _build_ui() -> void:
-	font = SystemFont.new(); font.font_names = PackedStringArray(["Inter", "Segoe UI", "Arial", "sans-serif"])
-	font.font_weight = 900; font.font_italic = true
+	font = HD.head_font()
+	body = HD.body_font()
 	layer = CanvasLayer.new(); layer.layer = 90; add_child(layer)
 	# ---- title ----
 	title_root = Control.new(); _full(title_root); title_root.visible = false; layer.add_child(title_root)
@@ -331,11 +375,12 @@ func _build_ui() -> void:
 	for l in [l1, l2, l3]: tv.add_child(l)
 	var gap := Control.new(); gap.custom_minimum_size = Vector2(0, 46); tv.add_child(gap)
 	title_buttons = VBoxContainer.new(); title_buttons.add_theme_constant_override("separation", 12); tv.add_child(title_buttons)
-	continue_btn = _button("CONTINUE", func(): _start(true))
+	continue_btn = _button("CONTINUE", func(): _start(true), "play")
 	title_buttons.add_child(continue_btn)
-	title_buttons.add_child(_button("NEW GAME", func(): _start(false)))
-	title_buttons.add_child(_button("SETTINGS", _open_settings))
-	title_buttons.add_child(_button("QUIT", func(): get_tree().quit()))
+	title_buttons.add_child(_button("NEW GAME", func(): _start(false), "star"))
+	title_buttons.add_child(_button("SETTINGS", _open_settings, "sliders"))
+	title_buttons.add_child(_button("QUIT", func(): get_tree().quit(), "power"))
+	for b in title_buttons.get_children(): (b as Control).size_flags_horizontal = Control.SIZE_SHRINK_BEGIN; (b as Control).custom_minimum_size = Vector2(460, 62)
 	var hint := _label(16, Color(0.8, 0.88, 0.95, 0.7), false)
 	hint.text = "Arrows / stick to choose    Enter / A to select"
 	hint.anchor_left = 0.06; hint.anchor_top = 0.93; hint.anchor_right = 0.6; hint.anchor_bottom = 0.98
@@ -344,24 +389,26 @@ func _build_ui() -> void:
 	pause_root = Control.new(); _full(pause_root); pause_root.visible = false; layer.add_child(pause_root)
 	var dim := ColorRect.new(); dim.color = Color(0.0, 0.02, 0.05, 0.6); _full(dim); dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pause_root.add_child(dim)
-	var pp := PanelContainer.new(); pp.add_theme_stylebox_override("panel", _panel_box())
-	_center(pp, Vector2(560, 400)); pause_root.add_child(pp)
-	var pv := VBoxContainer.new(); pv.add_theme_constant_override("separation", 12); pp.add_child(pv)
-	var pt := _label(54, Color(1, 0.72, 0.25)); pt.text = "PAUSED"; pt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; pv.add_child(pt)
-	pause_buttons = VBoxContainer.new(); pause_buttons.add_theme_constant_override("separation", 12)
-	pause_buttons.alignment = BoxContainer.ALIGNMENT_CENTER; pv.add_child(pause_buttons)
-	pause_buttons.add_child(_button("RESUME", close_pause))
-	pause_buttons.add_child(_button("SETTINGS", _open_settings))
-	pause_buttons.add_child(_button("RESTART FROM CHECKPOINT", _restart_checkpoint))
-	pause_buttons.add_child(_button("QUIT TO TITLE", _quit_to_title))
-	pause_buttons.add_child(_button("QUIT GAME", func(): Game.save(); get_tree().quit()))
-	for b in pause_buttons.get_children(): (b as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	pause_art = Control.new(); _center(pause_art, PAUSE_SIZE); pause_art.pivot_offset = PAUSE_SIZE * 0.5
+	pause_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pause_art.draw.connect(_draw_pause)
+	pause_root.add_child(pause_art)
+	pause_buttons = VBoxContainer.new(); pause_buttons.add_theme_constant_override("separation", 10)
+	pause_buttons.position = Vector2(14, 128); pause_buttons.size = Vector2(440, 380)
+	pause_art.add_child(pause_buttons)
+	pause_buttons.add_child(_button("RESUME", close_pause, "play"))
+	pause_buttons.add_child(_button("SETTINGS", _open_settings, "sliders"))
+	pause_buttons.add_child(_button("RESTART FROM CHECKPOINT", _restart_checkpoint, "restart"))
+	pause_buttons.add_child(_button("QUIT TO TITLE", _quit_to_title, "home"))
+	pause_buttons.add_child(_button("QUIT GAME", func(): Game.save(); get_tree().quit(), "power"))
+	for b in pause_buttons.get_children(): (b as Control).custom_minimum_size = Vector2(440, 62)
 	# ---- settings ----
 	settings_root = Control.new(); _full(settings_root); settings_root.visible = false; layer.add_child(settings_root)
 	var dim2 := ColorRect.new(); dim2.color = Color(0.0, 0.02, 0.05, 0.65); _full(dim2); dim2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	settings_root.add_child(dim2)
 	var sp := PanelContainer.new(); sp.add_theme_stylebox_override("panel", _panel_box())
-	_center(sp, Vector2(760, 560)); settings_root.add_child(sp)
+	_center(sp, Vector2(780, 600)); settings_root.add_child(sp)
+	sp.draw.connect(_draw_card.bind(sp))
 	var sv := VBoxContainer.new(); sv.add_theme_constant_override("separation", 10); sp.add_child(sv)
 	var st := _label(44, Color(1, 0.72, 0.25)); st.text = "SETTINGS"; st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sv.add_child(st)
 	_slider_row(sv, "look", "LOOK SENSITIVITY", 20, 250)
@@ -377,11 +424,14 @@ func _build_ui() -> void:
 	sh.text = "Up / down to choose    left / right to change    Esc / B to go back"
 	sh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sv.add_child(sh)
 
-func _panel_box() -> StyleBoxFlat:
-	var s := StyleBoxFlat.new(); s.bg_color = Color(0.02, 0.06, 0.11, 0.94); s.border_color = Color(0.37, 0.95, 1.0, 0.8)
-	s.set_border_width_all(3); s.set_corner_radius_all(22)
-	s.content_margin_left = 34; s.content_margin_right = 34; s.content_margin_top = 22; s.content_margin_bottom = 24
+## Settings card: an empty box for the margins, with a HUD-style panel drawn behind its rows.
+func _panel_box() -> StyleBox:
+	var s := StyleBoxEmpty.new()
+	s.content_margin_left = 40; s.content_margin_right = 40; s.content_margin_top = 26; s.content_margin_bottom = 28
 	return s
+
+func _draw_card(c: Control) -> void:
+	HD.panel(c, Rect2(Vector2(8, 8), c.size - Vector2(16, 16)), CYAN, 20)
 
 func _row(parent: Control, text: String) -> HBoxContainer:
 	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 18); parent.add_child(h)
@@ -421,3 +471,98 @@ func _check_row(parent: Control, key: String, text: String) -> void:
 	c.toggled.connect(func(on): _set_opt(key, on))
 	c.mouse_entered.connect(func(): c.grab_focus())
 	setting_rows[key] = { ctl = c, val = v }
+
+# ---------------------------------------------------------------- pause screen art
+## The pause screen: a header plate, the buttons on the left and a status card on the right with
+## the current objective, sprockets, collectibles and the weapons you own (emblem, level, ammo).
+func _draw_pause() -> void:
+	var ci := pause_art
+	var W := PAUSE_SIZE.x
+	# header
+	var hr := Rect2(6, 6, W - 12, 80)
+	HD.panel(ci, hr, GOLD, 18, 0.0)
+	var vb := Vector2(56, 46 + sin(ui_t * 2.2) * 2.0)
+	HD.badge(ci, vb, 28, GOLD)
+	HD.icon(ci, "vesk", vb, 22, Color(0.95, 0.62, 0.3))
+	HD.text(ci, font, Vector2(102, 66), "PAUSED", 50, Color(1, 0.88, 0.5), 0, 8)
+	HD.text(ci, font, Vector2(W - 34, 44), "SKYHARBOR", 28, CYAN, 2, 6)
+	HD.text(ci, body, Vector2(W - 34, 68), "EPISODE 1", 15, Color(0.8, 0.88, 1.0), 2, 4)
+	# left column backing (buttons sit on it)
+	HD.panel(ci, Rect2(6, 112, 460, 406), CYAN, 18, 0.0, 0.9)
+	# right status card
+	var cr := Rect2(492, 112, W - 498, 406)
+	HD.panel(ci, cr, CYAN, 18, 0.0)
+	var x0 := cr.position.x + 26
+	HD.icon(ci, "flag", Vector2(x0 + 12, cr.position.y + 34), 14, GOLD)
+	HD.text(ci, font, Vector2(x0 + 36, cr.position.y + 42), "CURRENT JOB", 20, GOLD, 0, 5)
+	var obj := ""
+	if Game.hud and "obj_text" in Game.hud: obj = Game.hud.obj_text
+	if obj == "": obj = "Explore Skyharbor."
+	ci.draw_multiline_string_outline(body, Vector2(x0, cr.position.y + 76), obj, HORIZONTAL_ALIGNMENT_LEFT, cr.size.x - 52, 20, 2, 5, HD.INK)
+	ci.draw_multiline_string(body, Vector2(x0, cr.position.y + 76), obj, HORIZONTAL_ALIGNMENT_LEFT, cr.size.x - 52, 20, 2, Color(0.92, 0.97, 1.0))
+	ci.draw_line(Vector2(x0, cr.position.y + 124), Vector2(cr.end.x - 26, cr.position.y + 124), Color(CYAN, 0.35), 2.0)
+	# three stat tiles
+	var tiles := [["sprocket", GOLD, _thousands(Game.nuts()), "SPROCKETS"]]
+	var counts: Array = Game.hud.collect_counts if Game.hud and "collect_counts" in Game.hud else []
+	for k in counts:
+		tiles.append([k[0], k[1], "%d/%d" % [k[2], k[3]], "LUCKY WASHERS" if k[0] == "washer" else ("PAGES" if k[0] == "page" else str(k[0]).to_upper())])
+	var tw := (cr.size.x - 52 - 16.0 * (tiles.size() - 1)) / maxf(1.0, tiles.size())
+	for i in tiles.size():
+		var tl: Array = tiles[i]
+		var r := Rect2(x0 + i * (tw + 16), cr.position.y + 142, tw, 84)
+		HD.panel(ci, r, tl[1], 12, 0.0, 0.95)
+		var bc := Vector2(r.position.x + 38, r.get_center().y)
+		HD.badge(ci, bc, 22, tl[1])
+		HD.icon(ci, tl[0], bc, 14, tl[1], 1.0, ui_t * 0.8 if tl[0] == "sprocket" else 0.0)
+		HD.text(ci, font, Vector2(r.position.x + 72, r.position.y + 44), tl[2], 30, Color.WHITE, 0, 6)
+		HD.text(ci, body, Vector2(r.position.x + 72, r.position.y + 66), tl[3], 13, Color(0.8, 0.88, 1.0), 0, 4)
+	# arsenal
+	HD.icon(ci, "ammo", Vector2(x0 + 10, cr.position.y + 262), 12, CYAN)
+	HD.text(ci, font, Vector2(x0 + 32, cr.position.y + 270), "ARSENAL", 20, CYAN, 0, 5)
+	var c := Game.combat
+	if c == null or not "ORDER" in c: return
+	var n: int = c.ORDER.size()
+	var sw := (cr.size.x - 52 - 12.0 * (n - 1)) / n
+	for i in n:
+		var id: String = c.ORDER[i]
+		var owned: bool = c.usable(id)
+		var col: Color = c.weapon_color(id) if owned else Color(0.5, 0.55, 0.62)
+		var r := Rect2(x0 + i * (sw + 12), cr.position.y + 286, sw, 100)
+		HD.panel(ci, r, col, 12, 0.0, 0.95 if owned else 0.6)
+		var nm: String = c.weapon_name(id) if owned else "LOCKED"
+		var ns := 16
+		while ns > 11 and font.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, ns).x > sw - 22: ns -= 1
+		HD.text(ci, font, Vector2(r.position.x + 12, r.position.y + 26), nm, ns, col.lightened(0.2) if owned else Color(0.65, 0.7, 0.78), 0, 5)
+		var bc := Vector2(r.position.x + 32, r.position.y + 64)
+		HD.badge(ci, bc, 18, col, 1.0 if owned else 0.7)
+		HD.icon(ci, HD.weapon_icon(id) if owned else "lock", bc, 11, col if owned else Color(0.72, 0.76, 0.82), 1.0 if owned else 0.8)
+		var tx := r.position.x + 62
+		if owned:
+			var lv: int = c.level(id)
+			HD.text(ci, font, Vector2(tx, r.position.y + 64), "V%d" % lv, 19, GOLD if lv >= 5 else Color.WHITE, 0, 5)
+			var am := "HEAT" if not c.uses_ammo(id) else "%d/%d" % [c.ammo(id), c.max_ammo(id)]
+			HD.text(ci, body, Vector2(r.end.x - 12, r.position.y + 63), am, 13, Color(0.8, 0.88, 1.0), 2, 4)
+			var f := 1.0 if not c.uses_ammo(id) else clampf(float(c.ammo(id)) / maxf(1.0, c.max_ammo(id)), 0.0, 1.0)
+			var br := Rect2(tx, r.position.y + 74, r.end.x - 12 - tx, 7)
+			ci.draw_colored_polygon(HD.rrect(br.grow(1.5), 4), HD.INK)
+			ci.draw_colored_polygon(HD.rrect(br, 3), HD.SLOT)
+			if f > 0.01: ci.draw_colored_polygon(HD.rrect(Rect2(br.position, Vector2(br.size.x * f, br.size.y)), 3), col)
+		else:
+			HD.text(ci, body, Vector2(tx, r.position.y + 60), "At Gizmart", 13, Color(0.7, 0.75, 0.82), 0, 4)
+	# controls hint under the card
+	var pad: bool = Game.player != null and "using_pad" in Game.player and Game.player.using_pad
+	var hy := PAUSE_SIZE.y - 70
+	var x := 24.0
+	for pair in [["A" if pad else "Enter", "SELECT"], ["B" if pad else "Esc", "RESUME"]]:
+		var kw := 36.0 if pad else maxf(34.0, font.get_string_size(pair[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x + 18.0)
+		HD.keycap(ci, Vector2(x + kw * 0.5, hy), pair[0], pad)
+		x += kw + 10
+		x += HD.text(ci, font, Vector2(x, hy + 7), pair[1], 18, Color(0.9, 0.96, 1.0), 0, 5) + 30
+
+static func _thousands(n: int) -> String:
+	var s := str(n)
+	var out := ""
+	while s.length() > 3:
+		out = "," + s.substr(s.length() - 3) + out
+		s = s.substr(0, s.length() - 3)
+	return s + out

@@ -281,6 +281,26 @@ static func icon(ci: CanvasItem, kind: String, c: Vector2, s: float, col: Color,
 			ci.draw_circle(c + Vector2(0.34, -0.16) * s, s * 0.2, _fade(Color(0.45, 0.5, 0.58), alpha), true, -1, true)
 			ci.draw_circle(c + Vector2(0.34, -0.16) * s, s * 0.13, _fade(Color(0.4, 1.0, 0.95), alpha), true, -1, true)
 			ci.draw_circle(c + Vector2(0.3, -0.2) * s, s * 0.05, Color(1, 1, 1, 0.9 * alpha), true, -1, true)
+		"play":   # resume: a rounded play triangle
+			_shape(ci, c, s, [Vector2(-0.55, -0.85), Vector2(0.9, 0.0), Vector2(-0.55, 0.85)], col, alpha)
+		"sliders":   # settings: three slider tracks with knobs at different heights
+			for i in 3:
+				var x := (-0.55 + i * 0.55) * s
+				_bar(ci, c + Vector2(x, -0.85 * s), c + Vector2(x, 0.85 * s), maxf(2.0, s * 0.14), Color(0.8, 0.85, 0.95), alpha)
+				_disc(ci, c + Vector2(x, [0.35, -0.45, 0.1][i] * s), s * 0.26, col, alpha)
+		"restart":   # checkpoint restart: a circular arrow round a little flag
+			ci.draw_arc(c, s * 0.72, -PI * 0.35, PI * 1.45, 24, _fade(INK, alpha), s * 0.36, true)
+			ci.draw_arc(c, s * 0.72, -PI * 0.35, PI * 1.45, 24, _fade(col, alpha), s * 0.2, true)
+			var tip := c + Vector2(cos(-PI * 0.35), sin(-PI * 0.35)) * s * 0.72
+			_shape(ci, tip, s, [Vector2(-0.38, -0.12), Vector2(0.2, -0.32), Vector2(0.02, 0.32)], col, alpha)
+			ci.draw_circle(c, s * 0.16, _fade(col.lightened(0.4), alpha), true, -1, true)
+		"home":   # quit to title: a little house
+			_shape(ci, c, s, [Vector2(0, -0.95), Vector2(0.9, -0.1), Vector2(0.65, -0.1), Vector2(0.65, 0.85), Vector2(-0.65, 0.85), Vector2(-0.65, -0.1), Vector2(-0.9, -0.1)], col, alpha)
+			ci.draw_rect(Rect2(c + Vector2(-0.2, 0.25) * s, Vector2(0.4, 0.6) * s), _fade(INK, alpha))
+		"power":   # quit game: power symbol
+			ci.draw_arc(c, s * 0.7, -PI * 0.3, PI * 1.3, 24, _fade(INK, alpha), s * 0.4, true)
+			ci.draw_arc(c, s * 0.7, -PI * 0.3, PI * 1.3, 24, _fade(col, alpha), s * 0.22, true)
+			_bar(ci, c + Vector2(0, -0.95 * s), c + Vector2(0, -0.1 * s), s * 0.22, col, alpha)
 		"xp":   # small star
 			icon(ci, "star", c, s, col, alpha)
 		_:   # "star"
