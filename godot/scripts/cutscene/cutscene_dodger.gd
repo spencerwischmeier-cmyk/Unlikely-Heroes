@@ -23,7 +23,13 @@ func lip(id: String) -> void:
 	if VA.lip_data.is_empty() and FileAccess.file_exists(VA.LIPSYNC):
 		var d = JSON.parse_string(FileAccess.get_file_as_string(VA.LIPSYNC))
 		if d is Dictionary: VA.lip_data = d
+	if VA.lip_env.is_empty() and FileAccess.file_exists(VA.LIPENV):
+		var e = JSON.parse_string(FileAccess.get_file_as_string(VA.LIPENV))
+		if e is Dictionary: VA.lip_env = e.get("lines", {})
 	lip_cues = VA.lip_data.get(id, []); lip_t = 0.0
+	_env = VA.lip_env.get(id, [])
+var _env: Array = []
+var _tk := 0.0
 var act_t := 9.0
 
 func act(n: String) -> void:
@@ -60,12 +66,21 @@ func _process(dt: float) -> void:
 	var tk := talk * (0.5 + 0.5 * sin(t * 17.0) * sin(t * 5.3))
 	if lip_t >= 0.0 and not lip_cues.is_empty():
 		lip_t += dt
-		var shp := "X"
-		for c in lip_cues:
-			if float(c[0]) <= lip_t: shp = String(c[1])
-			else: break
-		tk = lerpf(tk, float(OPEN.get(shp, 0.0)) * talk, 0.8)
+		var lw := 0.0
+		if not _env.is_empty():
+			# the eye glow rides the loudness of his voice, eased so it swells rather than flickers
+			var f := (lip_t + 0.03) * 50.0
+			var j := mini(int(f), _env.size() - 1)
+			lw = lerpf(float(_env[j]), float(_env[mini(j + 1, _env.size() - 1)]), f - int(f))
+		else:
+			var shp := "X"
+			for c in lip_cues:
+				if float(c[0]) <= lip_t: shp = String(c[1])
+				else: break
+			lw = float(OPEN.get(shp, 0.0))
+		tk = lw * talk
 		if lip_t > float(lip_cues[-1][0]) + 0.3: lip_t = -1.0
+	_tk = lerpf(_tk, tk, 1.0 - exp(-18.0 * dt)); tk = _tk
 	# no body bob per syllable: the eye pulse carries his speech
 	# the body only re-sets y each frame (hover bob), so x/z are set outright, never accumulated
 	model.position = Vector3(p.x, model.position.y + p.y, p.z)

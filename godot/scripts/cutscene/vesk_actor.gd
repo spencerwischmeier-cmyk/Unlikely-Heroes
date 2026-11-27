@@ -25,14 +25,17 @@ const M := preload("res://scripts/mats.gd")
 const CS_ANIMS := "res://models/vesk_cs_anims.glb"
 const FACE_GLB := "res://models/vesk_face.glb"
 const LIPSYNC := "res://audio/voice/lipsync.json"
+const LIPENV := "res://audio/voice/lipenv.json"
 static var lip_data := {}
+static var lip_env := {}       # line id -> loudness 0..1 at LIP_FPS (art/lip_env.py)
+const LIP_FPS := 50.0
 # Rhubarb mouth shapes -> jaw degrees and mouth keys
 const VISEMES := {
 	"X": {"jaw": 0.0, "press": 0.55},
 	"A": {"jaw": 0.0, "press": 1.0},
 	"B": {"jaw": 2.5, "wide": 0.35},
 	"C": {"jaw": 6.0, "wide": 0.45},
-	"D": {"jaw": 11.0, "wide": 0.25},
+	"D": {"jaw": 13.0, "wide": 0.25},
 	"E": {"jaw": 6.0, "pucker": 0.45},
 	"F": {"jaw": 2.0, "pucker": 1.0},
 	"G": {"jaw": 2.0, "press": 0.35, "sneer": 0.45},
@@ -83,6 +86,9 @@ var lip_cues: Array = []
 var lip_id := ""
 var lip_clock := -1.0
 var vis_cur := {"jaw": 0.0, "wide": 0.0, "pucker": 0.0, "press": 0.0, "sneer": 0.0}
+var _vis_v := {}              # spring velocities for vis_cur
+var _env: Array = []          # this line's loudness envelope
+const LIP_W := {"jaw": 22.0, "wide": 18.0, "pucker": 20.0, "press": 26.0, "sneer": 16.0}   # spring stiffness (rad/s)
 var blink_in := 2.0
 var blink_t := -1.0
 var blink_double := false
@@ -382,26 +388,86 @@ func lip(id: String) -> void:
 	if lip_data.is_empty() and FileAccess.file_exists(LIPSYNC):
 		var d = JSON.parse_string(FileAccess.get_file_as_string(LIPSYNC))
 		if d is Dictionary: lip_data = d
-	lip_cues = lip_data.get(id, [])
+	if lip_env.is_empty() and FileAccess.file_exists(LIPENV):
+		var e = JSON.parse_string(FileAccess.get_file_as_string(LIPENV))
+		if e is Dictionary: lip_env = e.get("lines", {})
+	lip_cues = _clean_cues(lip_data.get(id, []))
 	lip_id = id; lip_clock = 0.0
+	_env = lip_env.get(id, [])
+
+## Rhubarb flickers between shapes every couple of frames on fast speech, which reads as a jittery mouth.
+## Fold any shape held under 60 ms into its neighbour, except a lip closure (A: m/b/p), which is
+## stretched to stay readable.
+func _clean_cues(raw: Array) -> Array:
+	var c: Array = []
+	for i in raw.size():
+		var st := float(raw[i][0]); var sh := String(raw[i][1])
+		var en := float(raw[i + 1][0]) if i + 1 < raw.size() else st + 0.3
+		if en - st < 0.06 and sh != "A" and not c.is_empty() and i + 1 < raw.size(): continue
+		if not c.is_empty() and String(c[-1][1]) == sh: continue
+		c.append([st, sh])
+	return c
 
 func blink() -> void:
 	if blink_t < 0.0: blink_t = 0.0
 
-func _lip_shape() -> String:
-	if force_viseme != "": return force_viseme
-	if lip_cues.is_empty() or lip_clock < 0.0: return "X"
+func _lip_time() -> float:
 	var tt := lip_clock
 	var snd := get_node_or_null("/root/Snd")
 	var vp: AudioStreamPlayer = snd.get("voice_player") if snd else null
 	if vp and vp.playing and vp.stream and vp.stream.resource_path.ends_with("/%s.ogg" % lip_id):
-		tt = vp.get_playback_position() + 0.03   # a hair early reads as in sync
+		tt = vp.get_playback_position()
+	return tt + 0.075   # the mouth leads the sound a touch (as real speech does), and covers the springs' lag
+
+func _lip_shape() -> String:
+	if force_viseme != "": return force_viseme
+	if lip_cues.is_empty() or lip_clock < 0.0: return "X"
+	var tt := _lip_time()
 	var shape := "X"
 	for c in lip_cues:
 		if float(c[0]) <= tt: shape = String(c[1])
 		else: break
-	if tt > float(lip_cues[-1][0]) + 0.2: lip_cues = []; lip_clock = -1.0
+	if tt > float(lip_cues[-1][0]) + 0.2: lip_cues = []; lip_clock = -1.0; _env = []
 	return shape
+
+## The mouth target at this instant: shapes cross-fade into each other (co-articulation: the next one is
+## already forming before its sound starts) and the jaw opens with how loud the syllable is.
+const XF_PRE := 0.06
+const XF_POST := 0.05
+func _lip_target() -> Dictionary:
+	var out := {"jaw": 0.0, "wide": 0.0, "pucker": 0.0, "press": 0.0, "sneer": 0.0}
+	if force_viseme != "" or lip_cues.is_empty() or lip_clock < 0.0:
+		var v0: Dictionary = VISEMES.get(_lip_shape(), VISEMES.X)
+		for k in out: out[k] = float(v0.get(k, 0.0))
+		return out
+	var tt := _lip_time()
+	if tt > float(lip_cues[-1][0]) + 0.2:
+		lip_cues = []; lip_clock = -1.0; _env = []
+		for k in out: out[k] = float(VISEMES.X.get(k, 0.0))
+		return out
+	# the cue we're in, and how far into the blend toward the next one
+	var i := 0
+	while i + 1 < lip_cues.size() and float(lip_cues[i + 1][0]) - XF_PRE <= tt: i += 1
+	var a: Dictionary = VISEMES.get(String(lip_cues[i][1]), VISEMES.X)
+	var prev: Dictionary = VISEMES.get(String(lip_cues[i - 1][1]), VISEMES.X) if i > 0 else VISEMES.X
+	var st := float(lip_cues[i][0])
+	var u := smoothstep(st - XF_PRE, st + XF_POST, tt)
+	for k in out: out[k] = lerpf(float(prev.get(k, 0.0)), float(a.get(k, 0.0)), u)
+	# loudness: a shout opens wide, a mutter barely parts; closures stay shut whatever the level
+	var e := _env_at(tt)
+	var closed := String(lip_cues[i][1]) in ["A", "X"] and u > 0.6
+	if not _env.is_empty():
+		out.jaw = out.jaw * (0.45 + 0.85 * e) + (0.0 if closed else e * 2.5)
+		out.wide = out.wide * (0.7 + 0.5 * e)
+	return out
+
+func _env_at(tt: float) -> float:
+	if _env.is_empty(): return 0.6
+	var f := tt * LIP_FPS
+	var j := int(f)
+	if j < 0: return float(_env[0])
+	if j + 1 >= _env.size(): return float(_env[-1]) if j < _env.size() + 5 else 0.0
+	return lerpf(float(_env[j]), float(_env[j + 1]), f - j)
 
 func _face(dt: float) -> void:
 	if lip_clock >= 0.0: lip_clock += dt
@@ -409,10 +475,17 @@ func _face(dt: float) -> void:
 	var mk := 1.0 - exp(-mood_k * dt)
 	for k in mood_cur: mood_cur[k] = lerpf(mood_cur[k], float(mood_want.get(k, 0.0)), mk)
 	# visemes: fast attack, co-articulated
-	var v: Dictionary = VISEMES.get(_lip_shape(), VISEMES.X)
-	var vk := 1.0 - exp(-24.0 * dt)
+	var v := _lip_target()
 	var clench: float = mood_cur.clench
-	for k in vis_cur: vis_cur[k] = lerpf(vis_cur[k], float(v.get(k, 0.0)), vk)
+	# critically damped springs: no velocity snaps at shape changes, so the jaw eases in and out of
+	# each syllable instead of ticking between poses (two substeps keep it stable at 30 fps)
+	var h := dt * 0.5
+	for _s in 2:
+		for k in vis_cur:
+			var w0: float = LIP_W.get(k, 30.0)
+			var x: float = vis_cur[k]; var vel: float = _vis_v.get(k, 0.0)
+			vel += (w0 * w0 * (float(v[k]) - x) - 2.0 * w0 * vel) * h
+			vis_cur[k] = x + vel * h; _vis_v[k] = vel
 	# blinks (sometimes a double), plus one when the head whips round
 	blink_in -= dt
 	if blink_in <= 0.0 and blink_t < 0.0:
