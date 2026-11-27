@@ -63,6 +63,7 @@ func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 	if amount >= 2.0 and player and global_position.distance_to(player.global_position) < 3.6:
 		var d := dir; d.y = 0
 		if d.length() < 0.01: d = global_position - player.global_position; d.y = 0
+		Game.bot_hit.emit(self, amount)
 		_launch(d.normalized())
 		return true
 	return super.damage(amount, point, dir)

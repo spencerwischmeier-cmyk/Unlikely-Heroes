@@ -97,6 +97,7 @@ func kind() -> String:
 ## returns true if this hit destroyed the bot
 func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 	if dead: return false
+	Game.bot_hit.emit(self, amount)
 	hp -= amount; flash = 1.0; pop = 1.0
 	var push := dir; push.y = 0
 	if push.length() < 0.01: push = (global_position - point); push.y = 0

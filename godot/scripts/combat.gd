@@ -467,6 +467,32 @@ func melee(origin: Vector3, facing: Vector3, step := 1) -> bool:
 		Snd.play("melee_hit", 0 if fin else -2, 0.08, 0.0)
 	return any
 
+## Vesk's air slam landing: everything on the ground within reach takes a knock outward.
+const SLAM_R := 3.8
+func slam_wave(origin: Vector3) -> bool:
+	var any := false
+	for t in get_tree().get_nodes_in_group("targets"):
+		if t.dead: continue
+		var c: Vector3 = t.center()
+		var d := c - origin
+		if absf(d.y - 0.6) > 1.6: continue
+		d.y = 0
+		var l := d.length()
+		if l > SLAM_R: continue
+		var out := d / l if l > 0.1 else Vector3.FORWARD
+		var dmg := 2.0 if t.is_in_group("boss") else lerpf(3.0, 2.0, l / SLAM_R)
+		t.damage(dmg, c, out)
+		damage_number(c, dmg, t.dead)
+		any = true
+	FX.ring(origin + Vector3(0, 0.1, 0), Color(1, 0.8, 0.4), 1.1)
+	FX.puff(origin + Vector3(0, 0.2, 0), Color(0.8, 0.75, 0.65))
+	FX.sparks(origin + Vector3(0, 0.2, 0), Color(1, 0.9, 0.6), 18, 6)
+	FX.shake(1.0 if any else 0.7)
+	if any: FX.stop(0.07)
+	Snd.play("land", 2); Snd.play("melee_hit", 0 if any else -6, 0.08, 0.0)
+	Game.slam_landed.emit(any)
+	return any
+
 func nearest_target(origin: Vector3, max_d: float) -> Node3D:
 	var best: Node3D = null
 	var bd := max_d
