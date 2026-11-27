@@ -21,12 +21,35 @@ var samp_n := 0
 var base_ms := 0.0
 var costs: Array = []
 
+class Mark extends Node:
+	var probe
+	var first := true
+	func _process(_dt: float) -> void:
+		if first: probe.t0 = Time.get_ticks_usec()
+		else: probe.script_us = Time.get_ticks_usec() - probe.t0
+	func _physics_process(_dt: float) -> void:
+		if first: probe.p0 = Time.get_ticks_usec()
+		else: probe.phys_us += Time.get_ticks_usec() - probe.p0
+
+var t0 := 0
+var p0 := 0
+var script_us := 0      # time spent in every _process callback this frame
+var phys_us := 0        # time spent in _physics_process callbacks since the last frame
+
+func _add_marks() -> void:
+	for f in [true, false]:
+		var m := Mark.new(); m.probe = self; m.first = f
+		m.process_priority = -100000 if f else 100000
+		m.process_physics_priority = -100000 if f else 100000
+		get_tree().root.add_child.call_deferred(m)
+
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a == "--perf-bisect": bisect = true; on = true; secs = 9999.0
 		if a == "--perf-probe": on = true
 		elif a.begins_with("--perf-probe="): on = true; secs = float(a.substr(13))
 	set_process(on)
+	if on: _add_marks()
 
 func _process(dt: float) -> void:
 	if bisect: _bisect(dt); return
@@ -44,9 +67,10 @@ func _process(dt: float) -> void:
 		objs = Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 		prims = Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
 		nodes = Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+		scr = script_us / 1000.0,
 	}
 	rows.append(r)
-	print("[perf] t=%.0f fps %.0f proc %.1fms phys %.1fms draws %d objs %d prims %dk nodes %d bots %d at %s" % [t, r.fps, r.proc, r.phys, r.draws, r.objs, r.prims / 1000, r.nodes,
+	print("[perf] t=%.0f scripts %.1fms fps %.0f frame %.1fms phys %.1fms draws %d objs %d prims %dk nodes %d bots %d at %s" % [t, r.scr, r.fps, r.proc, r.phys, r.draws, r.objs, r.prims / 1000, r.nodes,
 		get_tree().get_nodes_in_group("bots").size(), Game.player.global_position.snapped(Vector3.ONE) if Game.player else Vector3.ZERO])
 	if t >= secs:
 		var avg := func(k): return rows.reduce(func(a, x): return a + float(x[k]), 0.0) / rows.size()
@@ -87,8 +111,11 @@ func _set_on(group: Array, on_: bool) -> void:
 			else:
 				var w: Array = n.get_meta("pp", [true, true]); n.set_process(w[0]); n.set_physics_process(w[1])
 
+## script time of the last frame (process callbacks + physics callbacks), not the whole frame
 func _ms() -> float:
-	return Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0 + Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	var v := (script_us + phys_us) / 1000.0
+	phys_us = 0
+	return v
 
 var sub := 0          # 0 = measuring with the group on, 1 = with it off
 var on_ms := 0.0

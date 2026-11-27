@@ -4,7 +4,7 @@
 // Incrementing CACHE_VERSION will kick off the install event and force
 // previously cached resources to be updated from the network.
 /** @type {string} */
-const CACHE_VERSION = '1795752955|4591842';
+const CACHE_VERSION = '1795757054|4805608';
 /** @type {string} */
 const CACHE_PREFIX = 'Unlikely Heroes-sw-cache-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
@@ -17,7 +17,7 @@ const ENSURE_CROSSORIGIN_ISOLATION_HEADERS = false;
 const CACHED_FILES = ["index.html","index.js","index.offline.html","index.icon.png","index.apple-touch-icon.png","index.audio.worklet.js","index.audio.position.worklet.js"];
 // Files that we might not want the user to preload, and will only be cached on first load.
 /** @type {string[]} */
-const CACHEABLE_FILES = ["index.wasm", "pack.json", "game.c5d00afb8f.00.part", "game.c5d00afb8f.01.part", "game.c5d00afb8f.02.part", "game-pc.538bcd7a0a.00.part", "game-pc.538bcd7a0a.01.part", "game-pc.538bcd7a0a.02.part"];
+const CACHEABLE_FILES = ["index.wasm", "pack.json", "game.f2897903e5.00.part", "game.f2897903e5.01.part", "game.f2897903e5.02.part", "game-pc.93bb356c68.00.part", "game-pc.93bb356c68.01.part", "game-pc.93bb356c68.02.part"];
 const FULL_CACHE = CACHED_FILES.concat(CACHEABLE_FILES);
 
 self.addEventListener('install', (event) => {
