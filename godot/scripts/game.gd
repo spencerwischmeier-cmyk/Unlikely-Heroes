@@ -16,6 +16,7 @@ signal zone_cleared(id: String)
 signal objective_set(id: String, text: String)           # the current main objective
 signal objective_done(id: String)
 signal checkpoint_reached(pos: Vector3)
+signal progress_restored(zone_ids: Array)                 # Continue: these zones were already done in the save
 signal boss_started(boss_name: String)
 signal boss_health(boss_name: String, frac: float)
 signal boss_defeated(boss_name: String)

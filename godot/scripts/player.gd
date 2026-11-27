@@ -20,6 +20,7 @@ var melee_hit := 0.0
 var aim_point := Vector3.ZERO
 var level: Node3D
 var respawn_pos := Vector3.ZERO
+var respawn_yaw := NAN          # camera yaw to face after a respawn (NAN: keep the current one)
 var model: Node3D
 var body: Node3D
 var skel: Skeleton3D
@@ -295,6 +296,9 @@ func _physics_process(dt: float) -> void:
 
 func respawn() -> void:
 	global_position = respawn_pos; velocity = Vector3.ZERO; riding = false; swing_hook = null; rope.visible = false
+	dash_t = 0.0; long_jump = false; jumps = 0
+	if not is_nan(respawn_yaw): cam.yaw = respawn_yaw; face_yaw = respawn_yaw
+	if cam.has_method("snap"): cam.snap(self)
 	Game.player_respawned.emit(respawn_pos)
 
 func _muzzle() -> Vector3:

@@ -59,6 +59,7 @@ func _ready() -> void:
 	if args.has("--title") or not test:
 		_hold_intro()
 		_show_title.call_deferred()
+	if args.has("--auto-continue"): get_tree().create_timer(1.0, true).timeout.connect(func(): _start(true))
 	if args.has("--pause-menu"): get_tree().create_timer(1.2).timeout.connect(open_pause)
 	if args.has("--settings"): get_tree().create_timer(1.2).timeout.connect(func(): open_pause(); _open_settings())
 
@@ -189,10 +190,12 @@ func _start(continue_game: bool) -> void:
 	Snd.play("ui_select", -4)
 	if continue_game:
 		Game.load_save()
+		_place_at_checkpoint()
 	else:
 		Game.reset_save()
 		Game.data.nuts = 0; Game.data.unlocked = {"arc_lancer": true}; Game.data.collected = {}; Game.data.completed = {}
 		Game.data.checkpoint = -1; Game.data.erase("weapons"); Game.data.erase("weapon"); Game.data.erase("gripes")
+		Game.data.erase("checkpoint_pos"); Game.data.erase("checkpoint_yaw")
 	if Game.combat and Game.combat.has_method("reload_from_save"): Game.combat.reload_from_save()
 	Game.add_nuts(0)
 	var col := get_parent().get_node_or_null("Collectibles")
@@ -209,6 +212,16 @@ func _start(continue_game: bool) -> void:
 	if not OS.get_cmdline_user_args().has("--no-capture"): Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	Snd.music("skyharbor", 2.0)
 	_release_intro(not continue_game)
+
+## Continue: put Vesk back on the last checkpoint he touched (saves from before this existed start at the beginning).
+func _place_at_checkpoint() -> void:
+	var cp = Game.data.get("checkpoint_pos")
+	if not (cp is Array and cp.size() == 3) or Game.player == null: return
+	var p := Vector3(float(cp[0]), float(cp[1]), float(cp[2]))
+	Game.player.respawn_pos = p
+	Game.player.respawn_yaw = float(Game.data.get("checkpoint_yaw", Game.cam.yaw))
+	Game.player.respawn()
+	print("[menus] continue at checkpoint ", p)
 
 # ---------------------------------------------------------------- pause
 func open_pause() -> void:

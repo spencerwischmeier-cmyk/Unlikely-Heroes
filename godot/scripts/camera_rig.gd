@@ -52,6 +52,13 @@ func aim_dir() -> Vector3:
 func pivot() -> Vector3:
 	return global_position
 
+## Jump straight to the target (after a respawn or teleport) instead of sweeping across the level.
+func snap(p: Node3D) -> void:
+	cam_y = p.global_position.y
+	var right := Vector3(-cos(yaw), 0, sin(yaw))
+	global_position = p.global_position + Vector3(0, 1.55, 0) + right * -shoulder
+	rotation = Vector3(0, yaw + PI, 0)
+
 func update(dt: float, p) -> void:
 	# controller look, with a curve so small pushes aim precisely
 	var lx := Input.get_axis("look_left", "look_right")

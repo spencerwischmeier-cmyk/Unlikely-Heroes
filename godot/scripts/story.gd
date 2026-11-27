@@ -72,7 +72,20 @@ func start() -> void:
 	Game.cutscene_started.emit("intro")
 	if Game.main.has_method("has_cutscenes") and Game.main.has_cutscenes():
 		await Game.cutscene_finished
+	_resume()
 	_advance()
+
+## Continue: zones already finished in the save are passed over silently (their rails, gates and
+## power come back on) so the story picks up where the player left off. The boss is never skipped.
+func _resume() -> void:
+	var done: Array = []
+	while index + 1 < zones.size():
+		var z: Dictionary = zones[index + 1]
+		if z.get("kind", "") == "boss" or not Game.is_complete(z.id): break
+		index += 1
+		_apply_effects(z, true); done.append(z.id)
+	if not done.is_empty(): Game.progress_restored.emit(done)
+	if index >= 0: print("[story] resumed after zone %d (%s)" % [index, zones[index].id])
 
 func current_id() -> String:
 	return zones[index].id if index >= 0 and index < zones.size() else ""
@@ -206,8 +219,10 @@ func _spawn_wave(z: Dictionary, w: Dictionary) -> void:
 	if wave == 0 and randf() < 0.6: Snd.bark("dodger", "spawn")
 
 ## Unlocks, gates, power and grants of a zone (also applied when a zone is skipped).
-func _apply_effects(z: Dictionary) -> void:
-	for i in z.get("unlock_rails", []): Game.level.set_rail_locked(i, false); Snd.play("rail_unlock", -2)
+func _apply_effects(z: Dictionary, quiet := false) -> void:
+	for i in z.get("unlock_rails", []):
+		Game.level.set_rail_locked(i, false)
+		if not quiet: Snd.play("rail_unlock", -2)
 	for g in z.get("open_gates", []): if Game.level.has_method("open_gate"): Game.level.open_gate(g)
 	for m in z.get("power", []): if Game.level.has_method("power"): Game.level.power(m)
 	for it in z.get("grants", []): Game.unlock(it)
