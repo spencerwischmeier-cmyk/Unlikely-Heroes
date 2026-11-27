@@ -225,6 +225,7 @@ func _build_cars() -> void:
 	car_mm.instance_count = total
 	var mmi := MultiMeshInstance3D.new(); mmi.multimesh = car_mm; mmi.material_override = sm
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF   # moved every drawn frame
 	add_child(mmi)
 	set_meta("car_base", base)
 	for li in lanes.size():
@@ -239,6 +240,20 @@ func _build_cars() -> void:
 				up = rng.randf_range(-2.0, 2.0), hue = rng.randf(), mode = "lane", t = 0.0, pos = Vector3.ZERO, vel = Vector3.ZERO,
 				spin = 0.0, yaw = 0.0, glow = 0.0 })
 	for i in cars.size(): car_mm.set_instance_custom_data(i, Color(cars[i].hue, 0, 0, 0))
+	car_buf.resize(car_mm.instance_count * 16); car_buf.fill(0.0)
+	for i in cars.size(): car_buf[i * 16 + 12] = cars[i].hue
+
+## Cars and puffs are written into one float buffer per frame and handed over in a single call: setting
+## them one instance at a time was a few thousand rendering-server calls a frame.
+var car_buf := PackedFloat32Array()
+var puff_buf := PackedFloat32Array()
+var puff_dirty := false
+var headless := DisplayServer.get_name() == "headless"   # the dummy renderer keeps no buffers
+static func _put(buf: PackedFloat32Array, o: int, xf: Transform3D) -> void:
+	var b := xf.basis
+	buf[o] = b.x.x; buf[o + 1] = b.y.x; buf[o + 2] = b.z.x; buf[o + 3] = xf.origin.x
+	buf[o + 4] = b.x.y; buf[o + 5] = b.y.y; buf[o + 6] = b.z.y; buf[o + 7] = xf.origin.y
+	buf[o + 8] = b.x.z; buf[o + 9] = b.y.z; buf[o + 10] = b.z.z; buf[o + 11] = xf.origin.z
 
 func _lane_xf(c: Dictionary) -> Transform3D:
 	var ln: Dictionary = lanes[c.lane]
@@ -287,7 +302,7 @@ func _cars(dt: float, pp: Vector3) -> void:
 				c.t -= dt
 				xf = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -2000, 0))
 				if c.t <= 0.0: c.mode = "lane"
-		car_mm.set_instance_transform(i, xf * base)
+		_put(car_buf, i * 16, xf * base)
 		if c.mode == "lane":
 			var dd: float = (c.pos as Vector3).distance_to(pp)
 			if dd < near_d: near_d = dd
@@ -338,11 +353,14 @@ func _build_puffs() -> void:
 	var mmi := MultiMeshInstance3D.new(); mmi.multimesh = puffs; mmi.material_override = sm
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mmi.custom_aabb = AABB(Vector3(-3000, -2000, -3000), Vector3(6000, 4000, 6000))
+	mmi.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	add_child(mmi)
 	puff_data.resize(MAX_PUFFS)
 	for i in MAX_PUFFS:
 		puff_data[i] = { pos = Vector3.ZERO, vel = Vector3.ZERO, age = 1.0, life = 0.0, size = 0.0, col = Color(1, 1, 1, 0) }
 		puffs.set_instance_transform(i, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -3000, 0)))
+	puff_buf.resize(MAX_PUFFS * 16); puff_buf.fill(0.0)
+	for i in MAX_PUFFS: _put(puff_buf, i * 16, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -3000, 0)))
 
 func _puff(pos: Vector3, vel: Vector3, col: Color, size: float, life: float) -> void:
 	var p: Dictionary = puff_data[puff_next]
@@ -353,17 +371,19 @@ func _puffs(dt: float) -> void:
 	for i in MAX_PUFFS:
 		var p: Dictionary = puff_data[i]
 		if p.life <= 0.0: continue
+		puff_dirty = true
 		p.age += dt
 		var u: float = p.age / p.life
 		if u >= 1.0:
 			p.life = 0.0
-			puffs.set_instance_transform(i, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -3000, 0)))
+			_put(puff_buf, i * 16, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, -3000, 0)))
 			continue
 		p.pos += p.vel * dt
 		var s: float = p.size * (0.6 + u * 1.8)
-		puffs.set_instance_transform(i, Transform3D(Basis.IDENTITY.scaled(Vector3(s, s, s)), p.pos))
+		_put(puff_buf, i * 16, Transform3D(Basis.IDENTITY.scaled(Vector3(s, s, s)), p.pos))
 		var c: Color = p.col
-		puffs.set_instance_color(i, Color(c.r, c.g, c.b, c.a * (1.0 - u) * minf(1.0, u * 8.0 + 0.2)))
+		puff_buf[i * 16 + 12] = c.r; puff_buf[i * 16 + 13] = c.g; puff_buf[i * 16 + 14] = c.b
+		puff_buf[i * 16 + 15] = c.a * (1.0 - u) * minf(1.0, u * 8.0 + 0.2)
 
 # ------------------------------------------------------------------ the exodus
 func _ship_model(kind: String) -> Node3D:
@@ -478,5 +498,8 @@ func _process(dt: float) -> void:
 	var pl: Node3D = Game.player
 	var pp: Vector3 = pl.global_position if pl else Vector3.ZERO
 	_cars(dt, pp)
+	if not headless: car_mm.buffer = car_buf
 	_ships(dt, pp)
+	puff_dirty = false
 	_puffs(dt)
+	if puff_dirty and not headless: puffs.buffer = puff_buf
