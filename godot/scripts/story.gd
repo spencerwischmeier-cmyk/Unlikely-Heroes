@@ -262,6 +262,7 @@ func _spawn_wave(z: Dictionary, w: Dictionary) -> void:
 	var n: int = z.get("waves", []).size()
 	if not no_pacing and n >= 3 and wave == n - 1 and Game.hud and Game.hud.has_method("toast_small"):
 		Game.hud.toast_small("FINAL WAVE", Color(1, 0.7, 0.35))
+	if not no_pacing and n >= 3 and wave == n - 1 and Snd.director and Snd.director.has_method("final_wave"): Snd.director.final_wave()
 
 ## Unlocks, gates, power and grants of a zone (also applied when a zone is skipped).
 func _apply_effects(z: Dictionary, quiet := false) -> void:

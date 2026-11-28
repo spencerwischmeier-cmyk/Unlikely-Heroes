@@ -37,7 +37,15 @@ const LAYERS := {
 	"scatter_fire": [["scatter_punch", -5.0, 0.0]],
 	"lobber_fire": [["thump_launch", -4.0, 0.0]],
 	"seeker_fire": [["seeker_whir", -6.0, 0.02]],
+	"armor_crack": [["armor_clatter", -3.0, 0.22]],
+	"quake_crash": [["explode_sub", -3.0, 0.0], ["debris", -6.0, 0.12]],
 }
+## the Crane Bot fight's own cues (2026-11-28 round 2); `--no-boss-sfx` mutes them for before/after
+const BOSS_SFX := ["boss_armor_clang", "crane_jam_sputter", "boss_hiccup", "boss_phase_roar", "crane_alarm_whoop",
+	"crane_rearup_groan", "quake_crash", "quake_rumble", "armor_clatter"]
+var boss_sfx_off := OS.get_cmdline_user_args().has("--no-boss-sfx")
+## music lift (audio_director: FINAL WAVE and the boss's last stand): extra dB and a touch of speed on the playing track
+var music_lift := 0.0
 ## big hits briefly push the music down (how many dB), so they land with weight
 const IMPACTS := {"explode_big": 4.0, "crane_slam": 4.0, "relay_destroy": 5.0, "boss_defeat": 6.0, "lobber_explode": 2.0,
 	"hurt": 2.5, "crate_break": 1.0}
@@ -107,6 +115,7 @@ func has_sound(n: String) -> bool:
 
 func _ok(n: String, gap: float) -> bool:
 	if not has_sound(n): return false
+	if boss_sfx_off and n in BOSS_SFX: return false
 	var now := Time.get_ticks_msec() / 1000.0
 	if now - last.get(n, -9.0) < gap: return false
 	last[n] = now; return true
@@ -162,7 +171,7 @@ func _play3(c: String, pos: Vector3, db: float, pitch: float, key: String) -> vo
 func _layers(n: String, db: float, pitch: float, pos) -> void:
 	for l in LAYERS.get(n, []):
 		var ln: String = l[0]
-		if not has_sound(ln): continue
+		if not has_sound(ln) or (boss_sfx_off and ln in BOSS_SFX): continue
 		var c := pick(ln)
 		if l[2] <= 0.0: _layer_now(c, db + l[1], pitch, ln, pos)
 		else: get_tree().create_timer(l[2], true, false, true).timeout.connect(_layer_now.bind(c, db + l[1], pitch, ln, pos))
@@ -328,7 +337,9 @@ func _music_process(dt: float) -> void:
 		var want := 1.0 if k == track else 0.0
 		tr.fade = move_toward(tr.fade, want, dt * tr.rate)
 		var p: AudioStreamPlayer = tr.p
-		p.volume_db = music_db + tr.db + linear_to_db(maxf(tr.fade, 0.001)) - sting_depth * sting_duck - impact
+		p.volume_db = music_db + tr.db + linear_to_db(maxf(tr.fade, 0.001)) - sting_depth * sting_duck - impact \
+			+ (2.5 * music_lift if k == track else 0.0)
+		p.pitch_scale = 1.0 + (0.03 * music_lift if k == track else 0.0)
 		if tr.fade <= 0.0 and p.playing:
 			tr.pos = p.get_playback_position(); p.stop()
 
