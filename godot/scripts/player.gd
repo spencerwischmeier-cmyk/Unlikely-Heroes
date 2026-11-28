@@ -95,6 +95,7 @@ var last_rail = null   # the rail just left: not re-caught for a moment (stops r
 var last_rail_t := 0.0
 var swing_hook: Node3D = null
 var swing_t := 0.0
+var swing_t0 := 0.0          # where on the arc the swing started (> 0 when a run carries into it)
 var swing_L := 0.0
 var swing_A := 0.0
 var swing_dirv := Vector3.ZERO
@@ -116,6 +117,7 @@ var _args := OS.get_cmdline_user_args()
 var _no_move_fx := _args.has("--no-move-fx")          # landing / skid / run-start dust
 var _no_body_lean := _args.has("--no-body-lean")      # lean into speeding up, rock back when stopping, skid lean
 var _no_snap_smooth := _args.has("--no-snap-smooth")  # rail catches ease the body onto the rail; the hook rope shoots out
+var _no_swing_carry := _args.has("--no-swing-carry")
 var vis_off := Vector3.ZERO  # body offset that eases to zero (hides the snap when a rail catches him)
 var rail_fresh := false
 var skid_t := 0.0            # > 0 while skidding through a sharp reversal
@@ -648,9 +650,21 @@ func _find_hook() -> Node3D:
 
 func _start_swing(h: Node3D) -> void:
 	var d := h.global_position - global_position
-	swing_hook = h; swing_t = 0.0; swing_L = d.length()
+	swing_hook = h; swing_t = 0.0; swing_t0 = 0.0; swing_L = d.length()
 	swing_dirv = Vector3(d.x, 0, d.z).normalized()
 	swing_A = atan2(Vector2(d.x, d.z).length(), d.y)
+	# carry the run into the swing: start the arc where its speed matches how fast Vesk was already moving
+	# toward the hook (instead of stalling at the top), and ease his body over the small step that makes.
+	# The release point is the same, so where the swing throws him is unchanged. `--no-swing-carry`
+	if not _no_swing_carry:
+		var v_in := maxf(0.0, Vector3(velocity.x, 0, velocity.z).dot(swing_dirv))
+		var top := swing_A * PI / SWING_T * swing_L
+		if top > 1.0 and v_in > 1.0:
+			var k0 := minf(asin(clampf(v_in * 0.8 / top, 0.0, 1.0)) / PI, 0.16)
+			swing_t = k0 * SWING_T; swing_t0 = swing_t
+			var th := -swing_A * cos(PI * k0)
+			var at := h.global_position + swing_dirv * swing_L * sin(th) + Vector3(0, -swing_L * cos(th), 0)
+			if not _no_snap_smooth: vis_off = (vis_off + global_position - at).limit_length(1.6)
 
 func _step_swing(dt: float, let_go: bool) -> bool:
 	swing_t += dt
@@ -664,11 +678,11 @@ func _step_swing(dt: float, let_go: bool) -> bool:
 	var hand := global_position + Vector3(0, 1.2, 0)
 	rope.visible = true
 	# the line shoots out to the hook over the first moment instead of appearing whole
-	var tip := N if _no_snap_smooth else hand.lerp(N, smoothstep(0.0, 0.09, swing_t))
+	var tip := N if _no_snap_smooth else hand.lerp(N, smoothstep(0.0, 0.09, swing_t - swing_t0))
 	rope.global_position = (hand + tip) * 0.5
 	var up := (N - hand).normalized()
 	rope.global_basis = Basis(Quaternion(Vector3.UP, up)).scaled(Vector3(1, maxf(hand.distance_to(tip), 0.01), 1))
-	if k >= RELEASE or (let_go and swing_t > 0.25):
+	if k >= RELEASE or (let_go and swing_t - swing_t0 > 0.25):
 		swing_hook = null; rope.visible = false
 		velocity.y += 4.0
 		velocity += Vector3(velocity.x, 0, velocity.z).normalized() * 2.0
