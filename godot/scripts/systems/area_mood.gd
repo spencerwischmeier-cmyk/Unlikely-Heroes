@@ -147,6 +147,75 @@ const MOODS := {
 	},
 	"freight_gangway": FREIGHT_GANGWAY,
 	"freight_approach": FREIGHT_APPROACH,
+	# the sky routes: the Skyline Cableway is high, airy and bright, a clean blue haze with the gardens' gold;
+	# the balloon barge is festive, warm and rosy; the dish rail down to the Crane Yard is crisp steel-blue
+	# with the signal lamps glowing through it
+	"cableway": {
+		"rect": Rect2(-31, -57, 37, 21),
+		"fade": 6.0,
+		"off_flag": ["--no-routes-look", "--no-routes-sky"],
+		"env": {
+			"tonemap_exposure": 0.88,
+			"adjustment_contrast": 1.12,
+			"adjustment_saturation": 1.16,
+			"volumetric_fog_density": 0.0022,
+			"volumetric_fog_albedo": Color(0.9, 0.95, 1.0),
+			"volumetric_fog_anisotropy": 0.7,
+			"fog_light_color": Color(0.82, 0.9, 0.98),
+			"fog_sun_scatter": 0.3,
+			"ssao_intensity": 2.4,
+			"ssil_intensity": 1.2,
+			"glow_intensity": 1.0,
+			"glow_bloom": 0.14,
+		},
+		"sun_color": Color(1.0, 0.9, 0.72),
+		"ssr": false,
+		"fill_energy": 0.32,
+	},
+	"balloon_line": {
+		"rect": Rect2(35, -49, 28, 22),
+		"fade": 6.0,
+		"off_flag": ["--no-routes-look", "--no-routes-sky"],
+		"env": {
+			"tonemap_exposure": 0.85,
+			"adjustment_contrast": 1.13,
+			"adjustment_saturation": 1.2,
+			"volumetric_fog_density": 0.0026,
+			"volumetric_fog_albedo": Color(1.0, 0.88, 0.84),
+			"volumetric_fog_anisotropy": 0.76,
+			"fog_light_color": Color(1.0, 0.78, 0.7),
+			"fog_sun_scatter": 0.34,
+			"ssao_intensity": 2.5,
+			"ssil_intensity": 1.25,
+			"glow_intensity": 1.05,
+			"glow_bloom": 0.16,
+		},
+		"sun_color": Color(1.0, 0.8, 0.66),
+		"ssr": false,
+		"fill_energy": 0.26,
+	},
+	"dish_rail": {
+		"rect": Rect2(2, -97, 17, 40),
+		"fade": 6.0,
+		"off_flag": ["--no-routes-look", "--no-routes-sky"],
+		"env": {
+			"tonemap_exposure": 0.86,
+			"adjustment_contrast": 1.16,
+			"adjustment_saturation": 1.08,
+			"volumetric_fog_density": 0.0025,
+			"volumetric_fog_albedo": Color(0.86, 0.9, 1.0),
+			"volumetric_fog_anisotropy": 0.72,
+			"fog_light_color": Color(0.74, 0.82, 0.96),
+			"fog_sun_scatter": 0.3,
+			"ssao_intensity": 2.6,
+			"ssil_intensity": 1.2,
+			"glow_intensity": 1.08,
+			"glow_bloom": 0.15,
+		},
+		"sun_color": Color(1.0, 0.86, 0.72),
+		"ssr": false,
+		"fill_energy": 0.3,
+	},
 }
 
 const FREIGHT_ENV := {
@@ -183,7 +252,10 @@ func _ready() -> void:
 	off = OS.get_cmdline_user_args().has("--no-mood")
 	for k in MOODS: weight[k] = 0.0
 	for k in MOODS.keys():   # a mood can be switched off with its area's own flag (before/after shots)
-		if MOODS[k].has("off_flag") and OS.get_cmdline_user_args().has(MOODS[k].off_flag): disabled[k] = true
+		if MOODS[k].has("off_flag"):
+			var fl = MOODS[k].off_flag   # one flag or a list of them
+			for f in (fl if fl is Array else [fl]):
+				if OS.get_cmdline_user_args().has(f): disabled[k] = true
 
 func _grab() -> bool:
 	if env and sun: return true
