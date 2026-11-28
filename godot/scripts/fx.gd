@@ -160,6 +160,11 @@ func smoke_trail(pos: Vector3, scale := 1.0) -> void:
 	_emit(pos, _smoke_mesh, m, 2, 0.9, Vector2(0.2, 0.8), Vector3(0, 1.0, 0), Vector2(0.5, 1.1) * scale, 60)
 	_emit(pos, _fire_mesh, _bill(Color(1, 0.5, 0.15), 2.5), 1, 0.2, Vector2.ZERO, Vector3.ZERO, Vector2(0.5, 0.8) * scale)
 
+## A thin rising smoke wisp (a damaged bot smouldering). Smoke only, no flame.
+func wisp(pos: Vector3, scale := 1.0) -> void:
+	var m := _bill(Color(0.32, 0.32, 0.36), 1.0, false, true, 0.5)
+	_emit(pos, _smoke_mesh, m, 2, 1.0, Vector2(0.3, 0.9), Vector3(0, 1.6, 0), Vector2(0.35, 0.8) * scale, 25)
+
 ## Telegraph: a flat ring on the ground with a disc that fills it over `time` seconds, then vanishes.
 ## Read it as "this circle gets hit when the disc is full". Returns the node (free it to cancel early).
 func warn_ring(pos: Vector3, radius: float, time: float, color := Color(1, 0.2, 0.12)) -> Node3D:

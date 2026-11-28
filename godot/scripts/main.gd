@@ -142,8 +142,12 @@ func _grade() -> GradientTexture1D:
 
 func spawn_bot(kind: String, pos: Vector3, zone := Rect2()) -> Node3D:
 	if kind == "crew": return load("res://scripts/enemy_crew.gd").spawn(self, combat, player, pos, zone)
+	# Plated Roller: an armoured roller (`--no-plated` spawns a plain one instead)
+	var plated := kind == "plated" and not OS.get_cmdline_user_args().has("--no-plated")
+	if kind == "plated": kind = "roller"
 	var b: Node3D = (Roller if kind == "roller" else Hornet).new()
 	b.combat = combat; b.player = player; b.zone = zone
+	if plated: b.set("plated", true)
 	add_child(b)
 	b.global_position = pos + (Vector3(0, 6, 0) if kind == "roller" else Vector3(0, 12, 0))
 	FX.ring(pos + Vector3(0, 0.05, 0), Color(1, 0.35, 0.25))

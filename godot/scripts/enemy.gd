@@ -10,6 +10,7 @@ extends CharacterBody3D
 signal died(bot)
 
 const ScrapBurst := preload("res://scripts/chars/scrap_burst.gd")
+const Device := preload("res://scripts/device.gd")
 
 var combat: Node3D
 var player: CharacterBody3D
@@ -42,6 +43,11 @@ var cable_on := false             # subclasses set this in _ready to arrive on a
 var ticks := 0
 var idle_look := 0.0              # while bots are held still (cutscenes) they glance around instead of freezing
 var look_phase := randf() * TAU
+var wear_t := 0.0                 # damaged bots smoke and crackle (a "one more hit" cue without health bars)
+var startle_cd := 0.0
+var no_number_frame := -1         # combat skips the damage number on this physics frame (glances, armour cracks)
+static var _no_wear := OS.get_cmdline_user_args().has("--no-bot-wear")
+static var _no_react := OS.get_cmdline_user_args().has("--no-bot-react")
 
 ## True for roughly `chance` of spawns. Previews force it with Engine meta "bot_variant" (0 or 1).
 func roll_variant(chance := 0.4) -> bool:
@@ -53,6 +59,30 @@ func _init() -> void:
 	collision_mask = 1
 	add_to_group("targets")
 	add_to_group("bots")
+	if not _no_react: Game.bot_killed.connect(_on_peer_down)
+
+## A crewmate blows up close by: the bot flinches with a little hop and a "!" (enemies react to each other).
+func _on_peer_down(bot: Node, pos: Vector3, _kind: String) -> void:
+	if dead or bot == self or paused() or startle_cd > 0.0 or not is_inside_tree() or not can_startle(): return
+	var d := center().distance_to(pos)
+	if d > 5.0: return
+	startle_cd = 2.5
+	var away := global_position - pos; away.y = 0
+	away = away.normalized() if away.length() > 0.05 else Vector3.FORWARD
+	_startle(away, 1.0 - d / 5.0)
+	if combat and combat.has_method("float_text") and randf() < 0.7:
+		combat.float_text(center() + Vector3(0, 0.9, 0), "!", Color(1, 0.9, 0.35), 56)
+
+## True when the bot is free to flinch (subclasses say no mid-attack).
+func can_startle() -> bool:
+	return true
+
+## Default flinch for ground bots: hop back, swell, squint for a beat.
+func _startle(away: Vector3, k: float) -> void:
+	if is_on_floor(): velocity.y = 3.0 + k * 1.5
+	velocity += away * (2.0 + k * 3.0)
+	pop = maxf(pop, 0.6); stun = maxf(stun, 0.3 + k * 0.2)
+	lean = Vector3(away.z, 0, -away.x) * 0.3; lean_v = lean * 5.0
 
 func setup_model(path: String) -> void:
 	model = load(path).instantiate()
@@ -156,6 +186,8 @@ func tick_common(dt: float) -> void:
 	flash = maxf(0.0, flash - dt * 8.0)
 	pop = maxf(0.0, pop - dt * 7.0)
 	stun = maxf(0.0, stun - dt)
+	startle_cd = maxf(0.0, startle_cd - dt)
+	if not _no_wear and not dead and hp < max_hp and hp <= max_hp * 0.5 and not paused(): _wear(dt)
 	# springy lean: a hit knocks the bot back and it wobbles upright again (overshoots once or twice)
 	lean_v += (-lean * 170.0 - lean_v * 11.0) * dt
 	lean += lean_v * dt
@@ -167,6 +199,15 @@ func tick_common(dt: float) -> void:
 		idle_look = lerpf(idle_look, want, 1.0 - exp(-3.0 * dt))
 		model.rotation = lean + Vector3(0, idle_look, 0)
 	_tick_eyes(dt)
+
+## Badly damaged: a thin smoke wisp and the odd crackle of sparks, so "one more hit" reads at a glance.
+func _wear(dt: float) -> void:
+	wear_t -= dt
+	if wear_t > 0.0: return
+	wear_t = randf_range(0.28, 0.45) * (2.0 if Device.tier() == "phone" else 1.0)
+	var top := center() + Vector3(randf_range(-0.2, 0.2), 0.45, randf_range(-0.2, 0.2))
+	FX.wisp(top, 0.55 * burst_scale)
+	if randf() < 0.3: FX.sparks(top, Color(1, 0.75, 0.35), 4, 2.5)
 
 ## Eyes: blink now and then, squint shut while staggered, flash white when hit.
 func _tick_eyes(dt: float) -> void:
