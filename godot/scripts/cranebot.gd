@@ -418,12 +418,14 @@ func _big_hit(amount: float) -> void:
 	var c := center() + Vector3(0, 0.6, 0)
 	FX.sparks(c, Color(1, 0.85, 0.5), int(10 + 10 * k), 6.0)
 	ScrapBurst.burst(get_parent(), c, 0.9, skin_mats, int(clampf(amount * 0.6, 3, 8)))
+	Snd.at("boss_armor_clang", c, -2.0 + k * 2.0, 0.1, 0.08)
 	if amount >= 6.0 and state == "spray" and st_t > 0.15:
 		state = "idle"; st_t = 1.1; sprays = 0
 		cab_glow.emission_energy_multiplier = 0.5; _fan_hide()
 		FX.explosion(center() + Vector3(sin(turn_yaw) * 1.4, -0.1, cos(turn_yaw) * 1.4), 0.5)
 		if combat: combat.float_text(center() + Vector3(0, 2.0, 0), "JAMMED!", Color(1, 0.8, 0.35), 52)
 		Snd.at("crane_stun", center(), -2, 0.1)
+		Snd.at("crane_jam_sputter", center(), 0, 0.05, 0.3)
 
 ## The rivet fan's aim lines (one per rivet), built once.
 func _fan_build() -> void:
@@ -913,7 +915,7 @@ func _dying(dt: float) -> bool:
 			rock_v += Vector2(randf_range(-3.0, -1.5), randf_range(-2.5, 2.5))
 			FX.explosion(center() + Vector3(randf_range(-1, 1), 0.8, randf_range(-1, 1)), 0.6)
 			ScrapBurst.burst(get_parent(), center() + Vector3(0, 0.8, 0), 1.0, skin_mats, 4)
-			Snd.at("chars_crane_hurt", center(), -2, 0.15, 0.3)
+			Snd.at("chars_crane_hurt", center(), -2, 0.15, 0.3); Snd.at("boss_hiccup", center(), 0, 0.12, 0.2)
 	rotation.z = sin(t * 30.0) * 0.03 + (0.0 if k < 2.2 else (k - 2.2) * 0.22)
 	turn_yaw += dt * (0.5 + k * 0.8)
 	if phase == 1: pitch = maxf(-0.25, pitch - dt * 0.5)

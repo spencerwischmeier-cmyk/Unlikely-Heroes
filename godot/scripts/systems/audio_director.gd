@@ -93,7 +93,8 @@ func _ready() -> void:
 	Game.zone_entered.connect(_on_zone_entered)
 	Game.cutscene_started.connect(func(id): cut_id = id)
 	Game.player_respawned.connect(func(_p): Snd.play("area_whoosh", -12.0, 0.05, 0.5))
-	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0; boss_phase2 = false)
+	Game.boss_started.connect(func(_n): Snd.sting("sting_alert", 0.0, 4.0, 1.0); alert_cd = 30.0; boss_phase2 = false; boss_last = false)
+	Game.boss_defeated.connect(func(_n): boss_last = false)
 	Game.boss_health.connect(_on_boss_health)
 	Game.boss_defeated.connect(func(n: String): if n == "CRANE BOT": calm = true)
 	get_tree().node_added.connect(_on_node_added)
@@ -343,7 +344,32 @@ func _on_zone_cleared(id: String) -> void:
 	combat_t = maxf(combat_t, 3.5)   # let the combat music go soon after
 
 ## the boss fight's music turns furious at half health
+## Music lift: the FINAL WAVE of a long fight (story.gd calls final_wave) and the boss's last stand (under a
+## quarter health) push the playing track up a little louder and a touch faster, with a short stinger.
+## `--no-music-lift` turns it off.
+var lift_on := not OS.get_cmdline_user_args().has("--no-music-lift")
+var final_wave_t := 0.0     # > 0 while the final wave's fight is on
+var boss_last := false
+
+func final_wave() -> void:
+	if not lift_on: return
+	final_wave_t = 6.0
+	Snd.sting("sting_alert", -3.0, 3.0, 0.8)
+
+func _update_lift(dt: float) -> void:
+	var want := 0.0
+	if lift_on:
+		if final_wave_t > 0.0:
+			want = 1.0
+			# holds while the fight is on; a few seconds after it ends (or if it never starts) it lets go
+			final_wave_t = maxf(final_wave_t, 0.5) if combat else final_wave_t - dt
+		if boss_last: want = 1.0
+	Snd.music_lift = move_toward(Snd.music_lift, want, dt * (0.8 if want > Snd.music_lift else 0.4))
+
 func _on_boss_health(_n: String, frac: float) -> void:
+	if lift_on and not boss_last and frac > 0.0 and frac <= 0.25:
+		boss_last = true
+		Snd.sting("sting_alert", 0.0, 4.0, 0.8)
 	if boss_phase2 or frac > 0.5 or Snd.music_name != "boss" or not Snd.has_music("boss_b"): return
 	boss_phase2 = true
 	Snd.sting("sting_alert", 2.0, 6.0, 1.2)
@@ -570,6 +596,7 @@ func _process(dt: float) -> void:
 			if cand_t >= 0.8 or area == "": area = a
 		else: cand = area; cand_t = 0.0
 		_update_combat(0.2)
+		_update_lift(0.2)
 		_update_music()
 		if debug and Engine.get_process_frames() % 120 < 12: _print_state()
 	_update_beds(dt)
