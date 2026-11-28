@@ -1,6 +1,6 @@
 extends CanvasLayer
 ## Hit chain: landing hits in quick succession (shots, wrench, stomps, slams) builds a chain shown in a
-## small chip beside the crosshair. The chain breaks after CHAIN_T without a hit, or when Vesk is hurt.
+## small chip in the top-left HUD cluster, beside the jet/dash strip. The chain breaks after CHAIN_T without a hit, or when Vesk is hurt.
 ## Every 10 links pays out bonus sprockets, so fluid, aggressive play is rewarded without any enemy
 ## health bars. Hits landing on the same frame (a scatter blast) count once.
 
@@ -69,10 +69,9 @@ func _draw_chip() -> void:
 	var a := 1.0 if on else fade / 0.6
 	var tier := mini(shown / 10, 3)
 	var col: Color = COLORS[tier]
-	var vs := chip.get_viewport_rect().size
 	var s := 1.0 + pop * 0.25
-	# right of the reticle, level with it (the low-ammo / OVERHEAT tags sit under the reticle)
-	var r := Rect2(vs.x * 0.5 + 84, vs.y * 0.5 - 22 * s, 128 * s, 44 * s)
+	# top left, tucked beside the jet/dash strip of the vitals cluster (kept clear of the crosshair)
+	var r := Rect2(462, 96 - 22 * (s - 1.0), 128 * s, 44 * s)
 	HD.panel(chip, r, col, 12, 0.12, a * 0.95)
 	HD.text(chip, head, Vector2(r.position.x + 14, r.position.y + 33 * s), "x%d" % shown, int(28 * s), col.lerp(Color.WHITE, 0.35), 0, 6, a)
 	HD.text(chip, body, Vector2(r.end.x - 12, r.position.y + 28 * s), "CHAIN", int(14 * s), Color(0.9, 0.92, 1.0), 2, 4, a)
