@@ -20,6 +20,7 @@ extends Node
 ##   --et-skip1           tour: skip the phase 1 slam and go straight to the phase change
 ##   --et-cam             a fixed overview camera on the fight (for screenshots); --et-close: close-up on the nearest bot
 ##   --et-jump            Vesk double-jumps over the sweeping jib (on in tour mode)
+##   --et-noedge          the autoplayer doesn't step back from the arena edge (tests the boss arena lip)
 ##   --et-bot             a simple autoplayer fights: aims at the nearest bot, fires, strafes, dashes away
 ##                        from fusing rollers and locked-on hornets, wrenches rollers that get close
 ##   --et-secs=<s>        quit after s game seconds (headless runs default to 240) with a summary line
@@ -65,6 +66,7 @@ func _ready() -> void:
 			snaps.append([kv[0], float(kv[1]) if kv.size() > 1 else 0.5, false])
 	print("[enemy-test] mode ", mode, " flags ", flags)
 	Engine.set_meta("et_log", true)
+	Snd.line_started.connect(func(id, _sp, txt): if String(id).begins_with("dodger_call"): print("[enemy-test] dodger: ", txt))
 	Game.player_fell.connect(func(): print("[enemy-test] vesk fell off, last pos ", ap_last, " arena ", arena))
 	Game.player_hurt.connect(func(h): hurts += 1; print("[enemy-test] vesk hurt, hull ", h, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.bot_killed.connect(func(b, _p, k): kills += 1; print("[enemy-test] killed ", k, " returned_to_sender=", b.get_meta("returned_to_sender", false)))
@@ -76,6 +78,7 @@ func _ready() -> void:
 
 func _setup() -> void:
 	arena = Game.level.islands.get("arena", Rect2(-18, -112, 36, 30))
+	if flags.has("probe"): _probe_edges.call_deferred()
 	var c := arena.get_center()
 	_place_player(Vector3(c.x, 0.1, arena.end.y - 3.0), PI)
 	if mode == "tour": _place_player(Vector3(c.x + 3.5, 0.1, c.y + 3.0), PI)
@@ -232,7 +235,7 @@ func _autoplay(dt: float) -> void:
 	_ap_hold("move_left", ap_strafe < 0.0); _ap_hold("move_right", ap_strafe > 0.0)
 	var roller_close: bool = best.has_method("_launch") and bd < 5.0
 	# near the arena edge (circle-strafing drifts outward): step back in toward the fight
-	var edge := arena.size.x > 0.0 and not arena.grow(-4.5).has_point(Vector2(pp.x, pp.z))
+	var edge := arena.size.x > 0.0 and not arena.grow(-4.5).has_point(Vector2(pp.x, pp.z)) and not flags.has("noedge")
 	_ap_hold("move_back", roller_close and best.get("state") != "fuse" and not edge)
 	_ap_hold("move_forward", edge)
 	ap_dash_cd -= dt
@@ -344,3 +347,26 @@ func _process(dt: float) -> void:
 			snapping = false
 			if snaps.all(func(x): return x[2]): get_tree().quit()
 			return
+
+## --et-probe: which arena edges are walled (rays from inside to outside at knee height)
+func _probe_edges() -> void:
+	await get_tree().physics_frame
+	var sp := Game.main.get_world_3d().direct_space_state
+	var c := arena.get_center()
+	for side in ["n", "s", "w", "e"]:
+		var hits := 0; var tot := 0; var gaps: Array = []
+		for i in 21:
+			var u := lerpf(-0.95, 0.95, i / 20.0)
+			var a: Vector3; var b: Vector3
+			match side:
+				"n": a = Vector3(c.x + u * arena.size.x * 0.5, 0.5, arena.position.y + 1.5); b = a + Vector3(0, 0, -3)
+				"s": a = Vector3(c.x + u * arena.size.x * 0.5, 0.5, arena.end.y - 1.5); b = a + Vector3(0, 0, 3)
+				"w": a = Vector3(arena.position.x + 1.5, 0.5, c.y + u * arena.size.y * 0.5); b = a + Vector3(-3, 0, 0)
+				"e": a = Vector3(arena.end.x - 1.5, 0.5, c.y + u * arena.size.y * 0.5); b = a + Vector3(3, 0, 0)
+			var q := PhysicsRayQueryParameters3D.create(a, b); q.collision_mask = 1
+			tot += 1
+			var h := sp.intersect_ray(q)
+			if h.is_empty(): gaps.append(snappedf(a.x if side in ["n", "s"] else a.z, 0.1))
+			else: hits += 1
+			# floor beyond?
+		print("[enemy-test] edge %s walled %d/%d open at %s" % [side, hits, tot, gaps])
