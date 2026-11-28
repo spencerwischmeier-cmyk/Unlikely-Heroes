@@ -142,6 +142,7 @@ func _ready() -> void:
 	body.add_child(hero)
 	_shadows(hero)
 	_fur(hero)
+	_near_fade(hero)
 	skel = hero.find_child("Skeleton3D", true, false)
 	anim = hero.find_child("AnimationPlayer", true, false)
 	anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
@@ -178,6 +179,24 @@ func _fur(n: Node) -> void:
 				f.subsurf_scatter_enabled = true; f.subsurf_scatter_strength = 0.12
 				f.roughness = maxf(f.roughness, 0.55)
 				mi.set_surface_override_material(i, f)
+
+## When a wall pushes the camera right up behind Vesk, he dithers out instead of filling the screen
+## (pixel dither stays opaque, so it is cheap on every renderer). `--no-near-fade` to compare.
+func _near_fade(n: Node) -> void:
+	if OS.get_cmdline_user_args().has("--no-near-fade"): return
+	for mi: MeshInstance3D in n.find_children("*", "MeshInstance3D", true, false):
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_surface_override_material(i)
+			if m == null:
+				var am := mi.get_active_material(i)
+				if not (am is StandardMaterial3D): continue
+				m = (am as StandardMaterial3D).duplicate()
+				mi.set_surface_override_material(i, m)
+			if m is StandardMaterial3D:
+				var sm := m as StandardMaterial3D
+				sm.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_DITHER
+				sm.distance_fade_min_distance = 0.45
+				sm.distance_fade_max_distance = 1.15
 
 func _shadows(n: Node) -> void:
 	if n is GeometryInstance3D: (n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
