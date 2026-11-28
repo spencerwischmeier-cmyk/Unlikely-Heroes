@@ -409,9 +409,14 @@ func _hit(t: Node, dmg: float, point: Vector3, dir: Vector3, wpn: String) -> boo
 	var was_bot: bool = t.is_in_group("bots") or t.is_in_group("boss")
 	var kill: bool = t.damage(dmg, point, dir)
 	hit_marker.emit(kill)
-	if not t.is_in_group("crate") and not t.is_in_group("switches"): damage_number(point, dmg, kill)
+	if not t.is_in_group("crate") and not t.is_in_group("switches") and not _no_number(t): damage_number(point, dmg, kill)
 	if kill and was_bot: _add_xp(wpn, 10 if t.is_in_group("boss") else 1)
 	return kill
+
+## A bot that just shrugged a hit off (armour glance or crack) shows its own word instead of a number.
+func _no_number(t: Node) -> bool:
+	var f = t.get("no_number_frame")
+	return f != null and int(f) == Engine.get_physics_frames()
 
 func _target_of(col: Object) -> Node:
 	if not (col is Node): return null
@@ -483,7 +488,7 @@ func slam_wave(origin: Vector3) -> bool:
 		var out := d / l if l > 0.1 else Vector3.FORWARD
 		var dmg := 2.0 if t.is_in_group("boss") else lerpf(3.0, 2.0, l / SLAM_R)
 		t.damage(dmg, c, out)
-		damage_number(c, dmg, t.dead)
+		if not _no_number(t): damage_number(c, dmg, t.dead)
 		any = true
 	FX.ring(origin + Vector3(0, 0.1, 0), Color(1, 0.8, 0.4), 1.1)
 	FX.puff(origin + Vector3(0, 0.2, 0), Color(0.8, 0.75, 0.65))
@@ -585,6 +590,7 @@ func _close_call() -> void:
 
 func hurt_player(n: int, from = null, force := false) -> void:
 	if (invuln > 0.0 and not force) or hull <= 0: return
+	if Engine.has_meta("et_log"): print("[hurt-src] ", get_stack().slice(1, 3).map(func(f): return "%s:%d" % [f.function, f.line]))
 	hull -= n; invuln = 0.9; Snd.play("hurt", -2); Game.player_hurt.emit(hull)
 	if from is Vector3: Game.player_hit_from.emit(from)
 	if hull <= 2: Snd.bark("dodger", "low", 0.6)

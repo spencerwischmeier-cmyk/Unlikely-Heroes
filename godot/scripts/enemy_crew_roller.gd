@@ -94,7 +94,10 @@ func center() -> Vector3:
 
 ## Wind up and fire a rivet at Vesk (called by the crew).
 func fire() -> void:
-	if shoot_t < 0.0 and not dead and combat.claim_aim(self, WIND + 0.1): shoot_t = WIND
+	if shoot_t < 0.0 and not dead and combat.claim_aim(self, WIND + 0.1):
+		shoot_t = WIND
+		# the riveter cocks: an audible cue to dodge (audio_space.gd plays enemy_windup_rivet when it exists)
+		if not no_tells and not Snd.has_sound("enemy_windup_rivet"): Snd.at("hook_lock", center(), -9, 0.1, 0.05)
 
 func _physics_process(dt: float) -> void:
 	if dead: return
@@ -165,6 +168,14 @@ func _chat(dt: float) -> void:
 	chat_dir = best.global_position - global_position; chat_dir.y = 0
 	chat_t = 1.1; pop = 0.25
 	Snd.at("chars_crew_grumble", center(), -14, 0.15, 0.2)
+
+func can_startle() -> bool:
+	return shoot_t < 0.0 and build_t <= 0.0
+
+func _startle(away: Vector3, k: float) -> void:
+	super._startle(away, k)
+	chat_t = 0.0
+	Snd.at("chars_crew_grumble", center(), -8, 0.2, 0.2)
 
 func _shoot() -> void:
 	var muzzle: Node3D = model.find_child("crew_muzzle", true, false)

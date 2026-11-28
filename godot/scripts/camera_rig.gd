@@ -17,6 +17,7 @@ var aim_assist := true            # controller only: the view slows over a bot a
 var shake_t := 0.0                # runs the smooth shake noise
 var lead := Vector3.ZERO          # the framing drifts a little ahead of a run so you see where you're going
 var dip := 0.0                    # camera dips on hard landings
+var recenter := not OS.get_cmdline_user_args().has("--no-cam-recenter")   # non-controller run recentering
 
 var pitch_node := Node3D.new()
 var arm := SpringArm3D.new()
@@ -138,6 +139,12 @@ func update(dt: float, p) -> void:
 	var hv := Vector2(p.velocity.x, p.velocity.z)
 	if p.using_pad and look_idle > 0.7 and p.aim_hold <= 0.0 and not p.riding and hv.length() > 3.0:
 		yaw += angle_difference(yaw, atan2(hv.x, hv.y)) * (1.0 - exp(-0.9 * dt)) * minf(1.0, (hv.length() - 3.0) / 4.0)
+	# mouse / keyboard / touch: once the view has been left alone for a moment, drift in behind a run
+	# (gentler, and never swings round when he runs back toward the camera)
+	elif recenter and not p.using_pad and look_idle > 1.4 and p.aim_hold <= 0.0 and not p.riding and p.grounded and hv.length() > 4.0:
+		var dd := angle_difference(yaw, atan2(hv.x, hv.y))
+		if absf(dd) < 2.0:
+			yaw += dd * (1.0 - exp(-0.55 * dt)) * minf(1.0, (look_idle - 1.4) / 1.0) * minf(1.0, (hv.length() - 4.0) / 4.0)
 	pitch = clampf(pitch, -0.7, 0.55)
 
 	shoulder = lerpf(shoulder, 0.95 if p.aim_hold > 0.0 else 0.55, 1.0 - exp(-5.0 * dt))

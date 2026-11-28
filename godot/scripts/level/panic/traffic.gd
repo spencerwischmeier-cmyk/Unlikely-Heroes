@@ -272,15 +272,25 @@ func _lane_xf(c: Dictionary) -> Transform3D:
 	b = b * Basis(Vector3.FORWARD, clampf(turn * 1.6, -0.6, 0.6))
 	return Transform3D(b, p)
 
+var _no_lod := OS.get_cmdline_user_args().has("--no-traffic-lod")
+var _frame := 0
 func _cars(dt: float, pp: Vector3) -> void:
 	var base: Transform3D = get_meta("car_base")
 	var near_d := 1e9
+	_frame += 1
 	for i in cars.size():
 		var c: Dictionary = cars[i]
 		var xf: Transform3D
 		match c.mode:
 			"lane":
 				c.d += c.speed * dt
+				# far cars are a few pixels: recompute their pose every 2nd (>180 m) or 3rd (>350 m) frame,
+				# staggered by car, and keep last frame's pose in the buffer in between (`--no-traffic-lod`)
+				if not _no_lod:
+					var fd: float = (c.pos as Vector3).distance_squared_to(pp)
+					var every := 3 if fd > 122500.0 else (2 if fd > 32400.0 else 1)
+					if every > 1 and (_frame + i) % every != 0:
+						continue
 				xf = _lane_xf(c)
 				c.pos = xf.origin
 				c.vel = -xf.basis.z * absf(c.speed)

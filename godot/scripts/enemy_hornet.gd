@@ -3,6 +3,8 @@ extends "res://scripts/enemy.gd"
 ##   Telegraph   it buzzes, its eye charges up and a thin red aim line points at Vesk; the line freezes
 ##               for the last moment before the shot, so a sidestep or a jump dodges it
 ##   Hit         it is batted off course and wobbles; a hit while charging staggers it and delays the shot
+##   Hurt        badly hurt (half health) it breaks off: drops its aim, peels away to a wide, high strafe
+##               for a moment, smoking, then comes back (`--no-bot-react` turns it and flinches off)
 ##   Death       it spins down trailing smoke and bursts when it hits the ground (or after a moment)
 
 const AIM_T := 0.95       # how long the aim line shows before the shot
@@ -30,6 +32,8 @@ var orbit_dir := 1.0      # circles one way, then sometimes turns round
 var orbit_spd := 0.35
 var dart_t := 0.0         # after a shot it darts sideways to a new spot
 var turn_t := 4.0
+var retreat_t := 0.0      # peeling away after a bad hit
+var retreated := false
 
 func _ready() -> void:
 	hp = 4.0; max_hp = 4.0; nuts = 8
@@ -70,6 +74,24 @@ func knock(v: Vector3) -> void:
 	stun = maxf(stun, stagger_time)
 	if aiming: fire_t = maxf(fire_t, LOCK_T + 0.35)   # a hit while charging delays the shot
 
+func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
+	var killed := super.damage(amount, point, dir)
+	if not killed and not dead and not retreated and not _no_react and hp <= max_hp * 0.5:
+		retreated = true; retreat_t = 1.8
+		if aiming and combat: (combat.aimers as Dictionary).erase(get_instance_id())   # give the shot turn back
+		aiming = false; aim_line.visible = false; remove_meta("lock_click")
+		fire_t = AIM_T + retreat_t + randf_range(0.3, 0.8)
+		orbit_dir = -orbit_dir; wobble = 1.0
+		Snd.at("hornet_buzz", global_position, -2, 0.2, 0.0)
+	return killed
+
+func can_startle() -> bool:
+	return not aiming and spawn_t <= 0.0
+
+func _startle(away: Vector3, k: float) -> void:
+	velocity += away * (3.0 + k * 3.0) + Vector3(0, 2.5 + k * 2.0, 0)
+	wobble = 1.0; pop = maxf(pop, 0.5); stun = maxf(stun, 0.25)
+
 func _physics_process(dt: float) -> void:
 	if dead:
 		if fall_t > 0.0: _fall(dt)
@@ -87,8 +109,11 @@ func _physics_process(dt: float) -> void:
 		if randf() < 0.45: orbit_dir = -orbit_dir
 		orbit_r = clampf(orbit_r + randf_range(-2.5, 2.5), 7.0, 13.0); height = clampf(height + randf_range(-1.0, 1.0), 2.8, 6.0)
 	dart_t = maxf(0.0, dart_t - dt)
-	orbit_a += dt * orbit_spd * orbit_dir * (1.0 + dart_t * 5.0)
-	var want := Vector3(hp_.x + cos(orbit_a) * orbit_r, hp_.y + height + sin(t * 1.3) * 0.5, hp_.z + sin(orbit_a) * orbit_r)
+	retreat_t = maxf(0.0, retreat_t - dt)
+	var rk := minf(1.0, retreat_t / 0.6)    # eases back in over the last moment
+	orbit_a += dt * orbit_spd * orbit_dir * (1.0 + dart_t * 5.0 + rk * 1.6)
+	var rr := orbit_r + rk * 6.0
+	var want := Vector3(hp_.x + cos(orbit_a) * rr, hp_.y + height + rk * 2.5 + sin(t * 1.3) * 0.5, hp_.z + sin(orbit_a) * rr)
 	var steer := (want - global_position) * (3.0 if spawn_t > 0.0 else 1.4)
 	var away := global_position - hero_c
 	if away.length() < 6.0: steer += away.normalized() * (6.0 - away.length()) * 4.0
@@ -113,6 +138,9 @@ func _physics_process(dt: float) -> void:
 		if not aiming:
 			aiming = true; Snd.at("hornet_buzz", global_position, -3, 0.0, 0.0)
 		if fire_t > LOCK_T: aim_at = hero_c + player.velocity * 0.15
+		elif not has_meta("lock_click"):
+			set_meta("lock_click", true)   # the aim freezes: a click says "move now"
+			if not no_tells: Snd.at("hook_lock", global_position, -6, 0.05, 0.05)
 		var charge := 1.0 - fire_t / AIM_T
 		eye_light.light_energy = 0.5 + charge * 7.0
 		for e in eyes: (e.mat as StandardMaterial3D).emission_energy_multiplier = 5.0 + charge * 16.0
@@ -125,7 +153,7 @@ func _physics_process(dt: float) -> void:
 		for e in eyes: (e.mat as StandardMaterial3D).emission_energy_multiplier = 5.0
 	if spawn_t > -0.1: _arrive()
 	if fire_t <= 0.0:
-		aiming = false; aim_line.visible = false
+		aiming = false; aim_line.visible = false; remove_meta("lock_click")
 		fire_t = randf_range(2.4, 3.6)
 		var from := global_position + (aim_at - global_position).normalized() * 0.9
 		combat.enemy_shot(from, aim_at)

@@ -23,8 +23,12 @@ static func line_text(id: String) -> String:
 	var d = JSON.parse_string(FileAccess.get_file_as_string("res://audio/voice/panic_lines.json")) if FileAccess.file_exists("res://audio/voice/panic_lines.json") else null
 	return d.get(id, "") if d is Dictionary else ""
 const TINTS := [Color(1, 1, 1), Color(1.0, 0.92, 0.86), Color(0.88, 0.95, 1.0), Color(0.95, 1.0, 0.9), Color(1.0, 0.95, 1.0)]
-const ACTIVE_D := 70.0
-const SHOW_D := 105.0
+const ACTIVE_D_PC := 70.0
+const SHOW_D_PC := 105.0
+## browsers and phones animate and show people over a shorter distance (Device.reach(); `--no-lite-extra` keeps the PC distances)
+static var _lite_k: float = 1.0 if OS.get_cmdline_user_args().has("--no-lite-extra") else Device.reach()
+static var ACTIVE_D: float = ACTIVE_D_PC * _lite_k
+static var SHOW_D: float = SHOW_D_PC * _lite_k
 const CELL := 1.0
 const SCAN_PER_FRAME := 6000
 
@@ -340,8 +344,9 @@ func _process(dt: float) -> void:
 
 ## Level of detail for people: past SHADOW_D they stop casting shadows, past NEAR_D their animation
 ## updates every other frame (staggered, with the time saved up so they don't slow down).
-const NEAR_D := 24.0
-const SHADOW_D := 36.0
+static var NEAR_D: float = 24.0 * _lite_k
+## phones: people cast no shadows at all (the sun's shadow map is the costliest pass there)
+static var SHADOW_D: float = 0.0 if (Device.phone() and _lite_k < 1.0) else 36.0 * _lite_k
 func _lod(p: Dictionary, d: float, dt: float) -> void:
 	var shad := d < SHADOW_D
 	if shad != p.shad:

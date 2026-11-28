@@ -12,7 +12,7 @@ extends Node
 ##
 ## Zone dictionary keys (all optional except id/rect):
 ##   id, name, rect (Rect2 on XZ), y (floor height, default 0), objective (shown while heading there),
-##   enter_lines / clear_lines (voice ids), waves (Array of {roller:int, hornet:int}),
+##   enter_lines / clear_lines (voice ids), waves (Array of {roller:int, plated:int, hornet:int, crew:int}),
 ##   unlock_rails (Array of rail indexes), open_gates (Array of gate ids, calls level.open_gate),
 ##   power (Array of mover ids, calls level.power), grants (Array of item ids, Game.unlock),
 ##   relay_pos (Vector3), boss_pos (Vector3),
@@ -42,6 +42,7 @@ var wave_delay := 0.0
 var wave_age := 0.0
 var wave_size := 0
 var no_overlap := OS.get_cmdline_user_args().has("--no-wave-overlap")
+var no_pacing := OS.get_cmdline_user_args().has("--no-wave-pacing")
 var boss: Node3D
 var relay: Node3D
 var switches: Array = []
@@ -127,9 +128,11 @@ func _physics_process(dt: float) -> void:
 		wave_delay -= dt
 		if wave_delay > 0.0: return
 		if wave < waves.size():
-			_spawn_wave(z, waves[wave]); wave += 1; wave_delay = 1.2; wave_age = 0.0
+			_spawn_wave(z, waves[wave]); wave += 1; wave_age = 0.0
 			var w: Dictionary = waves[wave - 1]
-			wave_size = int(w.get("roller", 0)) + int(w.get("hornet", 0)) + int(w.get("crew", 0)) * 3
+			wave_size = int(w.get("roller", 0)) + int(w.get("plated", 0)) + int(w.get("hornet", 0)) + int(w.get("crew", 0)) * 3
+			# pacing: a big wave earns a longer breather before the next one (a small one keeps the pressure on)
+			wave_delay = 1.2 if no_pacing else clampf(0.7 + 0.3 * wave_size, 0.9, 2.4)
 		elif alive.is_empty():
 			_clear(z)
 
@@ -218,7 +221,7 @@ func _switched(z: Dictionary, sw: Node3D) -> void:
 func _spawn_in(r: Rect2, y: float, w: Dictionary) -> void:
 	var n := 0
 	var base := randf() * TAU
-	for kind in ["roller", "hornet", "crew"]:
+	for kind in ["roller", "plated", "hornet", "crew"]:
 		for i in int(w.get(kind, 0)):
 			alive.append(Game.main.spawn_bot(kind, _spawn_spot(r, y, base + TAU * float(n) / 5.0), r)); n += 1
 
@@ -255,6 +258,10 @@ func _floor_at(p: Vector3) -> bool:
 func _spawn_wave(z: Dictionary, w: Dictionary) -> void:
 	_spawn_in(z.rect, z.get("y", 0.0), w)
 	if wave == 0 and randf() < 0.6: Snd.bark("dodger", "spawn")
+	# a long fight calls its last wave, so the player knows the end is in sight
+	var n: int = z.get("waves", []).size()
+	if not no_pacing and n >= 3 and wave == n - 1 and Game.hud and Game.hud.has_method("toast_small"):
+		Game.hud.toast_small("FINAL WAVE", Color(1, 0.7, 0.35))
 
 ## Unlocks, gates, power and grants of a zone (also applied when a zone is skipped).
 func _apply_effects(z: Dictionary, quiet := false) -> void:
