@@ -146,6 +146,11 @@ static func _sign(L, text: String, pos: Vector3, yaw: float) -> void:
 
 ## a mast for an overhead cable: a pole beside the path with an arm reaching over it
 static func _cable_mast(L, foot: Vector3, top_y: float, arm_to: Vector3) -> void:
+	if RL.sky_on():
+		# the look pass draws an iron lattice pylon with a lantern head and an arm to the cable instead
+		TKsolid(L, foot + Vector3(0, top_y / 2, 0), Vector3(0.5, top_y, 0.5))
+		RL.masts.append([foot, top_y, arm_to])
+		return
 	L.cyl(foot + Vector3(0, top_y / 2, 0), 0.14, 0.2, top_y, steel, 10, true)
 	L.box(foot + Vector3(0, 0.15, 0), Vector3(0.8, 0.3, 0.8), L.mat_dark)
 	var top := foot + Vector3(0, top_y, 0)
@@ -477,14 +482,15 @@ static func _cableway(L, rng: RandomNumberGenerator) -> void:
 	L.hook(Vector3(-44, 15.3, -40)); L.hook(Vector3(-34, 15.3, -40))
 	var st := Rect2(-31, -44, 8, 8)
 	L.island("mast_cable_station", st, 6.6, Color(0.86, 0.86, 0.9), 0.8)
-	_fence(L, "iron", st, 6.6, [["w", -42, -38], ["e", -42, -39]], "nsew")
+	_fence(L, "station" if RL.sky_on() else "iron", st, 6.6, [["w", -42, -38], ["e", -42, -39]], "nsew")
 	L.checkpoints.append({ pos = Vector3(-27, 6.7, -40), r = 2.4 })
 	L.label("CABLEWAY", Vector3(-27, 6.6, -42.5), 2.4, Color(1, 0.85, 0.6))
 	# the station's A-frame and the haul rope beside the grind cable
-	for s in [-1, 1]: YK.beam(L, Vector3(-24.5, 6.6, -40 + s * 3.0), Vector3(-24.5, 12.0, -40), 0.25, "yellow")
-	L.box(Vector3(-24.5, 12.1, -40), Vector3(0.8, 0.5, 4.0), L.mat_dark, false)
+	if not RL.sky_on():   # the look pass puts a bullwheel tower here (routes_look._cableway)
+		for s in [-1, 1]: YK.beam(L, Vector3(-24.5, 6.6, -40 + s * 3.0), Vector3(-24.5, 12.0, -40), 0.25, "yellow")
+		L.box(Vector3(-24.5, 12.1, -40), Vector3(0.8, 0.5, 4.0), L.mat_dark, false)
 	var cable := [Vector3(-23.4, 7.05, -40.5), Vector3(-15, 6.0, -43.0), Vector3(-6, 5.5, -47.0), Vector3(1.0, 6.0, -50.5), Vector3(5.6, 7.2, -53.0)]
-	_rail(L, cable, false, false)
+	L.set_meta("rail_cableway", _rail(L, cable, false, false))
 	# the stalled car on the haul rope, swinging a little; a suitcase dangling from its door
 	var haul_a := Vector3(-24.5, 11.5, -42.0); var haul_b := Vector3(4.5, 11.0, -55.0)
 	YK.beam(L, haul_a, haul_b, 0.06, "dark")
@@ -494,11 +500,12 @@ static func _cableway(L, rng: RandomNumberGenerator) -> void:
 	# the mast end: a terminal deck west of the catch ledge
 	var tm := Rect2(0, -57, 6, 7)
 	L.island("mast_terminal", tm, 6.6, Color(0.82, 0.84, 0.88), 0.8)
-	_fence(L, "iron", tm, 6.6, [["w", -54, -50], ["e", -57, -50]], "nsw")
-	for s in [-1, 1]: YK.beam(L, Vector3(3.0, 6.6, -53.5 + s * 3.0), Vector3(3.0, 11.6, -53.5), 0.25, "yellow")
+	_fence(L, "station" if RL.sky_on() else "iron", tm, 6.6, [["w", -54, -50], ["e", -57, -50]], "nsw")
+	if not RL.sky_on():
+		for s in [-1, 1]: YK.beam(L, Vector3(3.0, 6.6, -53.5 + s * 3.0), Vector3(3.0, 11.6, -53.5), 0.25, "yellow")
 	C.luggage(Vector3(-27, 6.6, -38.5), 1.6, 5, rng)
 	C.prop("luggage_cart", Vector3(-29, 6.6, -42), 0.5, 1.0, Vector2.ZERO, true)
-	C.broken_sign("CABLEWAY CLOSED", Vector3(-24.6, 10.2, -40), PI / 2, Color(1.0, 0.45, 0.3), 0.2, 0.01)
+	C.broken_sign("CABLEWAY CLOSED", Vector3(-24.6, 9.5 if RL.sky_on() else 10.2, -40), PI / 2, Color(1.0, 0.45, 0.3), 0.2, 0.01)
 	_sign(L, "CABLE LINE TO THE SIGNAL MAST", Vector3(-30.2, 6.6, -36.6), PI)
 	C.flush()
 
@@ -509,9 +516,10 @@ static func _balloon_line(L, rng: RandomNumberGenerator) -> void:
 	var bg := Rect2(54, -40, 8, 12)
 	L.islands["pier_barge"] = bg; L.heights["pier_barge"] = 3.0
 	L.box(Vector3(58, 2.7, -34), Vector3(8, 0.6, 12), M.worn("deck", Color(0.85, 0.8, 0.72), 0.14, 0.45, 0.6, 0.55))
-	L.box(Vector3(58, 1.9, -34), Vector3(7.2, 1.0, 11.2), M.paint(Color(0.2, 0.5, 0.82)), false)
-	L.box(Vector3(58, 1.35, -34), Vector3(6.4, 0.2, 10.4), L.glow_cyan, false)
-	_fence(L, "iron", bg, 3.0, [["e", -38, -33], ["w", -36, -32]], "nsew")
+	if not RL.sky_on():   # the look pass hangs a painted airship hull and a gas envelope on it instead
+		L.box(Vector3(58, 1.9, -34), Vector3(7.2, 1.0, 11.2), M.paint(Color(0.2, 0.5, 0.82)), false)
+		L.box(Vector3(58, 1.35, -34), Vector3(6.4, 0.2, 10.4), L.glow_cyan, false)
+	_fence(L, "station" if RL.sky_on() else "iron", bg, 3.0, [["e", -38, -33], ["w", -36, -32]], "nsew")
 	L.checkpoints.append({ pos = Vector3(58, 3.1, -34), r = 2.4 })
 	L.label("BALLOON BARGE", Vector3(58, 3.0, -31), 2.0, Color(0.75, 0.98, 1))
 	for p in [Vector3(55.5, 3.0, -38.5), Vector3(60.5, 3.0, -29.5)]:
@@ -531,7 +539,8 @@ static func _balloon_line(L, rng: RandomNumberGenerator) -> void:
 # ------------------------------------------------------------------ the dish rail down to the Crane Yard
 static func _dish_rail(L) -> void:
 	L.R_YARD = _rail(L, [Vector3(20, 20.45, -50.6), Vector3(19, 19.4, -55), Vector3(16.5, 16.6, -62), Vector3(12.5, 12.6, -71),
-		Vector3(7.5, 8.2, -81), Vector3(4.0, 4.4, -90), Vector3(1.8, 1.8, -97.5), Vector3(1.0, 1.0, -101.5)], true)
+		Vector3(7.5, 8.2, -81), Vector3(4.0, 4.4, -90), Vector3(1.8, 1.8, -97.5), Vector3(1.0, 1.0, -101.5)], true, not RL.sky_on())
+	# (with the look pass, routes_look._dish_rail stands the rail on lattice pylons instead of plain poles)
 
 # ------------------------------------------------------------------ traversal cases (final coordinates)
 static func traversal_cases(moves: Dictionary) -> Dictionary:

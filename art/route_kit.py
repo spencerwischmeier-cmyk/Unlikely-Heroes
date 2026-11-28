@@ -514,28 +514,267 @@ def flood_mast():
 
 
 def cable_pylon():
-    """an iron lattice pylon for the overhead cables (the viaduct's cable masts and the dish rail): four
-    corner legs tapering up, X bracing, an arm along +X, a lamp and a brass finial"""
-    p = Prop('rt_cable_pylon'); ir = K('metal', IRON_LT); br = K('brass')
+    """an iron lattice pylon (lattice only, so it can be stretched): four corner legs tapering from 0.84 m to
+    0.36 m over 8 m, X bracing in six panels, a stone footing and a cap plate. The game scales it (height to the
+    cable, width for the tall ones dropping into the clouds) and puts rt_pylon_head / rt_pylon_arm on top."""
+    p = Prop('rt_cable_pylon'); ir = K('metal', IRON_LT); dk = K('metal', IRON)
     h = 8.0; b0, b1 = 0.42, 0.18
     box(p, (1.1, 0.35, 1.1), S(STONE_LT), (0, 0.17, 0), b=0.05)
     for cx in (-1, 1):
         for cz in (-1, 1):
-            rod(p, (cx * b0, 0.3, cz * b0), (cx * b1, h, cz * b1), 0.045, ir)
+            rod(p, (cx * b0, 0.3, cz * b0), (cx * b1, h, cz * b1), 0.05, ir)
+    sq = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
     for k in range(6):
         y0 = 0.3 + k * (h - 0.3) / 6; y1 = y0 + (h - 0.3) / 6
         w0 = b0 + (b1 - b0) * (y0 / h); w1 = b0 + (b1 - b0) * (y1 / h)
         for side in range(4):
-            a = [(-1, -1), (1, -1), (1, 1), (-1, 1)][side]; b_ = [(-1, -1), (1, -1), (1, 1), (-1, 1)][(side + 1) % 4]
-            rod(p, (a[0] * w0, y0, a[1] * w0), (b_[0] * w1, y1, b_[1] * w1), 0.02, ir)
-    box(p, (0.5, 0.2, 0.5), ir, (0, h, 0), b=0.03)
-    sph(p, 0.12, br, (0, h + 0.2, 0), seg=10, rings=6)
+            a = sq[side]; b_ = sq[(side + 1) % 4]
+            rod(p, (a[0] * w0, y0, a[1] * w0), (b_[0] * w1, y1, b_[1] * w1), 0.022, ir)
+            rod(p, (b_[0] * w0, y0, b_[1] * w0), (a[0] * w1, y1, a[1] * w1), 0.022, ir)
+            rod(p, (a[0] * w1, y1, a[1] * w1), (b_[0] * w1, y1, b_[1] * w1), 0.03, dk)
+    box(p, (0.5, 0.14, 0.5), dk, (0, h, 0), b=0.02)
+    p.finish()
+
+
+def pylon_head():
+    """the unscaled top of a pylon: a teal crown with brass bands, a glass lantern, a brass finial and a little
+    pennant (origin at the pylon's cap)"""
+    p = Prop('rt_pylon_head'); ir = K('metal', IRON); br = K('brass')
+    box(p, (0.62, 0.12, 0.62), K('paint', TEAL), (0, 0.06, 0), b=0.02)
+    for cx in (-1, 1):
+        for cz in (-1, 1):
+            rod(p, (cx * 0.22, 0.1, cz * 0.22), (cx * 0.12, 0.95, cz * 0.12), 0.025, ir)
+    cyl(p, 0.2, 0.08, br, (0, 0.14, 0), seg=10, b=0)
+    cyl(p, 0.16, 0.5, K('glass', GLASS), (0, 0.48, 0), seg=8, b=0)
+    sph(p, 0.1, K('glow', AMBER), (0, 0.48, 0), seg=10, rings=6)
+    cyl(p, 0.22, 0.14, K('paint', TEAL), (0, 0.8, 0), r2=0.05, seg=8, b=0.01)
+    tor(p, 0.17, 0.02, br, (0, 0.74, 0), RX, seg=12, tube=4)
+    rod(p, (0, 0.9, 0), (0, 1.75, 0), 0.02, br)
+    sph(p, 0.06, br, (0, 1.78, 0), seg=8, rings=6)
+    # a swallow-tail pennant on the finial
+    box(p, (0.6, 0.22, 0.015), K('cloth', SAFFRON), (0.32, 1.55, 0), rot=(0, 0, -0.08), b=0, seg=1)
+    box(p, (0.2, 0.09, 0.016), K('cloth', CRIMSON), (0.66, 1.6, 0), rot=(0, 0, 0.3), b=0, seg=1)
+    box(p, (0.2, 0.09, 0.016), K('cloth', CRIMSON), (0.66, 1.48, 0), rot=(0, 0, -0.4), b=0, seg=1)
+    p.mark('light_0', (0, 0.48, 0))
+    p.finish()
+
+
+def pylon_arm():
+    """a lattice arm along +X from 0 to 1 m (the game stretches it along X to reach the cable): a top chord, a
+    lower chord meeting it at the end, zigzag web, and a cable saddle with a sheave at x 1"""
+    p = Prop('rt_pylon_arm'); ir = K('metal', IRON_LT); br = K('brass')
+    for z in (-0.12, 0.12):
+        rod(p, (0, 0, z), (1.0, 0, z), 0.035, ir)
+        rod(p, (0, -0.55, z), (1.0, -0.12, z), 0.03, ir)
+        for k in range(6):
+            x0 = k / 6; x1 = (k + 1) / 6
+            y0 = -0.55 + 0.43 * x0; y1 = -0.55 + 0.43 * x1
+            if k % 2 == 0: rod(p, (x0, y0, z), (x1, 0, z), 0.014, ir)
+            else: rod(p, (x0, 0, z), (x1, y1, z), 0.014, ir)
+    box(p, (0.06, 0.16, 0.34), K('metal', IRON), (1.0, -0.05, 0), b=0)
+    cyl(p, 0.14, 0.06, br, (1.0, -0.22, 0), RX, seg=12, b=0)
+    p.finish()
+
+
+def cable_tower():
+    """The bullwheel tower at each end of the Skyline Cableway, straddling the station deck (legs at z +-3, the
+    cable leaves along +X): teal lattice legs on stone plinths, a cream machine house on a girder, the bullwheel
+    turning flat on the +X side with sheaves, brass trim, lanterns on the corners, a board for the line's name."""
+    p = Prop('rt_cable_tower'); tl = K('paint', TEAL); br = K('brass'); ir = K('metal', IRON)
+    for sz in (-1, 1):
+        z = sz * 3.0
+        box(p, (0.9, 0.36, 0.9), S(STONE_LT), (0, 0.18, z), b=0.05)
+        for cx in (-0.25, 0.25):
+            rod(p, (cx, 0.36, z - 0.25), (cx * 0.6, 4.9, z * 0.92 - 0.15), 0.05, tl)
+            rod(p, (cx, 0.36, z + 0.25), (cx * 0.6, 4.9, z * 0.92 + 0.15), 0.05, tl)
+        for k in range(5):
+            y0 = 0.4 + k * 0.9
+            rod(p, (-0.22, y0, z - 0.22), (0.2, y0 + 0.9, z + 0.2), 0.02, ir)
+            rod(p, (0.22, y0, z - 0.22), (-0.2, y0 + 0.9, z + 0.2), 0.02, ir)
+        tor(p, 0.3, 0.035, br, (0, 1.2, z), RX, seg=12, tube=4)
+    # cross girder and the machine house
+    box(p, (0.6, 0.45, 7.2), ir, (0, 4.95, 0), b=0.03)
+    box(p, (0.3, 0.25, 6.2), tl, (0, 3.9, 0), b=0.02)
+    box(p, (2.2, 1.5, 2.6), K('paint', CREAM), (-0.3, 5.95, 0), b=0.05)
+    for sz in (-1, 1):
+        box(p, (0.04, 0.5, 0.5), K('glow', AMBER), (-1.42, 6.0, sz * 0.7), b=0, seg=1)
+        box(p, (0.06, 0.62, 0.62), br, (-1.4, 6.0, sz * 0.7), b=0.01, seg=1)
+    # roof with a ridge and brass finials
+    for sx in (-1, 1):
+        box(p, (1.5, 0.1, 3.0), tl, (-0.3 + sx * 0.6, 6.95, 0), rot=(0, 0, -sx * 0.4), b=0.02)
+    cyl(p, 0.07, 3.0, br, (-0.3, 7.25, 0), RX, seg=8, b=0)
+    for sz in (-1, 1): sph(p, 0.12, br, (-0.3, 7.25, sz * 1.5), seg=10, rings=6)
+    # the bullwheel: a big flat wheel with spokes on the +X side
+    cyl(p, 0.18, 1.2, ir, (1.1, 5.2, 0), seg=10, b=0)
+    tor(p, 1.25, 0.09, ir, (1.1, 5.25, 0), RX, seg=28, tube=6)
+    tor(p, 1.12, 0.04, K('paint', CRIMSON), (1.1, 5.25, 0), RX, seg=28, tube=5)
+    for k in range(8):
+        a = TAU * k / 8
+        rod(p, (1.1, 5.25, 0), (1.1 + math.cos(a) * 1.15, 5.25, math.sin(a) * 1.15), 0.03, ir)
+    cyl(p, 0.22, 0.2, br, (1.1, 5.85, 0), seg=10, b=0.01)
+    # sheave wheels on the cable side
+    for sz in (-1, 1):
+        cyl(p, 0.22, 0.06, ir, (2.3, 5.0, sz * 1.15), RX, seg=12, b=0)
+    # name board (Label3D in the game) hanging under the girder, facing +X and -X
+    box(p, (0.14, 0.7, 3.2), K('paint', 0x1e3a3a), (0, 4.35, 0), b=0.03)
+    for sx in (-1, 1): box(p, (0.03, 0.62, 3.1), br, (sx * 0.085, 4.35, 0), b=0.0, seg=1)
+    p.mark('sign', (0.1, 4.35, 0))
+    # corner lanterns
+    for sz in (-1, 1):
+        rod(p, (0, 5.2, sz * 3.6), (0, 4.6, sz * 3.6), 0.015, ir)
+        sph(p, 0.22, K('glow', 0xffb060), (0, 4.4, sz * 3.6), (1, 1.2, 1), seg=10, rings=6)
+        p.mark('light_%d' % (0 if sz < 0 else 1), (0, 4.4, sz * 3.6))
+    p.finish()
+
+
+def garden_lamp():
+    """a garden-style lamp post for the stations and the barge: a slim teal post on a stone foot, a crook with a
+    glass globe, a hanging flower basket"""
+    p = Prop('rt_garden_lamp'); tl = K('paint', TEAL); br = K('brass')
+    box(p, (0.42, 0.24, 0.42), S(STONE_LT), (0, 0.12, 0), b=0.04)
+    cyl(p, 0.09, 3.2, tl, (0, 1.84, 0), r2=0.06, seg=10, b=0)
+    for y in (0.5, 1.6): tor(p, 0.09, 0.025, br, (0, y, 0), RX, seg=12, tube=4)
+    tor(p, 0.28, 0.035, tl, (0.28, 3.44, 0), (0, 0, 0), seg=14, tube=5, arc=math.pi)
+    rod(p, (0.56, 3.44, 0), (0.56, 3.25, 0), 0.02, tl)
+    cyl(p, 0.14, 0.08, br, (0.56, 3.22, 0), seg=10, b=0)
+    sph(p, 0.2, K('glass', GLASS), (0.56, 2.98, 0), seg=12, rings=8)
+    sph(p, 0.1, K('glow', AMBER), (0.56, 2.98, 0), seg=10, rings=6)
+    p.mark('light_0', (0.56, 2.98, 0))
+    # flower basket on a bracket on the other side
+    rod(p, (0, 2.5, 0), (-0.5, 2.5, 0), 0.02, K('metal', IRON))
+    rod(p, (-0.5, 2.5, 0), (-0.5, 2.25, 0), 0.012, K('metal', IRON))
+    sph(p, 0.2, K('wood', WOOD_DK), (-0.5, 2.05, 0), (1, 0.6, 1), seg=10, rings=6)
+    for k in range(7):
+        a = TAU * k / 7
+        sph(p, 0.09, K('leaf', LEAF if k % 2 else LEAF_DK), (-0.5 + math.cos(a) * 0.15, 2.16, math.sin(a) * 0.15), seg=6, rings=4)
+        sph(p, 0.05, K('paint', FLOWERS[k % len(FLOWERS)]), (-0.5 + math.cos(a + 0.4) * 0.14, 2.24, math.sin(a + 0.4) * 0.14), seg=6, rings=4)
+    for k in range(4):
+        a = TAU * k / 4 + 0.3
+        for j in range(3):
+            sph(p, 0.045, K('leaf', LEAF_DK), (-0.5 + math.cos(a) * 0.2, 1.95 - j * 0.12, math.sin(a) * 0.2), seg=6, rings=4)
+    p.finish()
+
+
+def pennants():
+    """a single cloth pennant hanging from its origin (under a cable), 0.34 wide, 0.5 long; three colours"""
+    for name, c in (('rt_pennant_a', SAFFRON), ('rt_pennant_b', TEAL), ('rt_pennant_c', CRIMSON)):
+        p = Prop(name)
+        bm = bmesh.new()
+        v = [bm.verts.new(q) for q in ((-0.17, 0, -0.01), (0.17, 0, -0.01), (0, -0.5, -0.01), (-0.17, 0, 0.01), (0.17, 0, 0.01), (0, -0.5, 0.01))]
+        bm.faces.new((v[0], v[2], v[1])); bm.faces.new((v[3], v[4], v[5]))
+        for a, b_ in ((0, 1), (1, 2), (2, 0)):
+            bm.faces.new((v[a], v[b_], v[b_ + 3], v[a + 3]))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        p.add(bm, K('cloth', c), smooth=False)
+        box(p, (0.38, 0.03, 0.03), K('cloth', CREAM), (0, -0.01, 0), b=0, seg=1)
+        p.finish()
+
+
+def loft(sections):
+    """a closed hull through rings of the same length: [(z, [(x, y), ...]), ...]; caps at both ends"""
+    bm = bmesh.new()
+    rings = [[bm.verts.new((x, y, z)) for x, y in pts] for z, pts in sections]
+    n = len(rings[0])
+    for a, b_ in zip(rings, rings[1:]):
+        for i in range(n):
+            j = (i + 1) % n
+            bm.faces.new((a[i], a[j], b_[j], b_[i]))
+    bm.faces.new(list(reversed(rings[0]))); bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
+def barge_hull():
+    """The balloon barge's hull under its 8 x 12 deck (deck top y 0, long along Z, bow toward -Z): a rounded
+    painted hull with a gold rubbing strake, glowing portholes, a keel fin, two propeller pods at the stern,
+    a brass prow with a lamp; mooring bollards on the deck edge."""
+    p = Prop('rt_barge_hull'); hull = K('paint', 0x2a5f9e); gd = K('brass'); dk = K('paint', 0x1d3f6a)
+    secs = []
+    for z in [-7.4, -6.8, -6.0, -4.6, -2.5, 0.0, 2.5, 4.5, 5.6, 6.2]:
+        if z < 0: u = abs(z) / 7.4; w = 4.0 * (1 - u ** 3.0); d = 2.6 * (1 - u ** 2.0) + 0.25
+        else: u = z / 6.2; w = 4.0 * (1 - u ** 5.0) * 0.98 + 0.02; d = 2.6 * (1 - u ** 3.0) + 0.25
+        w = max(w, 0.35)
+        ring = [(-w, -0.1), (w, -0.1)]
+        ring = []
+        for k in range(12):
+            a = math.pi * k / 11
+            ring.append((math.cos(a) * w, -0.1 - math.sin(a) * d))
+        secs.append((z, ring))
+    p.add(loft(secs), hull, b=0.0, angle=50)
+    # the rubbing strake and a painted band
+    box(p, (8.15, 0.22, 11.4), gd, (0, -0.25, -0.4), b=0.05)
+    box(p, (7.9, 0.3, 10.6), K('paint', CREAM), (0, -0.55, -0.3), b=0.04)
+    # portholes along both sides
+    for sx in (-1, 1):
+        for k in range(5):
+            z = -3.6 + k * 1.8
+            cyl(p, 0.2, 0.08, gd, (sx * 3.9, -1.15, z), RZ, seg=12, b=0)
+            cyl(p, 0.14, 0.09, K('glow', 0xffc070), (sx * 3.92, -1.15, z), RZ, seg=12, b=0)
+    # keel fin and the stern pods with fans
+    box(p, (0.18, 1.2, 7.5), dk, (0, -3.0, 0.4), b=0.05)
+    for sx in (-1, 1):
+        rod(p, (sx * 2.4, -1.4, 4.4), (sx * 4.2, -1.8, 5.2), 0.1, K('metal', IRON))
+        cyl(p, 0.45, 1.5, K('paint', CREAM), (sx * 4.5, -1.9, 5.3), RX, r2=0.32, seg=14, b=0.02)
+        tor(p, 0.62, 0.06, gd, (sx * 4.5, -1.9, 6.15), (0, 0, 0), seg=18, tube=5)
+        for k in range(4):
+            a = TAU * k / 4 + 0.4
+            box(p, (0.16, 0.55, 0.04), K('metal', STEEL), (sx * 4.5 + math.cos(a) * 0.28, -1.9 + math.sin(a) * 0.28, 6.1), rot=(0, 0, a + math.pi / 2), b=0, seg=1)
+        box(p, (0.08, 1.3, 1.4), K('paint', CRIMSON), (sx * 1.6, -0.9, 5.6), rot=(0, sx * 0.1, 0), b=0.02)
+    # the prow: a brass beak with a lamp
+    rod(p, (0, -0.6, -7.2), (0, 0.2, -8.4), 0.12, gd)
+    sph(p, 0.25, K('glow', 0xffb060), (0, 0.3, -8.5), seg=10, rings=6)
+    p.mark('light_0', (0, 0.3, -8.8))
+    # bollards along the deck edge
+    for sx in (-1, 1):
+        for z in (-5.0, 5.0):
+            cyl(p, 0.14, 0.45, K('metal', IRON), (sx * 3.6, 0.22, z), seg=10, b=0.01)
+            cyl(p, 0.2, 0.06, gd, (sx * 3.6, 0.46, z), seg=10, b=0)
+    p.finish()
+
+
+def barge_envelope():
+    """The barge's gas envelope, 15 m over the deck (origin at deck centre): a striped spindle, a brass nose
+    cone, fins, load bands, a spreader bar with bunting and ropes down to the deck corners"""
+    p = Prop('rt_barge_envelope'); cr, cm = K('cloth', CRIMSON), K('cloth', CREAM); gd = K('brass')
+    rope = K('cloth', 0x8a6a4a)
+    yc = 15.0; L = 13.0; R = 3.4; n = 12
+    for k in range(n):
+        z0 = -L / 2 + L * k / n; z1 = z0 + L / n
+        r0 = R * math.sqrt(max(0.0, 1 - (2 * z0 / L) ** 2)); r1 = R * math.sqrt(max(0.0, 1 - (2 * z1 / L) ** 2))
+        cyl(p, max(r0, 0.05), L / n, cr if k % 2 else cm, (0, yc, (z0 + z1) / 2), RX, r2=max(r1, 0.05), seg=20, b=0, cap=False)
+    cyl(p, 0.35, 0.5, gd, (0, yc, -L / 2), RX, r2=0.05, seg=12, b=0)
+    for a in (0, math.pi / 2, math.pi, 3 * math.pi / 2):
+        box(p, (0.08, 1.6, 1.8), K('paint', SAFFRON), (math.cos(a) * 1.3, yc + math.sin(a) * 1.3, L / 2 - 0.6), rot=(0, 0, a + math.pi / 2), b=0.02)
+    for z in (-3.5, 0.0, 3.5):
+        tor(p, R * 1.0 * math.sqrt(1 - (2 * z / L) ** 2), 0.05, rope, (0, yc, z), (0, 0, 0), seg=24, tube=4)
+    box(p, (0.2, 0.2, 9.0), K('wood', WOOD_DK), (0, yc - R - 0.5, 0), b=0.02)
+    for sz in (-1, 1):
+        for sx in (-1, 1):
+            rod(p, (0, yc - R - 0.5, sz * 4.4), (sx * 3.55, 0.6, sz * 5.6), 0.03, rope, seg=5)
+            rod(p, (sx * 1.2, yc - R + 0.3, sz * 2.0), (0, yc - R - 0.5, sz * 3.0), 0.025, rope, seg=5)
+    for k in range(12):
+        z = -4.2 + k * 0.76
+        box(p, (0.02, 0.36, 0.3), K('cloth', [SAFFRON, TEAL, CREAM, PLUM][k % 4]), (0, yc - R - 0.8, z), rot=(0.0, 0, 0), b=0, seg=1)
+    p.finish()
+
+
+def signal_lamp():
+    """a dish rail signal: a short post carrying a hooded red-over-green lamp head and a brass number plate"""
+    p = Prop('rt_signal_lamp'); ir = K('metal', IRON)
+    cyl(p, 0.06, 1.6, ir, (0, 0.8, 0), seg=8, b=0)
+    box(p, (0.36, 0.8, 0.22), K('paint', 0x1e2a30), (0, 1.9, 0), b=0.03)
+    for y, c in ((2.1, 0xff4030), (1.7, 0x40ff80)):
+        cyl(p, 0.11, 0.06, K('glow', c), (0, y, 0.12), RX, seg=10, b=0)
+        cyl(p, 0.14, 0.14, ir, (0, y + 0.06, 0.16), RX, seg=10, b=0, cap=False)
+    box(p, (0.24, 0.16, 0.03), K('brass'), (0, 1.35, 0.06), b=0.0, seg=1)
+    p.mark('light_0', (0, 2.1, 0.3))
     p.finish()
 
 
 ALL = [pier, arch, parapet, parapet_post, lamp_twin, flower_boxes, banners,
        rail_lacquer, lacquer_post, lantern_gate, lantern_pier, timber_bay,
-       rail_freight, freight_post, girder_bay, sign_gantry, flood_mast, cable_pylon]
+       rail_freight, freight_post, girder_bay, sign_gantry, flood_mast, cable_pylon,
+       pylon_head, pylon_arm, cable_tower, garden_lamp, pennants, barge_hull, barge_envelope, signal_lamp]
 
 if __name__ == '__main__':
     want = [a for a in sys.argv[1:] if not a.startswith('-')]
