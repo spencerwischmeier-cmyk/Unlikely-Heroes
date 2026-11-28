@@ -172,6 +172,7 @@ func _telegraph(b: Node) -> String:
 
 func _windup(b: Node3D, key: String) -> void:
 	var c: Vector3 = b.center() if b.has_method("center") else b.global_position + Vector3(0, 0.8, 0)
+	if debug: print("[audio-space] windup %s at %s" % [key, c.snapped(Vector3(0.1, 0.1, 0.1))])
 	match key:
 		"rivet": Snd.at("enemy_windup_rivet", c, -5.0, 0.1, 0.12)
 		"hornet": Snd.at("enemy_windup_hornet", c, -6.0, 0.1, 0.12)
