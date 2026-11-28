@@ -10,7 +10,7 @@ extends Node
 ##   tour    the whole boss fight in order: intro, a magnet slam, the phase change, a jib sweep that
 ##           Vesk double-jumps over, then a ride up the track rail into the cab (good with --et-snap)
 ## Extra flags:
-##   --et-force=<attack>  boss always picks this attack (slam, spray, crew, sweep)
+##   --et-force=<attack>  boss always picks this attack (slam, spray, crew, sweep, quake)
 ##   --et-god             Vesk's hull is refilled every frame
 ##   --et-grind           (phase 2) put Vesk on the track rail each time it unlocks: tests the cab strike
 ##   --et-wrench          Vesk wrenches any roller that gets close (tests Return to Sender)
@@ -65,6 +65,7 @@ func _ready() -> void:
 			snaps.append([kv[0], float(kv[1]) if kv.size() > 1 else 0.5, false])
 	print("[enemy-test] mode ", mode, " flags ", flags)
 	Engine.set_meta("et_log", true)
+	Game.player_fell.connect(func(): print("[enemy-test] vesk fell off, last pos ", ap_last, " arena ", arena))
 	Game.player_hurt.connect(func(h): hurts += 1; print("[enemy-test] vesk hurt, hull ", h, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
 	Game.bot_killed.connect(func(b, _p, k): kills += 1; print("[enemy-test] killed ", k, " returned_to_sender=", b.get_meta("returned_to_sender", false)))
 	Game.slam_landed.connect(func(hit): print("[enemy-test] slam landed hit=", hit, " t=", snappedf(float(n) / Engine.physics_ticks_per_second, 0.01)))
@@ -189,9 +190,24 @@ func _ap_hold(a: String, on: bool) -> void:
 	if on and not Input.is_action_pressed(a): Input.action_press(a)
 	elif not on and Input.is_action_pressed(a): Input.action_release(a)
 
+var ap_qjump := 0
+var ap_last := Vector3.ZERO
 func _autoplay(dt: float) -> void:
 	var pl := Game.player
 	var pp := pl.global_position
+	if pp.y > -2.0: ap_last = pp
+	# quake rings (boss last stand): hop each one as it arrives
+	if boss and is_instance_valid(boss) and not boss.quake_rings.is_empty():
+		var dq := Vector2(pp.x - boss.global_position.x, pp.z - boss.global_position.z).length()
+		var soon := false
+		for q in boss.quake_rings:
+			var gap: float = dq - float(q.r)
+			if gap > 0.4 and gap < 2.2: soon = true
+		if soon and ap_qjump == 0 and pl.is_on_floor():
+			Input.action_press("jump"); ap_qjump = 1; print("[enemy-test] jump a quake ring")
+	if ap_qjump > 0:
+		ap_qjump += 1
+		if ap_qjump > 12: Input.action_release("jump"); ap_qjump = 0
 	var best: Node3D = null
 	var bd := INF
 	var threat := false
@@ -215,7 +231,10 @@ func _autoplay(dt: float) -> void:
 	if ap_strafe_t <= 0.0: ap_strafe_t = randf_range(1.2, 2.6); ap_strafe = -ap_strafe
 	_ap_hold("move_left", ap_strafe < 0.0); _ap_hold("move_right", ap_strafe > 0.0)
 	var roller_close: bool = best.has_method("_launch") and bd < 5.0
-	_ap_hold("move_back", roller_close and best.get("state") != "fuse")
+	# near the arena edge (circle-strafing drifts outward): step back in toward the fight
+	var edge := arena.size.x > 0.0 and not arena.grow(-4.5).has_point(Vector2(pp.x, pp.z))
+	_ap_hold("move_back", roller_close and best.get("state") != "fuse" and not edge)
+	_ap_hold("move_forward", edge)
 	ap_dash_cd -= dt
 	_ap_hold("dash", false)
 	# --et-parry: swing the wrench just as an enemy shot arrives
