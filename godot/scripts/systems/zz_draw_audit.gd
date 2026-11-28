@@ -8,6 +8,7 @@ func _ready() -> void:
 	var radius := 200.0
 	for a in OS.get_cmdline_user_args():
 		if a == "--draw-audit": on = true
+		elif a.begins_with("--draw-audit-under="): _under = a.substr(19)
 		elif a.begins_with("--draw-audit="): on = true; radius = float(a.substr(13))
 	if not on: return
 	await get_tree().create_timer(3.0).timeout
@@ -20,6 +21,25 @@ func _ready() -> void:
 	await get_tree().create_timer(0.5).timeout
 	_audit(radius)
 	get_tree().quit()
+
+## `--draw-audit-under=<node name>` also lists the first 40 drawn pieces under that node (size, distance, range)
+var _under := ""
+var _listed := 0
+
+## headless (dummy renderer) multimeshes report an empty box: rebuild it from the instances, as the renderer does
+var _mm_boxes := {}
+func _aabb(gi: GeometryInstance3D) -> AABB:
+	var b := gi.get_aabb()
+	if b.size != Vector3.ZERO or not (gi is MultiMeshInstance3D): return b
+	var mm := (gi as MultiMeshInstance3D).multimesh
+	if mm == null or mm.mesh == null or mm.instance_count == 0: return b
+	if _mm_boxes.has(mm): return _mm_boxes[mm]
+	var mb := mm.mesh.get_aabb()
+	var n := mm.instance_count if mm.visible_instance_count < 0 else mm.visible_instance_count
+	var out := mm.get_instance_transform(0) * mb
+	for i in range(1, n): out = out.merge(mm.get_instance_transform(i) * mb)
+	_mm_boxes[mm] = out
+	return out
 
 func _vis(n: Node3D) -> bool:
 	while n:
@@ -40,7 +60,7 @@ func _audit(radius: float) -> void:
 		var gi := g as GeometryInstance3D
 		if not (gi is MeshInstance3D or gi is MultiMeshInstance3D): continue
 		if not _vis(gi): continue
-		var ab := gi.global_transform * gi.get_aabb()
+		var ab := gi.global_transform * _aabb(gi)
 		var d := ab.get_center().distance_to(cam) - ab.size.length() * 0.5
 		if d > radius: continue
 		if gi.visibility_range_end > 0.0 and d > gi.visibility_range_end: continue
@@ -51,6 +71,9 @@ func _audit(radius: float) -> void:
 		if gi is MultiMeshInstance3D: mm_inst += (gi as MultiMeshInstance3D).multimesh.visible_instance_count if (gi as MultiMeshInstance3D).multimesh.visible_instance_count >= 0 else (gi as MultiMeshInstance3D).multimesh.instance_count
 		if gi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF: shadow += surf
 		var path := String(gi.get_path())
+		if _under != "" and path.contains("/" + _under + "/") and _listed < 40:
+			_listed += 1
+			print("[audit-under] %s  surf %d  size %.1f  d %.0f  range %.0f  shadow %d  %s" % [path.get_slice("/" + _under + "/", 1).left(70), surf, ab.size.length(), d, gi.visibility_range_end, gi.cast_shadow, gi.get_class()])
 		var parts := path.split("/")
 		var key := "/".join(parts.slice(2, mini(6, parts.size() - 1)))
 		by_area[key] = by_area.get(key, 0) + surf
@@ -73,7 +96,7 @@ func _audit(radius: float) -> void:
 	for g in get_tree().root.find_children("*", "GeometryInstance3D", true, false):
 		var gi := g as GeometryInstance3D
 		if not (gi is MeshInstance3D or gi is MultiMeshInstance3D) or gi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF or not _vis(gi): continue
-		var ab2 := gi.global_transform * gi.get_aabb()
+		var ab2 := gi.global_transform * _aabb(gi)
 		var d2 := ab2.get_center().distance_to(cam) - ab2.size.length() * 0.5
 		if d2 > sun_d: continue
 		if gi.visibility_range_end > 0.0 and d2 > gi.visibility_range_end: continue
