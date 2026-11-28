@@ -590,6 +590,7 @@ func _close_call() -> void:
 
 func hurt_player(n: int, from = null, force := false) -> void:
 	if (invuln > 0.0 and not force) or hull <= 0: return
+	if Engine.has_meta("et_log"): print("[hurt-src] ", get_stack().slice(1, 3).map(func(f): return "%s:%d" % [f.function, f.line]))
 	hull -= n; invuln = 0.9; Snd.play("hurt", -2); Game.player_hurt.emit(hull)
 	if from is Vector3: Game.player_hit_from.emit(from)
 	if hull <= 2: Snd.bark("dodger", "low", 0.6)
