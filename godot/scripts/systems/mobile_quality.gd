@@ -118,13 +118,15 @@ func _tune(n: Node) -> void:
 		# smoke, sparks and dust far off are a few pixels each but still a draw (and a GPU particle
 		# update pass): stop drawing them past a distance (big smoke columns sit in the sky and keep theirs)
 		var pg := n as GeometryInstance3D
-		if not no_lite_extra and pg.visibility_range_end <= 0.0 and not _in_sky(pg):
+		if not no_lite_extra and not _in_sky(pg):
 			var pab := pg.get_aabb()
 			var psc := pg.global_transform.basis.get_scale()
 			var psize := maxf(pab.size.x * psc.x, maxf(pab.size.y * psc.y, pab.size.z * psc.z))
 			if psize < 12.0:   # tall smoke plumes are landmarks: those keep drawing
-				pg.visibility_range_end = (70.0 if phone else 120.0) * (1.0 if psize < 5.0 else 1.8)
-				pg.visibility_range_end_margin = 6.0
+				var lite_end := (70.0 if phone else 120.0) * (1.0 if psize < 5.0 else 1.8)
+				if pg.visibility_range_end <= 0.0 or pg.visibility_range_end > lite_end:
+					pg.visibility_range_end = lite_end
+					pg.visibility_range_end_margin = 6.0
 		return
 	if n is Label3D: return
 	var gi := n as GeometryInstance3D
