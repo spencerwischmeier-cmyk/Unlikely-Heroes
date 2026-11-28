@@ -6,6 +6,11 @@ extends "res://scripts/enemy.gd"
 ##   Wrench      a wrench hit launches it like a ball ("Return to Sender"): it flies off, and blows up
 ##               on the first bot (or the Crane Bot) it hits, hurting them instead of Vesk.
 ##               Launched rollers carry meta "returned_to_sender" = true in Game.bot_killed when they hit a bot.
+## Plated Roller (main.spawn_bot("plated"), `plated` = true): the same bot bolted into riveted steel
+## plates. It rolls a little slower and shrugs off light hits: bolts glance off with a "TINK" (a lot of
+## them do wear the plates through). A heavy hit (wrench, stomp, air slam, lobber, a batted shot)
+## cracks the shell at once: the plates burst off, it reels dizzy for a moment, then charges, angry and
+## faster, as a plain roller (a second wrench sends it back). `--no-plated` spawns plain rollers instead.
 
 const SPEED := 4.4
 const FUSE := 0.8
@@ -27,6 +32,12 @@ var flank := 0.0          # each roller curves in from its own side instead of q
 var pace := 1.0           # and rolls at its own pace
 var sep_t := 0.0
 var sep := Vector3.ZERO   # push away from nearby bots (refreshed a few times a second)
+var plated := false       # set before adding to the tree (Plated Roller)
+var armor := 0.0          # plate strength left; light hits chip it, heavy hits crack it at once
+var plates: Array = []
+var plate_mat: StandardMaterial3D
+var daze := 0.0           # reeling after its shell cracks
+var angry := false
 
 func _ready() -> void:
 	hp = 2.0; max_hp = 2.0; nuts = 4
@@ -44,7 +55,8 @@ func _ready() -> void:
 	scrap_count = 10
 	cable_on = true
 	# the night-shift paint job: rust orange, a bit bigger, with a bent antenna and a blinking bulb
-	if roll_variant() and cap:
+	if plated: _build_plates()
+	elif roll_variant() and cap:
 		apply_variant(Color(1.05, 0.74, 0.6), 1.08)
 		var ant := Node3D.new(); ant.position = Vector3(0.16, 1.0, -0.18); ant.rotation = Vector3(-0.35, 0, -0.3); cap.add_child(ant)
 		add_prop(ant, cyl(0.045, 0.08), Color(0.17, 0.19, 0.22), Vector3(0, 0.0, 0), Vector3.ZERO, 0.7)
@@ -57,9 +69,83 @@ func _ready() -> void:
 func center() -> Vector3:
 	return global_position + Vector3(0, 0.55, 0)
 
+## Riveted steel plates: six round plates on the ball (they roll with it) and a welded brow plate and
+## side cheeks on the helmet. They are thrown off as debris when the shell cracks.
+func _build_plates() -> void:
+	armor = 3.0; nuts = 7; scrap_count = 12; pace *= 0.82
+	burst_color = Color(0.75, 0.85, 1.0)
+	plate_mat = StandardMaterial3D.new(); plate_mat.albedo_color = Color(0.46, 0.5, 0.56); plate_mat.metallic = 0.85; plate_mat.roughness = 0.32
+	plate_mat.emission_enabled = true; plate_mat.emission = Color.WHITE; plate_mat.emission_energy_multiplier = 0.0
+	flash_mats.append(plate_mat)
+	var rivet := StandardMaterial3D.new(); rivet.albedo_color = Color(0.85, 0.68, 0.3); rivet.metallic = 0.9; rivet.roughness = 0.3
+	var dirs := [Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD, Vector3.BACK, Vector3.DOWN, Vector3.UP]
+	var host: Node3D = ball if ball else model
+	for d in dirs:
+		var pl := MeshInstance3D.new(); pl.mesh = cyl(0.3, 0.07, 0.34); pl.material_override = plate_mat
+		pl.basis = Basis(Vector3.RIGHT, PI) if d == Vector3.DOWN else Basis(Quaternion(Vector3.UP, d)); pl.position = d * 0.56
+		for k in 4:
+			var r := MeshInstance3D.new(); r.mesh = ball_mesh(0.035); r.material_override = rivet
+			var a := TAU * k / 4.0 + 0.4
+			r.position = Vector3(cos(a) * 0.22, 0.04, sin(a) * 0.22); pl.add_child(r)
+		host.add_child(pl); plates.append(pl)
+	if cap:
+		var brow := MeshInstance3D.new(); brow.mesh = box(Vector3(0.62, 0.13, 0.1)); brow.material_override = plate_mat
+		brow.position = Vector3(0, 0.96, 0.4); brow.rotation.x = -0.35; cap.add_child(brow); plates.append(brow)
+		for x in [-0.5, 0.5]:
+			var ch := MeshInstance3D.new(); ch.mesh = box(Vector3(0.08, 0.3, 0.42)); ch.material_override = plate_mat
+			ch.position = Vector3(x, 0.72, 0.12); cap.add_child(ch); plates.append(ch)
+	break_parts = break_parts + plates
+
+## The plates crack and burst off; it reels, then comes on angrier and quicker.
+func _crack(point: Vector3, dir: Vector3) -> void:
+	if Engine.has_meta("et_log"): print("[enemy-test] plated roller cracked (armor left %.2f)" % armor)
+	armor = 0.0
+	no_number_frame = Engine.get_physics_frames()
+	var live := plates.filter(func(n): return is_instance_valid(n))
+	break_parts = break_parts.filter(func(n): return not (n in plates))
+	plates.clear()
+	var c := center()
+	ScrapBurst.burst(get_parent(), c, 0.8, [plate_mat], 5, live)
+	FX.sparks(c, Color(0.85, 0.92, 1.0), 26, 8); FX.ring(c, Color(0.8, 0.9, 1.0), 0.8)
+	FX.stop(0.08); FX.shake(0.6)
+	Snd.at("armor_crack" if Snd.has_sound("armor_crack") else "crate_break", c, 0, 0.1, 0.05)
+	Snd.at("chars_bot_break", c, -6, 0.1, 0.05)
+	if combat: combat.float_text(c + Vector3(0, 0.9, 0), "CRACK!", Color(0.8, 0.92, 1.0), 56)
+	var push := dir; push.y = 0
+	if push.length() < 0.01: push = global_position - point; push.y = 0
+	push = push.normalized() if push.length() > 0.01 else Vector3.FORWARD
+	velocity += push * 7.0 + Vector3(0, 3.5, 0)
+	lean = Vector3(push.z, 0, -push.x) * 0.6; lean_v = lean * 7.0
+	flash = 1.0; pop = 1.0
+	daze = 1.0; stun = maxf(stun, 1.0)
+	angry = true; pace *= 1.4
+	if warn: warn.queue_free(); warn = null
+	if state == "fuse":
+		state = "chase"; fuse = -1.0
+		for m in flash_mats: m.emission = Color.WHITE
+
+## A light hit on the plates: a white ping, a little shove, the plates wear down.
+func _glance(amount: float, point: Vector3, dir: Vector3) -> void:
+	armor -= amount * 0.3
+	no_number_frame = Engine.get_physics_frames()
+	flash = maxf(flash, 0.5); pop = maxf(pop, 0.25)
+	var push := dir; push.y = 0
+	if push.length() > 0.01: velocity += push.normalized() * 1.2
+	FX.hit_sparks(point, dir if dir.length() > 0.01 else Vector3.UP, Color(0.85, 0.92, 1.0), 5)
+	Snd.at("armor_tink" if Snd.has_sound("armor_tink") else "rail_spark", point, -8, 0.15, 0.06)
+	if combat and randf() < 0.6: combat.float_text(point + Vector3(0, 0.3, 0), "TINK", Color(0.75, 0.82, 0.92), 30)
+
+func can_startle() -> bool:
+	return state == "chase" and daze <= 0.0
+
 ## A wrench hit (heavy and up close) launches the roller instead of breaking it.
 func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 	if dead: return false
+	if armor > 0.0:
+		Game.bot_hit.emit(self, amount)
+		if amount >= 1.5 or armor - amount * 0.3 <= 0.0: _crack(point, dir)
+		else: _glance(amount, point, dir)
+		return false
 	if amount >= 2.0 and player and global_position.distance_to(player.global_position) < 3.6:
 		var d := dir; d.y = 0
 		if d.length() < 0.01: d = global_position - player.global_position; d.y = 0
@@ -104,9 +190,20 @@ func _physics_process(dt: float) -> void:
 			if model: model.rotation.y = sin(t * 40.0) * 0.15
 			if st_t <= 0.0:
 				state = "chase"; velocity.y = 3.0; eye_open = 1.0; pop = 0.8
+				if plated and combat and not Engine.has_meta("plated_seen"):
+					Engine.set_meta("plated_seen", true)    # the first one of a run says how to beat it
+					combat.float_text(center() + Vector3(0, 1.2, 0), "PLATED! WRENCH IT", Color(0.8, 0.92, 1.0), 40)
 				Snd.at("chars_roller_hop", global_position, -9, 0.15, 0.1)
 				if model: model.rotation.y = 0
 		"chase":
+			if daze > 0.0:
+				daze -= dt
+				if cap: cap.rotation.y += dt * 14.0 * daze
+				if randf() < 0.25: FX.sparks(center() + Vector3(0, 0.8, 0), Color(1, 0.95, 0.5), 2, 1.5)
+				if daze <= 0.0:
+					pop = 0.9; velocity.y = 3.2
+					Snd.at("chars_roller_hop", global_position, -6, 0.15, 0.1)
+					if eye_mat: eye_mat.emission_energy_multiplier = 9.0
 			if is_on_floor() and stun <= 0.0:
 				sep_t -= dt
 				if sep_t <= 0.0: sep_t = 0.2; sep = _separation()
