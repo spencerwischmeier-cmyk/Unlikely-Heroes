@@ -16,6 +16,7 @@ func _on_kill(bot: Node, pos: Vector3, _kind: String) -> void:
 	for b in s.alive:
 		if is_instance_valid(b) and b != bot and not b.dead: return
 	FX.slow(0.3, 0.5)
+	Game.combat_event.emit("final_blow", pos)   # systems/fight_reward.gd pays a style bonus
 	FX.shake(0.5)
 	FX.ring(pos + Vector3(0, 0.3, 0), Color(1.0, 0.85, 0.45), 1.2)
 	Snd.play("melee_hit", 2, 0.0, 0.0, 0.6)
