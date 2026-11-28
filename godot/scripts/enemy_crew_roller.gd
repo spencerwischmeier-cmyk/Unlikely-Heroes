@@ -96,7 +96,8 @@ func center() -> Vector3:
 func fire() -> void:
 	if shoot_t < 0.0 and not dead and combat.claim_aim(self, WIND + 0.1):
 		shoot_t = WIND
-		if not no_tells: Snd.at("hook_lock", center(), -9, 0.1, 0.05)   # the riveter cocks: an audible cue to dodge
+		# the riveter cocks: an audible cue to dodge (audio_space.gd plays enemy_windup_rivet when it exists)
+		if not no_tells and not Snd.has_sound("enemy_windup_rivet"): Snd.at("hook_lock", center(), -9, 0.1, 0.05)
 
 func _physics_process(dt: float) -> void:
 	if dead: return
