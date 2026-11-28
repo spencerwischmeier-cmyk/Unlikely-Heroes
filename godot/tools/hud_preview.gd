@@ -137,6 +137,8 @@ func _ready() -> void:
 			combat.weapon_changed.emit("thump_lobber")
 			await get_tree().create_timer(0.15).timeout
 			combat.hit_marker.emit(true)
+			var hc: Node = load("res://scripts/systems/hit_chain.gd").new(); add_child(hc)
+			hc.chain = 12; hc.shown = 12; hc.left = 1.8
 		"wheel", "wheel_pad":
 			Game.data.unlocked = {"arc_lancer": true, "scatter_bloom": true, "thump_lobber": true}
 			combat.current = "scatter_bloom"; combat.lv = 3; combat.am = 7; combat.mx = 32

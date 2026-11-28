@@ -828,7 +828,7 @@ func _draw_threats() -> void:
 		if not is_instance_valid(b) or not (b is Node3D) or b.get("dead") == true: continue
 		var wp: Vector3 = (b as Node3D).global_position + Vector3(0, 1, 0)
 		var dist := player.global_position.distance_to(wp)
-		if dist > 40.0: continue
+		if dist > 40.0 or cam.global_position.distance_to(wp) < 0.5: continue
 		var behind := cam.is_position_behind(wp)
 		var sp := cam.unproject_position(wp)
 		if not behind and Rect2(Vector2.ZERO, vs).grow(-40).has_point(sp): continue
