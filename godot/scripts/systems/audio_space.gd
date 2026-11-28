@@ -184,6 +184,21 @@ func _probe() -> void:
 	await get_tree().create_timer(1.5).timeout
 	if not _level_ok(): print("[audio-space] probe: no level"); get_tree().quit(1); return
 	Game.input_locked = false
+	# where is there cover? per island: how much of it is under a roof (same rays as in play)
+	var space := Game.player.get_world_3d().direct_space_state
+	for n in Game.level.islands:
+		var r: Rect2 = Game.level.islands[n]
+		var h: float = float(Game.level.heights.get(n, 0.0)) if "heights" in Game.level else 0.0
+		var tot := 0; var cov := 0
+		for x in range(int(r.position.x) + 1, int(r.end.x), 2):
+			for z in range(int(r.position.y) + 1, int(r.end.y), 2):
+				var from := Vector3(x, h + 1.9, z)
+				var hits := 0
+				for ry in COVER_RAYS:
+					var hh := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + (ry as Vector3).normalized() * COVER_H, 1))
+					if not hh.is_empty() and (hh.normal as Vector3).y < -0.3: hits += 1
+				tot += 1; if hits >= 2: cov += 1
+		if cov > 0: print("[audio-space] cover %s %d/%d" % [n, cov, tot])
 	for t in preload("res://scripts/level/ground/ground.gd").TOUR:
 		Game.player.global_position = t[1] + Vector3(0, 0.3, 0); Game.player.velocity = Vector3.ZERO
 		await get_tree().create_timer(1.6).timeout
