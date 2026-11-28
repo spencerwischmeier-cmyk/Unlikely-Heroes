@@ -58,6 +58,8 @@ var cur_island := ""
 var weights := {}
 var debug := false
 var verb := 0.08
+var verb_extra := 0.0       # added on top by audio_space.gd (wetter under roofs and in tunnels)
+var cover := 0.0            # 0..1, how covered the hero is (audio_space.gd): less wind under a roof
 var prev_swing := false
 var prev_hook = null
 var emit_t := 1.0
@@ -199,6 +201,30 @@ const NAME_SURFACE := [["grass", "grass"], ["lawn", "grass"], ["hedge", "grass"]
 	["stair", "stone"], ["metal", "metal"], ["steel", "metal"], ["grate", "metal"], ["catwalk", "metal"], ["walkway", "metal"],
 	["container", "metal"], ["pipe", "metal"], ["crane", "metal"], ["girder", "metal"], ["platform", "metal"]]
 
+## Floor steps: the ground pass (scripts/level/ground/ground.gd) gives every floor its area's material
+## (cobbles, terracotta tiles, flagstones, boardwalk, lacquered timber, tread plate, concrete, scrap earth);
+## the footstep follows the material under the hero, so the routes between areas sound like what they look
+## like (cobbled viaduct, timber Lantern Bridge, steel gantries, concrete causeway). `--no-floor-steps`: off.
+## ground.gd style index -> footstep set (DECK, JUNK, COBBLE, TERRA, FLAG, PLANKS, TREAD, CONCRETE, CURB, SAND, TIMBER)
+const STYLE_SURFACE := ["metal", "gravel", "stone", "tile", "stone", "wood", "metal", "concrete", "stone", "stone", "wood"]
+const GroundPass := preload("res://scripts/level/ground/ground.gd")
+var floor_steps := not OS.get_cmdline_user_args().has("--no-floor-steps")
+var ground_mat := {}        # floor material -> footstep set
+var ground_mats_t := 0.0
+
+func _ground_mats() -> void:
+	if not floor_steps or not ground_mat.is_empty(): return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now < ground_mats_t: return
+	ground_mats_t = now + 2.0
+	var g: Node = Game.level.get_node_or_null("Ground")
+	if g == null or g.get("mats") == null: return
+	for k in g.mats: ground_mat[g.mats[k]] = _step_set(STYLE_SURFACE[k] if k < STYLE_SURFACE.size() else "metal")
+
+## a footstep set that exists (new sets fall back to stone if their files are missing)
+static func _step_set(s: String) -> String:
+	return s if Snd.has_sound("step_" + s) else ("stone" if s in ["tile", "concrete"] else "metal")
+
 func _surface_by_ray() -> String:
 	var pl := Game.player
 	var from: Vector3 = pl.global_position + Vector3(0, 0.4, 0)
@@ -206,6 +232,15 @@ func _surface_by_ray() -> String:
 	var hit := pl.get_world_3d().direct_space_state.intersect_ray(q)
 	if hit.is_empty() or hit.collider == null: return ""
 	var n: Node = hit.collider
+	if floor_steps:
+		_ground_mats()
+		var m: Node = n
+		for i in 3:
+			if m == null or m == Game.level: break
+			if m is GeometryInstance3D and (m as GeometryInstance3D).material_override != null \
+					and ground_mat.has((m as GeometryInstance3D).material_override):
+				return ground_mat[(m as GeometryInstance3D).material_override]
+			m = m.get_parent()
 	for i in 4:
 		if n == null or n == Game.level: break
 		var nm := String(n.name).to_lower()
@@ -223,6 +258,9 @@ func surface() -> String:
 	if cur_island == "": return "metal"
 	var h: float = Game.level.heights.get(cur_island, 0.0) if "heights" in Game.level else 0.0
 	if absf(Game.player.global_position.y - h) > 2.5: return "metal"
+	if floor_steps:
+		var st := GroundPass._route_style(cur_island)   # the routes keep one floor end to end
+		if st >= 0 and st < STYLE_SURFACE.size(): return _step_set(STYLE_SURFACE[st])
 	for p in ISLAND_SURFACE:
 		if cur_island.begins_with(p[0]): return p[1]
 	var a: String = island_area.get(cur_island, "")
@@ -373,10 +411,10 @@ func _update_world(dt: float) -> void:
 	var a := area if AREAS.has(area) else "plaza"
 	verb = move_toward(verb, AREAS[a].verb, dt * 0.05)
 	var rv := Snd.bus_fx("World", "AudioEffectReverb")
-	if rv: rv.wet = verb
-	# more wind higher up
+	if rv: rv.wet = verb + verb_extra
+	# more wind higher up (and less under a roof)
 	var y: float = Game.player.global_position.y
-	Snd.loop_extra["wind_loop"] = clampf((y - 5.0) / 14.0, 0.0, 1.0) * 6.0
+	Snd.loop_extra["wind_loop"] = clampf((y - 5.0) / 14.0, 0.0, 1.0) * 6.0 - cover * 8.0
 	Snd.loop_extra["city_loop"] = -clampf((y - 8.0) / 12.0, 0.0, 1.0) * 6.0
 
 func _in_pause_menu() -> bool:
