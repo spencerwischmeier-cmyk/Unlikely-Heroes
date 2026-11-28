@@ -606,8 +606,8 @@ def cable_tower():
     for sz in (-1, 1): sph(p, 0.12, br, (-0.3, 7.25, sz * 1.5), seg=10, rings=6)
     # the bullwheel: a big flat wheel with spokes on the +X side
     cyl(p, 0.18, 1.2, ir, (1.1, 5.2, 0), seg=10, b=0)
-    tor(p, 1.25, 0.09, ir, (1.1, 5.25, 0), (0, 0, 0), seg=28, tube=6)
-    tor(p, 1.12, 0.04, K('paint', CRIMSON), (1.1, 5.25, 0), (0, 0, 0), seg=28, tube=5)
+    tor(p, 1.25, 0.09, ir, (1.1, 5.25, 0), RX, seg=28, tube=6)
+    tor(p, 1.12, 0.04, K('paint', CRIMSON), (1.1, 5.25, 0), RX, seg=28, tube=5)
     for k in range(8):
         a = TAU * k / 8
         rod(p, (1.1, 5.25, 0), (1.1 + math.cos(a) * 1.15, 5.25, math.sin(a) * 1.15), 0.03, ir)
@@ -634,7 +634,7 @@ def garden_lamp():
     box(p, (0.42, 0.24, 0.42), S(STONE_LT), (0, 0.12, 0), b=0.04)
     cyl(p, 0.09, 3.2, tl, (0, 1.84, 0), r2=0.06, seg=10, b=0)
     for y in (0.5, 1.6): tor(p, 0.09, 0.025, br, (0, y, 0), RX, seg=12, tube=4)
-    tor(p, 0.28, 0.035, tl, (0.28, 3.44, 0), (math.pi / 2, 0, 0), seg=14, tube=5, arc=math.pi)
+    tor(p, 0.28, 0.035, tl, (0.28, 3.44, 0), (0, 0, 0), seg=14, tube=5, arc=math.pi)
     rod(p, (0.56, 3.44, 0), (0.56, 3.25, 0), 0.02, tl)
     cyl(p, 0.14, 0.08, br, (0.56, 3.22, 0), seg=10, b=0)
     sph(p, 0.2, K('glass', GLASS), (0.56, 2.98, 0), seg=12, rings=8)
@@ -715,7 +715,7 @@ def barge_hull():
     for sx in (-1, 1):
         rod(p, (sx * 2.4, -1.4, 4.4), (sx * 4.2, -1.8, 5.2), 0.1, K('metal', IRON))
         cyl(p, 0.45, 1.5, K('paint', CREAM), (sx * 4.5, -1.9, 5.3), RX, r2=0.32, seg=14, b=0.02)
-        tor(p, 0.62, 0.06, gd, (sx * 4.5, -1.9, 6.15), RX, seg=18, tube=5)
+        tor(p, 0.62, 0.06, gd, (sx * 4.5, -1.9, 6.15), (0, 0, 0), seg=18, tube=5)
         for k in range(4):
             a = TAU * k / 4 + 0.4
             box(p, (0.16, 0.55, 0.04), K('metal', STEEL), (sx * 4.5 + math.cos(a) * 0.28, -1.9 + math.sin(a) * 0.28, 6.1), rot=(0, 0, a + math.pi / 2), b=0, seg=1)
@@ -746,7 +746,7 @@ def barge_envelope():
     for a in (0, math.pi / 2, math.pi, 3 * math.pi / 2):
         box(p, (0.08, 1.6, 1.8), K('paint', SAFFRON), (math.cos(a) * 1.3, yc + math.sin(a) * 1.3, L / 2 - 0.6), rot=(0, 0, a + math.pi / 2), b=0.02)
     for z in (-3.5, 0.0, 3.5):
-        tor(p, R * 1.0 * math.sqrt(1 - (2 * z / L) ** 2), 0.05, rope, (0, yc, z), RX, seg=24, tube=4)
+        tor(p, R * 1.0 * math.sqrt(1 - (2 * z / L) ** 2), 0.05, rope, (0, yc, z), (0, 0, 0), seg=24, tube=4)
     box(p, (0.2, 0.2, 9.0), K('wood', WOOD_DK), (0, yc - R - 0.5, 0), b=0.02)
     for sz in (-1, 1):
         for sx in (-1, 1):
