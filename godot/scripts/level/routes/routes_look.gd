@@ -514,12 +514,12 @@ static func _dish_rail() -> void:
 			var q := c.sample_baked(minf(u + 0.5, L))
 			var d := (q - p); d.y = 0; d = d.normalized()
 			var side := Vector3(-d.z, 0, d.x) * (1.0 if k % 2 == 0 else -1.0)
-			_pylon("dish", Vector3(p.x, -26.0, p.z), p.y - 0.2, 1.6 + (p.y + 26.0) / 30.0, false)
+			_pylon("dish", Vector3(p.x, -26.0, p.z), p.y - 0.2, 1.3 + (p.y + 26.0) / 60.0, false)
 			if k % 2 == 0:
-				var at := p + side * 1.3 + Vector3(0, -0.45, 0)
+				var at := p + side * 1.7 + Vector3(0, -0.45, 0)
 				_arm("dish", Vector3(p.x, p.y - 0.25, p.z), at)
 				put("dish", "rt_signal_lamp", xf(at + Vector3(0, -0.2, 0), atan2(-d.x, -d.z)))   # facing the riders coming down
-				if k % 4 == 0: light(at + Vector3(0, 1.9, 0), Color(1.0, 0.35, 0.25), 0.9, 6.0)
+				light(at + Vector3(0, 1.9, 0), Color(1.0, 0.35, 0.25), 1.1, 6.0)
 			k += 1
 		u += 10.0
 	_pennants("dish", c, 2.6, 4.0)
