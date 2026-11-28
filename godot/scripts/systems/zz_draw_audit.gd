@@ -79,8 +79,24 @@ func _audit(radius: float) -> void:
 		if gi.visibility_range_end > 0.0 and d2 > gi.visibility_range_end: continue
 		near_shadow += 1
 	var parts_n := 0
+	var cpu_amt := 0
+	var gpu_amt := 0
+	var emitting := 0
+	var by_p := {}
 	for g in get_tree().root.find_children("*", "GPUParticles3D", true, false) + get_tree().root.find_children("*", "CPUParticles3D", true, false):
-		if _vis(g) and (g as Node3D).global_position.distance_to(cam) < radius: parts_n += 1
+		if not (_vis(g) and (g as Node3D).global_position.distance_to(cam) < radius): continue
+		parts_n += 1
+		var em: bool = g.emitting
+		if em: emitting += 1
+		var amt: int = g.amount
+		if g is CPUParticles3D: cpu_amt += amt
+		else: gpu_amt += int(amt * (g as GPUParticles3D).amount_ratio)
+		var pp := String(g.get_path()).split("/")
+		var pk := "%s %s" % [g.get_class().left(3), "/".join(pp.slice(2, mini(5, pp.size() - 1)))]
+		by_p[pk] = by_p.get(pk, 0) + 1
+	print("[audit] particles: %d emitting, CPU particles %d, GPU particles %d" % [emitting, cpu_amt, gpu_amt])
+	var pk2 := by_p.keys(); pk2.sort_custom(func(a, b): return by_p[a] > by_p[b])
+	for k in pk2.slice(0, 8): print("[audit] particle systems %4d  %s" % [by_p[k], k])
 	print("[audit] lights %d (shadowed %d), sun-shadow casters within %.0f m: %d, particle systems %d" % [lights, lshadow, sun_d, near_shadow, parts_n])
 	print("[audit] objects %d, surfaces %d (shadow-casting %d), multimesh instances %d, radius %.0f" % [objects, total, shadow, mm_inst, radius])
 	var ak := by_area.keys(); ak.sort_custom(func(a, b): return by_area[a] > by_area[b])

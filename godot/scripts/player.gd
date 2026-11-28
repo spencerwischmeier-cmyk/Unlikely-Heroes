@@ -111,6 +111,18 @@ var arm_bones := []          # [upper, fore, hand] bone ids (right arm)
 var anim_t := 0.0
 var hurt_t := 0.0            # flinch + red flash when hit
 var fur_mats: Array = []
+# movement feel (all visual: none of these change where Vesk goes)
+var _args := OS.get_cmdline_user_args()
+var _no_move_fx := _args.has("--no-move-fx")          # landing / skid / run-start dust
+var _no_body_lean := _args.has("--no-body-lean")      # lean into speeding up, rock back when stopping, skid lean
+var _no_snap_smooth := _args.has("--no-snap-smooth")  # rail catches ease the body onto the rail; the hook rope shoots out
+var vis_off := Vector3.ZERO  # body offset that eases to zero (hides the snap when a rail catches him)
+var rail_fresh := false
+var skid_t := 0.0            # > 0 while skidding through a sharp reversal
+var skid_puff := 0.0
+var acc_lean := 0.0          # forward/back tilt from speeding up / slowing down
+var _prev_hv := Vector2.ZERO
+var _start_cd := 0.0
 
 func _ready() -> void:
 	var cs := CollisionShape3D.new()
@@ -246,6 +258,13 @@ func _physics_process(dt: float) -> void:
 			var diff := angle_difference(cur, tgt)
 			var turned := cur + clampf(diff, -16.0 * dt, 16.0 * dt)
 			var speed := hs * exp(-14.0 * dt) if absf(diff) > 2.3 else hs
+			if absf(diff) > 2.0 and hs > 5.0 and skid_t <= 0.0:
+				skid_t = 0.28
+				if not _no_move_fx: Snd.play("step_gravel_%d" % (randi() % 8 + 1), -9, 0.1)
+			# run start from a standstill: a small kick of dust behind the feet
+			elif hs < 1.0 and want > 6.0 and not _no_move_fx and since_dash > 0.3 and _start_cd <= 0.0:
+				_start_cd = 0.4
+				FX.dust(global_position - Vector3(wish.x, 0, wish.z).normalized() * 0.3, 3, 0.6, -Vector3(wish.x, 0, wish.z).normalized() + Vector3.UP, 50.0)
 			speed = minf(want, speed + 55.0 * dt) if speed < want else lerpf(speed, want, 1.0 - exp(-7.0 * dt))
 			velocity.x = sin(turned) * speed; velocity.z = cos(turned) * speed
 		else:
@@ -301,6 +320,9 @@ func _physics_process(dt: float) -> void:
 	if grounded:
 		if not was_grounded:
 			if vy_before < -6.0: land_t = clampf(-vy_before / 20.0, 0.3, 1.0)
+			if vy_before < -7.0 and not _no_move_fx:
+				var imp := clampf(-vy_before / 20.0, 0.4, 1.0)
+				FX.dust(global_position, int(5 + imp * 7), 0.7 + imp * 0.6)
 			if vy_before < -3.0: Snd.play("land", lerpf(-10.0, 0.0, clampf(-vy_before / 20.0, 0, 1)))
 			long_jump = false
 		jumps = 0; coyote = 0.12
@@ -548,7 +570,7 @@ func _catch_rail(p: Vector3) -> bool:
 		var along := velocity.dot((r.path.global_transform.basis * (t1 - t0)).normalized())
 		# standing near an end with no clear direction: don't snap on and get carried back along it
 		if absf(along) <= 1.0 and grounded and (off < 2.0 or off > r.length - 2.0): continue
-		riding = true; rail = r; rail_off = off
+		riding = true; rail = r; rail_off = off; rail_fresh = true
 		rail_dir = signf(along) if absf(along) > 1.0 else (1.0 if off < r.length * 0.5 else -1.0)
 		rail_speed = maxf(12.0, absf(along))
 		jumps = 0; grounded = true
@@ -567,7 +589,15 @@ func _step_rail(dt: float) -> void:
 	rail_off += rail_dir * rail_speed * dt
 	var done: bool = rail_off <= 0.0 or rail_off >= rail.length
 	var q: Vector3 = rail.path.to_global(rail.curve.sample_baked(clampf(rail_off, 0, rail.length)))
+	var before := global_position
 	global_position = q + Vector3(0, 0.13, 0)
+	if rail_fresh:
+		rail_fresh = false
+		# the catch snaps Vesk sideways/up onto the rail: keep his body where it was and ease it on
+		if not _no_snap_smooth:
+			var off := before - global_position
+			off -= tan * off.dot(tan)
+			vis_off = (vis_off + off).limit_length(1.6)
 	velocity = tan * rail_dir * rail_speed
 	grounded = true; jumps = 0; coyote = 0.12
 	if Vector2(velocity.x, velocity.z).length() > 2.0:
@@ -609,9 +639,11 @@ func _step_swing(dt: float, let_go: bool) -> bool:
 	velocity = swing_dirv * cos(th) * sp + Vector3(0, sin(th) * sp, 0)
 	var hand := global_position + Vector3(0, 1.2, 0)
 	rope.visible = true
-	rope.global_position = (hand + N) * 0.5
+	# the line shoots out to the hook over the first moment instead of appearing whole
+	var tip := N if _no_snap_smooth else hand.lerp(N, smoothstep(0.0, 0.09, swing_t))
+	rope.global_position = (hand + tip) * 0.5
 	var up := (N - hand).normalized()
-	rope.global_basis = Basis(Quaternion(Vector3.UP, up)).scaled(Vector3(1, hand.distance_to(N), 1))
+	rope.global_basis = Basis(Quaternion(Vector3.UP, up)).scaled(Vector3(1, maxf(hand.distance_to(tip), 0.01), 1))
 	if k >= RELEASE or (let_go and swing_t > 0.25):
 		swing_hook = null; rope.visible = false
 		velocity.y += 4.0
@@ -708,7 +740,26 @@ func _animate(dt: float) -> void:
 	flip_t = maxf(0.0, flip_t - dt)
 	if grounded or riding or swing_hook: flip_t = 0.0
 	var flip := TAU * smoothstep(0.42, 0.0, flip_t) if flip_t > 0.0 else 0.0
-	body.rotation = Vector3(-fl + flip, 0, lean)
+	# lean into speeding up, rock back a touch when stopping, and lean back hard through a skid
+	var hv := Vector2(velocity.x, velocity.z)
+	var acc := (hv - _prev_hv) / maxf(dt, 1e-4)
+	_prev_hv = hv
+	var fwd2 := Vector2(sin(face_yaw), cos(face_yaw))
+	skid_t = maxf(0.0, skid_t - dt)
+	_start_cd -= dt
+	var acc_to := 0.0
+	if grounded and not riding and swing_hook == null and dash_t <= 0.0 and not _no_body_lean:
+		acc_to = clampf(acc.dot(fwd2) * 0.004, -0.12, 0.14)
+		if skid_t > 0.0: acc_to = -0.3
+	acc_lean = lerpf(acc_lean, acc_to, 1.0 - exp(-(14.0 if skid_t > 0.0 else 8.0) * dt))
+	if skid_t > 0.0 and grounded and not _no_move_fx:
+		skid_puff -= dt
+		if skid_puff <= 0.0:
+			skid_puff = 0.07
+			FX.dust(global_position + Vector3(fwd2.x, 0, fwd2.y) * 0.25, 2, 0.55, Vector3.UP, 60.0)
+	body.rotation = Vector3(-fl + flip + acc_lean, 0, lean)
+	vis_off *= exp(-12.0 * dt)
+	model.position = vis_off
 	# the flip turns about Vesk's middle, not his feet
 	var piv := Vector3(0, 0.85, 0)
 	body.position = piv - Basis.from_euler(body.rotation) * piv if flip != 0.0 else Vector3.ZERO
