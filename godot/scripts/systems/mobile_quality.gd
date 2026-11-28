@@ -141,7 +141,9 @@ func _tune(n: Node) -> void:
 	elif big < 15.0 and not (gi is MultiMeshInstance3D):
 		gi.visibility_range_end = (230.0 if big >= 6.0 else 150.0) * reach
 		gi.visibility_range_end_margin = 8.0
-	if phone and big < (2.5 if no_lite_extra else 4.0) and gi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
+	# phones: props under 4 m cast no sun shadow; desktop browsers drop only the smallest clutter (under 1.2 m)
+	var no_shadow_under := (2.5 if no_lite_extra else 4.0) if phone else (0.0 if no_lite_extra else 1.2)
+	if big < no_shadow_under and gi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
 		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 func _in_sky(n: Node) -> bool:
