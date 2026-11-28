@@ -66,6 +66,7 @@ func _ready() -> void:
 		_emote("surprised" if h > 2 else "sad", 1.2)
 		if h <= 2: Snd.at("chars_dodger_worried", drone.global_position, -8, 0.05, 4.0)
 		if h > 2: _bark.call_deferred("dodger", "hurt", 0.2))
+	Game.combat_event.connect(_on_combat_event)
 	Game.item_unlocked.connect(func(id): if id == "shard_1": orange_t = 7.0; _emote("angry", 6.0))
 	Game.cutscene_started.connect(func(_id): if drone: drone.visible = false)
 	Game.cutscene_finished.connect(func(_id): if drone: drone.visible = true)
@@ -191,6 +192,36 @@ func _bark(who: String, kind: String, chance: float) -> void:
 	if randf() > chance: return
 	Snd.bark(who, kind)
 	if who == "dodger": bark_cd = 4.0
+
+## Fight reactions (Plated Rollers, the Crane Bot's phase change and Quake Stomp): text barks in the
+## subtitle strip (no new voice lines) and a face. `--no-dodger-calls` turns them off.
+var call_cd := {}
+var calls_seen := {}
+const CALLS := {
+	"plated_seen": [["Plated one! Bolts just bounce off. Wrench it, or stomp it!"],
+		["Another tin can. Wrench it!", "Armoured roller! Crack the shell!", "That one's wearing a saucepan. Wrench!"]],
+	"plated_crack": [["Shell's off! Now it's just a regular grumpy ball."],
+		["Cracked it!", "Peeled like a tin of beans!", "Ha! No more armour for you."]],
+	"boss_phase2": [["It ripped its own arm off. That's... commitment. Grind the track rail!"], ["Here we go again!"]],
+	"boss_quake": [["It's rearing up! Jump the shockwaves, jump!"], ["Jump! Jump!", "Shockwaves! Up, up!", "Rings again! Hop!"]],
+}
+const CALL_GAP := {"plated_seen": 25.0, "plated_crack": 12.0, "boss_phase2": 999.0, "boss_quake": 6.0}
+const CALL_FACE := {"plated_seen": "surprised", "plated_crack": "happy", "boss_phase2": "surprised", "boss_quake": "surprised"}
+static var _no_calls := OS.get_cmdline_user_args().has("--no-dodger-calls")
+
+func _on_combat_event(kind: String, _at: Vector3) -> void:
+	if _no_calls or state != "follow" or not CALLS.has(kind): return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now < float(call_cd.get(kind, -1.0)): return
+	var first := not calls_seen.has(kind)
+	if not first and kind != "boss_quake" and randf() > 0.6: return
+	# a warning always gets through; chatter waits for a quiet moment
+	if kind != "boss_quake" and Snd.voice_player and Snd.voice_player.playing: return
+	call_cd[kind] = now + float(CALL_GAP.get(kind, 10.0)); calls_seen[kind] = true
+	var set_: Array = CALLS[kind][0 if first else 1]
+	Snd.line_started.emit("dodger_call_" + kind, "dodger", set_.pick_random())
+	_emote(CALL_FACE.get(kind, "surprised"), 1.6)
+	if kind != "boss_quake": bark_cd = maxf(bark_cd, 3.0)
 
 # ---------------------------------------------------------------- combo meter and shot ratings
 func _on_kill(_bot: Node, pos: Vector3, _kind: String) -> void:

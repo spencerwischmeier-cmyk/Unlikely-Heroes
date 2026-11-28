@@ -25,6 +25,7 @@ signal progress_restored(zone_ids: Array)                 # Continue: these zone
 signal boss_started(boss_name: String)
 signal boss_health(boss_name: String, frac: float)
 signal boss_defeated(boss_name: String)
+signal combat_event(kind: String, at: Vector3)            # plated_seen, plated_crack, boss_phase2, boss_quake (Dodger reacts)
 signal nuts_changed(total: int)
 signal item_unlocked(id: String)                           # weapon, gadget or upgrade id
 signal collectible_found(kind: String, id: String)       # "washer", "page", "gripe" ...
