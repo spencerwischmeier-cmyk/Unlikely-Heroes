@@ -86,6 +86,12 @@ func puff(pos: Vector3, color := Color(0.85, 0.9, 1.0)) -> void:
 	var m := _bill(color, 0.6, false, true)
 	_emit(pos, _smoke_mesh, m, 8, 0.6, Vector2(0.5, 2.0), Vector3(0, 0.5, 0), Vector2(0.3, 0.7), 80, Vector3.UP)
 
+## Ground dust: a low, soft ring kicked up by feet (landings, skids, run starts). `size` scales spread and puffs.
+func dust(pos: Vector3, n := 7, size := 1.0, dir := Vector3.UP, spread := 88.0) -> void:
+	var m := _bill(Color(0.8, 0.74, 0.64), 0.75, false, true, 0.6)
+	var p := _emit(pos + Vector3(0, 0.08, 0), _smoke_mesh, m, n, 0.55, Vector2(1.2, 3.2) * size, Vector3(0, 0.6, 0), Vector2(0.35, 0.8) * size, spread, dir)
+	p.damping_min = 5.0; p.damping_max = 8.0
+
 func explosion(pos: Vector3, scale := 1.0, chunk_mats: Array = []) -> void:
 	_emit(pos, _fire_mesh, _bill(Color(1.0, 0.6, 0.2), 3.0), 14, 0.55, Vector2(1, 4) * scale, Vector3(0, 1.5, 0), Vector2(1.2, 2.6) * scale)
 	_emit(pos, _fire_mesh, _bill(Color(1.0, 0.95, 0.8), 4.0), 3, 0.18, Vector2(0, 1), Vector3.ZERO, Vector2(2.5, 3.5) * scale)
