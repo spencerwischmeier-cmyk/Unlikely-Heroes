@@ -178,6 +178,10 @@ func _fur(n: Node) -> void:
 				f.rim_enabled = true; f.rim = 0.55; f.rim_tint = 0.55
 				f.subsurf_scatter_enabled = true; f.subsurf_scatter_strength = 0.12
 				f.roughness = maxf(f.roughness, 0.55)
+				# the hurt flash (_animate) drives these; fur_mats was never filled, so hits showed no flash
+				if not f.emission_enabled:
+					f.emission_enabled = true; f.emission = Color(1.0, 0.18, 0.12); f.emission_energy_multiplier = 0.0
+					fur_mats.append(f)
 				mi.set_surface_override_material(i, f)
 
 ## When a wall pushes the camera right up behind Vesk, he dithers out instead of filling the screen
