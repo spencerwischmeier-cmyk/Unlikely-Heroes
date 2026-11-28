@@ -15,6 +15,8 @@ extends Node
 ##   (crane_alarm_whoop), the Quake Stomp's rear-up groan, ground crash and a rolling rumble with every
 ##   shockwave ring (crane_rearup_groan, quake_crash, quake_rumble). cranebot.gd itself plays the armour clang
 ##   on big hits, the JAMMED sputter and the death hiccups. All of them: `--no-boss-sfx` (snd.gd BOSS_SFX).
+## - Skyline Cableway: a low bullwheel / machine hum from the two cable towers over the station and the
+##   terminal (positions as in scripts/level/routes/routes_look.gd _cableway). `--no-cableway-hum`.
 ## `--no-audio-space` turns all of it off. `--space-debug` prints the state every 2 s; `--space-probe` visits the
 ## ground tour spots (scripts/level/ground/ground.gd TOUR), prints island / surface / route beds / cover there, and quits.
 
@@ -40,6 +42,9 @@ var cover_want := 0.0
 var ray_t := 0.0
 var prev := {}            # bot instance id -> last telegraph key
 var dbg_t := 2.0
+var cable_on := true
+var cable_done := false
+const CABLE_TOWERS := [Vector3(-24.5, 10.6, -40.0), Vector3(3.0, 10.6, -53.5)]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -49,6 +54,8 @@ func _ready() -> void:
 	cover_on = not all_off and not args.has("--no-cover-audio")
 	windup_on = not all_off and not args.has("--no-windup-sfx")
 	debug = args.has("--space-debug")
+	cable_on = not all_off and not args.has("--no-cableway-hum")
+	if debug: Snd.line_started.connect(func(id, sp, _t): print("[audio-space] line %s (%s) voiced=%s" % [id, sp, Snd.voice_player != null and Snd.voice_player.playing]))
 	if debug: print("[audio-space] route=%s cover=%s windup=%s" % [route_on, cover_on, windup_on])
 	if args.has("--space-probe"): _probe.call_deferred()
 	if cover_on:
@@ -67,6 +74,7 @@ func _process(dt: float) -> void:
 	if cover_on: _update_cover(dt)
 	if windup_on: _update_windups()
 	if windup_on: _update_boss(dt)
+	if cable_on and not cable_done: _cableway()
 	if debug:
 		dbg_t -= dt
 		if dbg_t <= 0.0:
@@ -259,3 +267,17 @@ func _update_boss(dt: float) -> void:
 		else:
 			whoop_t = randf_range(10.0, 15.0)
 			Snd.at("crane_alarm_whoop", c + Vector3(0, 1.5, 0), -9.0, 0.03, 0.5)
+
+# ------------------------------------------------------------------ cableway hum
+func _cableway() -> void:
+	cable_done = true
+	if not Game.level.islands.has("mast_cable_station") or not Snd.streams.has("cableway_hum"): return
+	for i in CABLE_TOWERS.size():
+		var s: AudioStream = Snd.streams["cableway_hum"].duplicate()
+		if "loop" in s: s.loop = true
+		var p := AudioStreamPlayer3D.new(); p.name = "CablewayHum%d" % i; p.stream = s; p.bus = "World"
+		p.volume_db = -4.0; p.unit_size = 5.0; p.max_distance = 45.0; p.pitch_scale = 1.0 + i * 0.06
+		p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+		Game.level.add_child(p); p.global_position = CABLE_TOWERS[i]
+		p.play(randf() * maxf(s.get_length() - 1.0, 0.0))
+	if debug: print("[audio-space] cableway hum at ", CABLE_TOWERS)
