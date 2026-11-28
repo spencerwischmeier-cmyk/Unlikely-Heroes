@@ -185,7 +185,11 @@ static func _foliage(K, root: Node3D, extra: Array = []) -> int:
 			mmi.queue_free()
 		elif mm.mesh == K.box_mesh:
 			# hedges: shrink the box into a dark core and cover it with clumps
-			var core := mm.duplicate() as MultiMesh
+			# a fresh MultiMesh (every instance is rewritten below): MultiMesh.duplicate() copied the buffer
+			# at a different size and printed "Cannot set a buffer on a Multimesh that is a different size"
+			var core := MultiMesh.new()
+			core.transform_format = MultiMesh.TRANSFORM_3D; core.use_colors = true
+			core.mesh = mm.mesh; core.instance_count = mm.instance_count
 			for i in mm.instance_count:
 				var xf := mm.get_instance_transform(i)
 				var col := mm.get_instance_color(i)
