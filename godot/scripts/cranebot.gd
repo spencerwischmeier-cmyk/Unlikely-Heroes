@@ -16,6 +16,14 @@ extends Node3D
 ##   Rivet fan, Work crew as before
 ##   Cab strike   grinding the track rail all the way up rams the cab: big bonus damage, the crane is
 ##                stunned for a few seconds (and takes extra damage), and the rail cools down
+## Last stand (below 25%, phase 2)
+##   Quake stomp  it rears up on its tracks (a ring at its feet, the lamps strobe), then crashes down and
+##                sends two shockwave rings rolling out across the yard: jump each ring as it reaches you
+## Feel (`--no-boss-feel` turns all of this off): the rivet fan shows its aim lines and locks them a
+## beat before it fires; big hits (3+) rock the turret, knock bolts off and freeze the frame a moment,
+## and a 6+ hit during the fan wind-up jams the volley; the phase change opens with a slow-motion
+## roar, the outrigger slam shoves Vesk and the bots back and red alarm lights come on round the
+## arena; the death throes hiccup and the last blast throws the cab and magnet.
 ## The cab is the weak point. Intro: it drops out of the sky onto a warning ring. Death: it shakes
 ## itself apart, tips over and bursts.
 ##
@@ -103,6 +111,17 @@ var skin_mats: Array = []      # livery materials for the scrap when it breaks
 var cab_squash := 0.0
 var lamp_mat: StandardMaterial3D
 var smoke_t := 0.0
+static var no_feel := OS.get_cmdline_user_args().has("--no-boss-feel")
+const Device := preload("res://scripts/device.gd")
+var rock := Vector2.ZERO        # big-hit stagger of the turret (x: pitch, y: roll), a spring
+var rock_v := Vector2.ZERO
+var fan_lines: Array = []       # rivet fan aim lines
+var fan_mat: StandardMaterial3D
+var fan_aim := Vector3.ZERO     # where the next volley goes (frozen for the last beat)
+var quake_rings: Array = []     # { node, r, hit }
+var quake_next := -1.0          # the second ring follows after this many seconds
+var alarm_lights: Array = []
+var hiccup_t := 0.0
 
 func _m(c: Color, metal := 0.5, rough := 0.4) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new(); m.albedo_color = c; m.metallic = metal; m.roughness = rough
@@ -253,8 +272,15 @@ func _damage_fx(dt: float) -> void:
 		jolt_v += (-jolt * 140.0 - jolt_v * 9.0) * dt
 		jolt += jolt_v * dt
 		cab_model.rotation.x = jolt * 0.12
+	if not no_feel:
+		rock_v += (-rock * 120.0 - rock_v * 8.0) * dt
+		rock += rock_v * dt
+		turn.rotation.x = rock.x * 0.08; turn.rotation.z = rock.y * 0.08
+		for i in alarm_lights.size():
+			var l: OmniLight3D = alarm_lights[i]
+			if is_instance_valid(l): l.light_energy = maxf(0.0, sin(t * 5.0 + i * PI * 0.5)) * 2.5
 	if lamp_mat:
-		var alarm := phase == 2 or state in ["slam", "spray", "sweep_wind", "sweep", "crew", "stunned", "dying", "rip"]
+		var alarm := phase == 2 or state in ["slam", "spray", "sweep_wind", "sweep", "crew", "stunned", "dying", "rip", "quake_wind"]
 		lamp_mat.emission_energy_multiplier = (9.0 if fmod(t, 0.36) < 0.18 else 1.0) if alarm else 0.6
 	if state in ["off", "intro"] or stacks.is_empty(): return
 	# slam tell: the magnet crackles and its coil arcs while it charges over Vesk
@@ -322,6 +348,7 @@ func _rail_lock(locked: bool) -> void:
 	rail_glow.emission_energy_multiplier = 3.0 if locked else 7.0
 
 func _hide() -> void:
+	_clear_quakes(); _alarm_off(); _fan_hide()
 	visible = false; magnet.visible = false; cable.visible = false; warn.visible = false
 	dead = true; state = "off"
 	body.process_mode = Node.PROCESS_MODE_DISABLED; hitbox.process_mode = Node.PROCESS_MODE_DISABLED
@@ -371,6 +398,7 @@ func _hurt(amount: float) -> bool:
 	hp -= amount; flash = 1.0
 	jolt_v -= minf(2.2, 0.6 + amount * 0.25)
 	if amount >= 3.0: Snd.at("chars_crane_hurt", center(), 0, 0.1, 0.8)
+	if amount >= 3.0 and not no_feel and state not in ["dying", "rip"]: _big_hit(amount)
 	if phase == 1 and hp <= BOSS_HP * 0.5:
 		hp = BOSS_HP * 0.5; pending_rip = true     # phase 2 always plays
 	Game.boss_health.emit(NAME, maxf(0.0, hp / BOSS_HP))
@@ -378,6 +406,120 @@ func _hurt(amount: float) -> bool:
 		hp = 0.0; _start_dying()
 		return true
 	return false
+
+## A big hit: the turret rocks on its ring, bolts and panels pop off, the frame freezes a moment. A heavy
+## blow while the rivet port is still charging jams the volley.
+func _big_hit(amount: float) -> void:
+	var a := randf() * TAU
+	var k := clampf(amount / 10.0, 0.35, 1.2)
+	rock_v += Vector2(cos(a), sin(a)) * 2.2 * k + Vector2(-1.2 * k, 0)
+	FX.stop(clampf(0.03 + amount * 0.006, 0.04, 0.12))
+	FX.shake(0.4 + k * 0.6)
+	var c := center() + Vector3(0, 0.6, 0)
+	FX.sparks(c, Color(1, 0.85, 0.5), int(10 + 10 * k), 6.0)
+	ScrapBurst.burst(get_parent(), c, 0.9, skin_mats, int(clampf(amount * 0.6, 3, 8)))
+	if amount >= 6.0 and state == "spray" and st_t > 0.15:
+		state = "idle"; st_t = 1.1; sprays = 0
+		cab_glow.emission_energy_multiplier = 0.5; _fan_hide()
+		FX.explosion(center() + Vector3(sin(turn_yaw) * 1.4, -0.1, cos(turn_yaw) * 1.4), 0.5)
+		if combat: combat.float_text(center() + Vector3(0, 2.0, 0), "JAMMED!", Color(1, 0.8, 0.35), 52)
+		Snd.at("crane_stun", center(), -2, 0.1)
+
+## The rivet fan's aim lines (one per rivet), built once.
+func _fan_build() -> void:
+	fan_mat = StandardMaterial3D.new(); fan_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fan_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; fan_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	fan_mat.albedo_color = Color(1, 0.3, 0.1, 0.4)
+	var cm := CylinderMesh.new(); cm.top_radius = 0.025; cm.bottom_radius = 0.025; cm.height = 1.0; cm.radial_segments = 6; cm.rings = 1
+	for i in 7:
+		var mi := MeshInstance3D.new(); mi.mesh = cm; mi.material_override = fan_mat; mi.top_level = true
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; mi.visible = false
+		add_child(mi); fan_lines.append(mi)
+
+func _fan_hide() -> void:
+	for l in fan_lines: (l as Node3D).visible = false
+
+## Where the fan's rivets go: n points spread round the aim, as the volley fires them.
+func _fan_targets(from: Vector3, to: Vector3) -> Array:
+	var base := atan2(to.x - from.x, to.z - from.z)
+	var n := 7 if (phase == 2) else 5
+	var spread := 1.0 if (phase == 2) else 0.8
+	var dist := Vector2(to.x - from.x, to.z - from.z).length()
+	var out: Array = []
+	for i in n:
+		var a := base + (float(i) / (n - 1) - 0.5) * spread
+		out.append(Vector3(from.x + sin(a) * dist, to.y, from.z + cos(a) * dist))
+	return out
+
+func _fan_tell(from: Vector3, charge: float, locked: bool) -> void:
+	if fan_lines.is_empty(): _fan_build()
+	var tg := _fan_targets(from, fan_aim)
+	for i in fan_lines.size():
+		var l: MeshInstance3D = fan_lines[i]
+		if i >= tg.size(): l.visible = false; continue
+		var d: Vector3 = (tg[i] as Vector3) - from
+		var ln := d.length()
+		if ln < 0.2: l.visible = false; continue
+		l.visible = true
+		var w := 1.0 + charge * 1.5
+		l.global_transform = Transform3D(Basis(Quaternion(Vector3.UP, d / ln)).scaled(Vector3(w, ln, w)), from + d * 0.5)
+	fan_mat.albedo_color = Color(1, 0.85, 0.5, 0.85) if locked else Color(1, 0.3, 0.1, 0.2 + charge * 0.4)
+
+## Quake rings: expanding shockwaves along the ground. Vesk has to be in the air as one passes him.
+func _quake_ring() -> void:
+	var tm := TorusMesh.new(); tm.inner_radius = 0.86; tm.outer_radius = 1.0; tm.rings = 64; tm.ring_segments = 6
+	var m := StandardMaterial3D.new(); m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.albedo_color = Color(1, 0.55, 0.2, 0.9)
+	var mi := MeshInstance3D.new(); mi.mesh = tm; mi.material_override = m; mi.top_level = true
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi); mi.global_position = Vector3(position.x, position.y + 0.15, position.z)
+	quake_rings.append({ node = mi, r = 2.6, hit = false })
+	FX.ring(position + Vector3(0, 0.1, 0), Color(1, 0.6, 0.3), 1.6)
+	Snd.at("crane_slam", position, 2, 0.1)
+
+func _tick_quakes(dt: float) -> void:
+	if quake_next > 0.0:
+		quake_next -= dt
+		if quake_next <= 0.0: _quake_ring()
+	if quake_rings.is_empty(): return
+	var p := player.global_position
+	var dist := Vector2(p.x - position.x, p.z - position.z).length()
+	for q in quake_rings.duplicate():
+		q.r += 8.0 * dt
+		var r: float = q.r
+		var n: MeshInstance3D = q.node
+		n.scale = Vector3(r, 0.35 + 0.2 * sin(r), r)
+		(n.material_override as StandardMaterial3D).albedo_color.a = clampf(1.2 - r / 18.0, 0.0, 0.9)
+		if randf() < 0.6:
+			var a := randf() * TAU
+			FX.puff(Vector3(position.x + cos(a) * r, position.y + 0.2, position.z + sin(a) * r), Color(0.85, 0.75, 0.6))
+		if not q.hit and absf(dist - r) < 0.6 and p.y - position.y < 0.55 and combat.invuln <= 0.0:
+			q.hit = true
+			combat.hurt_player(1, position)
+			var out := Vector3(p.x - position.x, 0, p.z - position.z).normalized()
+			player.velocity += out * 0.8 + Vector3(0, 5.0, 0)
+		if r > 18.0:
+			n.queue_free(); quake_rings.erase(q)
+
+func _clear_quakes() -> void:
+	for q in quake_rings: if is_instance_valid(q.node): q.node.queue_free()
+	quake_rings.clear(); quake_next = -1.0
+
+## Phase 2: red alarm lights strobe round the arena (two on light devices).
+func _alarm_on() -> void:
+	if area.size.x <= 0.0 or not alarm_lights.is_empty(): return
+	var c := area.get_center(); var h := area.size * 0.5 - Vector2(3, 3)
+	var spots := [Vector2(-h.x, -h.y), Vector2(h.x, h.y)] if Device.lite() else [Vector2(-h.x, -h.y), Vector2(h.x, -h.y), Vector2(-h.x, h.y), Vector2(h.x, h.y)]
+	for o in spots:
+		var l := OmniLight3D.new(); l.light_color = Color(1, 0.18, 0.1); l.omni_range = 14.0; l.light_energy = 0.0
+		l.shadow_enabled = false
+		get_parent().add_child(l); l.global_position = Vector3(c.x + o.x, position.y + 5.0, c.y + o.y)
+		alarm_lights.append(l)
+
+func _alarm_off() -> void:
+	for l in alarm_lights: if is_instance_valid(l): l.queue_free()
+	alarm_lights.clear()
 
 ## Kept for older callers.
 func crew_down() -> void:
@@ -403,6 +545,7 @@ func _physics_process(dt: float) -> void:
 	var angry := hp < BOSS_HP * 0.25
 	var speed := 1.35 if phase == 2 else 1.0
 	if pending_rip and state not in ["intro", "rip", "dying"]: _start_rip()
+	if not Game.input_locked: _tick_quakes(dt)
 	match state:
 		"intro": _intro(dt, to_hero)
 		"dying":
@@ -478,16 +621,13 @@ func _fight(dt: float, hero: Vector3, hero_flat: Vector3, to_hero: Vector3, hd: 
 		"spray":
 			pitch += (0.9 - pitch) * (1.0 - exp(-3.0 * dt))
 			cab_glow.emission_energy_multiplier = 0.5 + clampf(1.0 - st_t / 0.8, 0, 1) * 10.0 * (0.7 + 0.3 * sin(t * 40.0))
+			var from := center() + Vector3(sin(turn_yaw) * 1.4, -0.1, cos(turn_yaw) * 1.4)
+			# tell: an aim line for every rivet; they freeze (and brighten) for the last beat, so a sidestep works
+			if st_t > 0.28 or no_feel: fan_aim = hero + Vector3(0, 0.9, 0)
+			if not no_feel and st_t < 0.6 and st_t > 0.0: _fan_tell(from, clampf(1.0 - st_t / 0.6, 0, 1), st_t <= 0.28)
 			if st_t <= 0.0:
-				var from := center() + Vector3(sin(turn_yaw) * 1.4, -0.1, cos(turn_yaw) * 1.4)
-				var to := hero + Vector3(0, 0.9, 0)
-				var base := atan2(to.x - from.x, to.z - from.z)
-				var n := 7 if (phase == 2) else 5
-				var spread := 1.0 if (phase == 2) else 0.8
-				var dist := Vector2(to.x - from.x, to.z - from.z).length()
-				for i in n:
-					var a := base + (float(i) / (n - 1) - 0.5) * spread
-					combat.enemy_shot(from, Vector3(from.x + sin(a) * dist, to.y, from.z + cos(a) * dist))
+				for tgt in _fan_targets(from, fan_aim): combat.enemy_shot(from, tgt)
+				_fan_hide()
 				sprays -= 1; st_t = 0.55; Snd.at("crane_spray", from, 2)
 				FX.sparks(from, Color(1, 0.6, 0.3), 12, 5.0)
 				cab_glow.emission_energy_multiplier = 0.5
@@ -526,6 +666,19 @@ func _fight(dt: float, hero: Vector3, hero_flat: Vector3, to_hero: Vector3, hd: 
 			_sweep_hit(prev, turn_yaw)
 			if st_t < 0.5: jib_h += (JIB_UP - jib_h) * (1.0 - exp(-4.0 * dt))
 			if st_t <= 0.0: state = "idle"; st_t = randf_range(1.3, 1.8) / speed
+		"quake_wind":
+			# rears up on its tracks, shuddering, then crashes down
+			var u := clampf(1.0 - st_t / 1.1, 0, 1)
+			rotation.x = -0.16 * sin(minf(u, 0.85) / 0.85 * PI * 0.5) + sin(t * 40.0) * 0.008
+			jib_h += (JIB_UP + 0.6 - jib_h) * (1.0 - exp(-4.0 * dt))
+			if randf() < dt * 8.0: FX.puff(position + Vector3(randf_range(-2, 2), 0.2, randf_range(-2, 2)), Color(0.85, 0.75, 0.6))
+			if st_t <= 0.0:
+				rotation.x = 0.0
+				FX.explosion(position + Vector3(0, 0.3, 0), 0.9); FX.shake(1.4); FX.stop(0.06)
+				_quake_ring(); quake_next = 0.85
+				state = "quake"; st_t = 1.9
+		"quake":
+			if st_t <= 0.0: state = "idle"; st_t = randf_range(1.0, 1.4) / speed
 		"stunned":
 			jib_h += (0.45 - jib_h) * (1.0 - exp(-8.0 * dt))
 			if randf() < dt * 10.0: FX.sparks(center() + Vector3(randf_range(-1, 1), randf_range(-0.5, 1), randf_range(-1, 1)), Color(1, 0.8, 0.4), 8, 5.0)
@@ -553,11 +706,12 @@ func _pick_attack(speed: float, angry: bool) -> void:
 	else:
 		opts = ["sweep", "sweep", "spray"]
 		if _bots_in_arena() < 3: opts.append("crew")
+		if angry and not no_feel: opts.append("quake"); opts.append("quake")
 	var nxt: String = opts.pick_random()
 	if nxt == last_attack and randf() < 0.7:
 		var others := opts.filter(func(o): return o != nxt)
 		if not others.is_empty(): nxt = others.pick_random()
-	if force_next != "" and not (force_next == "sweep" and phase == 1) and not (force_next == "slam" and phase == 2): nxt = force_next
+	if force_next != "" and not (force_next in ["sweep", "quake"] and phase == 1) and not (force_next == "slam" and phase == 2): nxt = force_next
 	last_attack = nxt; state = nxt
 	match nxt:
 		"slam":
@@ -565,6 +719,11 @@ func _pick_attack(speed: float, angry: bool) -> void:
 			if not said_slam: said_slam = true; Game.say("boss_slam")
 		"spray": st_t = 0.8; sprays = 2 if (phase == 2 or angry) else 1
 		"crew": st_t = 1.2
+		"quake":
+			state = "quake_wind"; st_t = 1.1
+			FX.warn_ring(Vector3(position.x, position.y, position.z), 4.0, 1.1, Color(1, 0.45, 0.15))
+			Snd.at("crane_warn", center(), 3, 0.0)
+			Snd.at("enemy_windup_slam" if Snd.has_sound("enemy_windup_slam") else "chars_crane_roar", center(), 0, 0.05)
 		"sweep":
 			state = "sweep_wind"; st_t = 1.4
 			sweep_dir = 1.0 if randf() < 0.5 else -1.0
@@ -663,6 +822,12 @@ func _start_rip() -> void:
 	half.emit()
 	Snd.at("crane_warn", center(), 4, 0.0)
 	eye_mat.emission = Color(1, 0.4, 0.08)
+	_fan_hide()
+	if not no_feel:
+		# the turning point lands as a beat: a slow-motion roar, the turret reels
+		FX.slow(0.35, 0.7); FX.shake(1.2)
+		Snd.at("chars_crane_roar", center(), 4, 0.0)
+		rock_v += Vector2(-3.0, randf_range(-1.5, 1.5))
 
 func _rip(dt: float, to_hero: Vector3) -> void:
 	var k := 4.0 - st_t   # time since the rip started
@@ -702,6 +867,18 @@ func _rip(dt: float, to_hero: Vector3) -> void:
 			FX.puff(o.global_position + Vector3(0, 0.2, 0)); FX.ring(o.global_position + Vector3(0, 0.05, 0), Color(1, 0.7, 0.4), 0.5)
 		FX.shake(1.2); Snd.at("crane_slam", position, 4)
 		phase = 2
+		if not no_feel:
+			# the outriggers hit like a shockwave: Vesk and any bots are shoved back, alarms come on
+			FX.ring(position + Vector3(0, 0.1, 0), Color(1, 0.55, 0.25), 2.6)
+			var d := player.global_position - position; d.y = 0
+			if d.length() < 9.0 and d.length() > 0.1:
+				player.velocity += d.normalized() * minf(6.0, (9.0 - d.length()) * 0.9) + Vector3(0, 3.5, 0)
+			for b in get_tree().get_nodes_in_group("bots"):
+				if b.dead or not b.has_method("knock"): continue
+				var bd: Vector3 = (b as Node3D).global_position - position; bd.y = 0
+				if bd.length() < 10.0 and bd.length() > 0.1: b.knock(bd.normalized() * 3.0)
+			_alarm_on()
+			Snd.at("zone_alarm", position, -2, 0.0)
 		rail_path.visible = true; _rail_lock(false); _rail_on(true); rail_cd = 0.0
 		Snd.at("rail_unlock", position, 2)
 		if Game.hud and Game.hud.has_method("show_banner"): Game.hud.show_banner("GRIND THE TRACK RAIL", "Ride it up and ram the cab. Double jump the jib!", Color(1, 0.75, 0.3))
@@ -712,6 +889,10 @@ func _rip(dt: float, to_hero: Vector3) -> void:
 # ---------- death ----------
 func _start_dying() -> void:
 	state = "dying"; st_t = 3.4; warn.visible = false
+	_fan_hide(); _clear_quakes(); rotation.x = 0.0
+	if not no_feel:
+		FX.slow(0.3, 0.9)     # the finishing blow lands in slow motion
+		rock_v += Vector2(-4.0, randf_range(-2.0, 2.0)); hiccup_t = 0.5
 	_rail_on(false); rail_path.visible = false
 	for c in crates: c.charge = 0.0
 	Snd.at("crane_warn", center(), 4, 0.0); Snd.at("boss_defeat", center(), 6, 0.0)
@@ -724,6 +905,15 @@ func _dying(dt: float) -> bool:
 	if randf() < dt * 10.0: FX.smoke_trail(position + Vector3(randf_range(-2, 2), 2.5, randf_range(-2, 2)), 2.0)
 	if randf() < dt * 4.0: Snd.at("explode_small", center(), 0, 0.2, 0.1)
 	var k := 3.4 - st_t
+	if not no_feel:
+		# death throes: it hiccups, bucking on its tracks with a pop of fire and a puff of bolts
+		hiccup_t -= dt
+		if hiccup_t <= 0.0 and st_t > 0.5:
+			hiccup_t = randf_range(0.45, 0.7)
+			rock_v += Vector2(randf_range(-3.0, -1.5), randf_range(-2.5, 2.5))
+			FX.explosion(center() + Vector3(randf_range(-1, 1), 0.8, randf_range(-1, 1)), 0.6)
+			ScrapBurst.burst(get_parent(), center() + Vector3(0, 0.8, 0), 1.0, skin_mats, 4)
+			Snd.at("chars_crane_hurt", center(), -2, 0.15, 0.3)
 	rotation.z = sin(t * 30.0) * 0.03 + (0.0 if k < 2.2 else (k - 2.2) * 0.22)
 	turn_yaw += dt * (0.5 + k * 0.8)
 	if phase == 1: pitch = maxf(-0.25, pitch - dt * 0.5)
@@ -734,7 +924,14 @@ func _dying(dt: float) -> bool:
 		var at := center()
 		FX.death_burst(at, 2.6, flash_mats.slice(0, 2), Color(1, 0.75, 0.3)); FX.explosion(position + Vector3(0, 1, 0), 2.0)
 		FX.shake(2.2); Snd.at("explode_big", at, 6, 0.0)
-		ScrapBurst.burst(get_parent(), at, 2.4, skin_mats, 26)
+		var thrown: Array = []
+		if not no_feel:
+			# the cab blows off the turret and the magnet drops, tumbling with the scrap
+			for n in [cab_model, mag_model]: if n and is_instance_valid(n): thrown.append(n)
+			cab_model = null; mag_model = null
+			FX.ring(position + Vector3(0, 0.1, 0), Color(1, 0.8, 0.4), 3.0)
+			FX.slow(0.4, 0.5)
+		ScrapBurst.burst(get_parent(), at, 2.4, skin_mats, 26, thrown)
 		for c in crates: if is_instance_valid(c): c.smash(true)
 		crates.clear()
 		rotation.z = 0.0
