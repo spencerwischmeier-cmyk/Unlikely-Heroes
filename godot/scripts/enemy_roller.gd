@@ -97,11 +97,12 @@ func _build_plates() -> void:
 	break_parts = break_parts + plates
 
 ## The plates crack and burst off; it reels, then comes on angrier and quicker.
-func _crack(point: Vector3, dir: Vector3) -> void:
+func _crack(point: Vector3, dir: Vector3, heavy := false) -> void:
 	if Engine.has_meta("et_log"): print("[enemy-test] plated roller cracked (armor left %.2f)" % armor)
 	armor = 0.0
 	no_number_frame = Engine.get_physics_frames()
 	Game.combat_event.emit("plated_crack", global_position)
+	if heavy: Game.combat_event.emit("plated_smash", global_position)   # cracked by a wrench, stomp or slam (style bonus)
 	var live := plates.filter(func(n): return is_instance_valid(n))
 	break_parts = break_parts.filter(func(n): return not (n in plates))
 	plates.clear()
@@ -144,7 +145,7 @@ func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 	if dead: return false
 	if armor > 0.0:
 		Game.bot_hit.emit(self, amount)
-		if amount >= 1.5 or armor - amount * 0.3 <= 0.0: _crack(point, dir)
+		if amount >= 1.5 or armor - amount * 0.3 <= 0.0: _crack(point, dir, amount >= 1.5)
 		else: _glance(amount, point, dir)
 		return false
 	if amount >= 2.0 and player and global_position.distance_to(player.global_position) < 3.6:

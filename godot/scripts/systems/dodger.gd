@@ -194,7 +194,7 @@ func _bark(who: String, kind: String, chance: float) -> void:
 	if who == "dodger": bark_cd = 4.0
 
 ## Fight reactions (Plated Rollers, the Crane Bot's phase change and Quake Stomp): text barks in the
-## subtitle strip (no new voice lines) and a face. `--no-dodger-calls` turns them off.
+## subtitle strip, voiced, and a face. `--no-dodger-calls` turns them off.
 var call_cd := {}
 var calls_seen := {}
 const CALLS := {
@@ -208,6 +208,9 @@ const CALLS := {
 const CALL_GAP := {"plated_seen": 25.0, "plated_crack": 12.0, "boss_phase2": 999.0, "boss_quake": 6.0}
 const CALL_FACE := {"plated_seen": "surprised", "plated_crack": "happy", "boss_phase2": "surprised", "boss_quake": "surprised"}
 static var _no_calls := OS.get_cmdline_user_args().has("--no-dodger-calls")
+## voice file kind per call (`--no-call-voice`: text only, as before)
+const CALL_VOICE := {"plated_seen": "plated", "plated_crack": "crack", "boss_phase2": "phase2", "boss_quake": "quake"}
+static var _no_call_voice := OS.get_cmdline_user_args().has("--no-call-voice")
 
 func _on_combat_event(kind: String, _at: Vector3) -> void:
 	if _no_calls or state != "follow" or not CALLS.has(kind): return
@@ -224,7 +227,11 @@ func _on_combat_event(kind: String, _at: Vector3) -> void:
 		return
 	call_cd[kind] = now + float(CALL_GAP.get(kind, 10.0)); calls_seen[kind] = true
 	var set_: Array = CALLS[kind][0 if first else 1]
-	Snd.line_started.emit("dodger_call_" + kind, "dodger", set_.pick_random())
+	var i := randi() % set_.size()
+	# voiced (audio/voice/dodger_<kind>_<n>, art/voice_dodger_calls.py): Snd.voice shows the same line as the subtitle
+	var vid := "dodger_%s%s_%d" % [CALL_VOICE.get(kind, kind), "First" if first else "", i + 1]
+	if not _no_call_voice and ResourceLoader.exists("res://audio/voice/%s.ogg" % vid): Snd.voice(vid, kind == "boss_quake")
+	else: Snd.line_started.emit("dodger_call_" + kind, "dodger", set_[i])
 	_emote(CALL_FACE.get(kind, "surprised"), 1.6)
 	if kind != "boss_quake": bark_cd = maxf(bark_cd, 3.0)
 

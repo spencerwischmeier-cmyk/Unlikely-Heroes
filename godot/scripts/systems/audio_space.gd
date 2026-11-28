@@ -10,6 +10,13 @@ extends Node
 ##   the crew roller's riveter cocks (rivet), the hornet's eye charges (hornet), the Crane Bot's slam and sweep
 ##   strain (slam) and its spray charges (charge). `--no-windup-sfx`. Unused so far: enemy_windup_lunge
 ##   (a motor rev before a lunge) and enemy_windup_throw (a spring-arm creak before a throw).
+## - Crane Bot cues (round 2), read off its state like the wind-ups: a fury roar when it rips its jib off for
+##   phase two (boss_phase_roar), an alarm whoop when the red alarm lights come on and now and then after
+##   (crane_alarm_whoop), the Quake Stomp's rear-up groan, ground crash and a rolling rumble with every
+##   shockwave ring (crane_rearup_groan, quake_crash, quake_rumble). cranebot.gd itself plays the armour clang
+##   on big hits, the JAMMED sputter and the death hiccups. All of them: `--no-boss-sfx` (snd.gd BOSS_SFX).
+## - Skyline Cableway: a low bullwheel / machine hum from the two cable towers over the station and the
+##   terminal (positions as in scripts/level/routes/routes_look.gd _cableway). `--no-cableway-hum`.
 ## `--no-audio-space` turns all of it off. `--space-debug` prints the state every 2 s; `--space-probe` visits the
 ## ground tour spots (scripts/level/ground/ground.gd TOUR), prints island / surface / route beds / cover there, and quits.
 
@@ -35,6 +42,9 @@ var cover_want := 0.0
 var ray_t := 0.0
 var prev := {}            # bot instance id -> last telegraph key
 var dbg_t := 2.0
+var cable_on := true
+var cable_done := false
+const CABLE_TOWERS := [Vector3(-24.5, 10.6, -40.0), Vector3(3.0, 10.6, -53.5)]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -44,6 +54,8 @@ func _ready() -> void:
 	cover_on = not all_off and not args.has("--no-cover-audio")
 	windup_on = not all_off and not args.has("--no-windup-sfx")
 	debug = args.has("--space-debug")
+	cable_on = not all_off and not args.has("--no-cableway-hum")
+	if debug: Snd.line_started.connect(func(id, sp, _t): print("[audio-space] line %s (%s) voiced=%s" % [id, sp, Snd.voice_player != null and Snd.voice_player.playing]))
 	if debug: print("[audio-space] route=%s cover=%s windup=%s" % [route_on, cover_on, windup_on])
 	if args.has("--space-probe"): _probe.call_deferred()
 	if cover_on:
@@ -61,10 +73,13 @@ func _process(dt: float) -> void:
 	if route_on: _update_routes(dt)
 	if cover_on: _update_cover(dt)
 	if windup_on: _update_windups()
+	if windup_on: _update_boss(dt)
+	if cable_on and not cable_done: _cableway()
 	if debug:
 		dbg_t -= dt
 		if dbg_t <= 0.0:
 			dbg_t = 2.0
+			if Snd.music_lift > 0.01: print("[audio-space] music lift %.2f track=%s" % [Snd.music_lift, Snd.track])
 			var w := {}
 			for b in bed_w: w[b] = snappedf(bed_w[b], 0.01)
 			var d := _director()
@@ -209,3 +224,60 @@ func _probe() -> void:
 		for b in bed_w: if bed_w[b] > 0.01: w[b] = snappedf(bed_w[b], 0.01)
 		print("[audio-space] probe %-16s island=%-18s surface=%-8s cover=%.2f routes=%s" % [t[0], d.cur_island if d else "?", d.surface() if d else "?", cover, w])
 	get_tree().quit()
+
+# ------------------------------------------------------------------ Crane Bot cues
+var boss_state := ""
+var boss_rings := 0
+var boss_alarm := false
+var whoop_t := 0.0
+var whoops_left := 0
+
+func _update_boss(dt: float) -> void:
+	var b: Node = null
+	for n in get_tree().get_nodes_in_group("boss"):
+		if n.get("quake_rings") != null: b = n; break
+	if b == null or not (b is Node3D): boss_state = ""; boss_alarm = false; return
+	var c: Vector3 = b.center() if b.has_method("center") else (b as Node3D).global_position + Vector3(0, 2, 0)
+	var base: Vector3 = (b as Node3D).global_position
+	var st := String(b.get("state"))
+	if st != boss_state:
+		match st:
+			"rip": Snd.at("boss_phase_roar", c, 5.0, 0.03, 1.0)
+			"quake_wind": Snd.at("crane_rearup_groan", base + Vector3(0, 1, 0), 2.0, 0.05, 0.5)
+			"quake": Snd.at("quake_crash", base + Vector3(0, 0.5, 0), 5.0, 0.05, 0.5)
+		if debug: print("[audio-space] boss state ", st)
+		boss_state = st
+	var rings: int = (b.get("quake_rings") as Array).size()
+	if rings > boss_rings:
+		Snd.at("quake_rumble", base + Vector3(0, 0.5, 0), 2.0, 0.08, 0.3)
+		if debug: print("[audio-space] quake ring %d" % rings)
+	boss_rings = rings
+	var al = b.get("alarm_lights")
+	var lit: bool = al is Array and not (al as Array).is_empty() and not b.get("dead") and st != "dying"
+	if lit and not boss_alarm:
+		whoops_left = 2; whoop_t = 0.0
+		if debug: print("[audio-space] alarm lights on")
+	boss_alarm = lit
+	if not lit: return
+	whoop_t -= dt
+	if whoop_t <= 0.0:
+		if whoops_left > 0:
+			whoops_left -= 1; whoop_t = 1.35
+			Snd.at("crane_alarm_whoop", c + Vector3(0, 1.5, 0), 0.0, 0.0, 0.5)
+		else:
+			whoop_t = randf_range(10.0, 15.0)
+			Snd.at("crane_alarm_whoop", c + Vector3(0, 1.5, 0), -9.0, 0.03, 0.5)
+
+# ------------------------------------------------------------------ cableway hum
+func _cableway() -> void:
+	cable_done = true
+	if not Game.level.islands.has("mast_cable_station") or not Snd.streams.has("cableway_hum"): return
+	for i in CABLE_TOWERS.size():
+		var s: AudioStream = Snd.streams["cableway_hum"].duplicate()
+		if "loop" in s: s.loop = true
+		var p := AudioStreamPlayer3D.new(); p.name = "CablewayHum%d" % i; p.stream = s; p.bus = "World"
+		p.volume_db = -4.0; p.unit_size = 5.0; p.max_distance = 45.0; p.pitch_scale = 1.0 + i * 0.06
+		p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+		Game.level.add_child(p); p.global_position = CABLE_TOWERS[i]
+		p.play(randf() * maxf(s.get_length() - 1.0, 0.0))
+	if debug: print("[audio-space] cableway hum at ", CABLE_TOWERS)

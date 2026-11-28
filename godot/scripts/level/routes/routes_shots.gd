@@ -19,7 +19,7 @@ const SPOTS := [
 	["approach_side", Vector3(-6, 0.1, -50.0), Vector3(-6, -2, -45), 0.0, Vector3(-30, 10, -30)],
 	["cableway", Vector3(-27.0, 6.7, -40.0), Vector3(4, 7, -53), -0.05],
 	["barge", Vector3(59.0, 3.1, -34.0), Vector3(36, 3.5, -48), -0.05],
-	["dish_rail", Vector3(20.0, 20.1, -48.5), Vector3(4, 3, -92), 0.0, Vector3(24, 24, -44)],
+	["dish_rail", Vector3(20.0, 20.1, -48.5), Vector3(6, 6, -86), 0.0, Vector3(13, 25, -57)],   # beside the dish, not behind it
 	["cable_side", Vector3(-27.0, 6.7, -40.0), Vector3(-10, 6, -47), 0.0, Vector3(-14, 13, -24)],
 	["barge_side", Vector3(59.0, 3.1, -34.0), Vector3(56, 5, -36), 0.0, Vector3(74, 11, -16)],
 	["barge_wide", Vector3(59.0, 3.1, -34.0), Vector3(55, 10, -36), 0.0, Vector3(84, 12, -6)],

@@ -771,10 +771,73 @@ def signal_lamp():
     p.finish()
 
 
+def ticket_booth():
+    """A cableway ticket booth (1.4 x 1.1, faces +Z): cream panelled walls on a stone plinth, a glazed window with
+    a brass grille and a counter, a teal roof with a scalloped valance, a lamp over the window, a fare board."""
+    p = Prop('rt_ticket_booth'); tl = K('paint', TEAL); cr = K('paint', CREAM); br = K('brass')
+    box(p, (1.5, 0.16, 1.2), S(STONE_LT), (0, 0.08, 0), b=0.03)
+    box(p, (1.4, 1.0, 1.1), cr, (0, 0.66, 0), b=0.03)
+    box(p, (1.4, 0.9, 0.2), cr, (0, 2.05, 0.45), b=0.02)
+    for sx in (-1, 1):
+        box(p, (0.16, 1.5, 1.1), cr, (sx * 0.62, 1.86, 0), b=0.02)
+    box(p, (1.4, 1.5, 0.12), cr, (0, 1.86, -0.49), b=0.02)
+    box(p, (1.08, 0.9, 0.04), K('glass', GLASS), (0, 1.56, 0.44), b=0)
+    for k in range(5): box(p, (0.02, 0.9, 0.03), br, (-0.4 + k * 0.2, 1.56, 0.47), b=0, seg=1)
+    box(p, (1.3, 0.06, 0.34), K('wood', WOOD_DK), (0, 1.16, 0.62), b=0.015)
+    box(p, (1.5, 0.08, 1.25), tl, (0, 2.56, 0.02), b=0.02)
+    for sx in (-1, 1):
+        box(p, (0.9, 0.06, 1.4), tl, (sx * 0.38, 2.72, 0.02), rot=(0, 0, -sx * 0.32), b=0.02)
+    for k in range(7):
+        sph(p, 0.08, K('paint', CRIMSON if k % 2 else SAFFRON), (-0.66 + k * 0.22, 2.46, 0.63), (1, 0.8, 0.4), seg=8, rings=4)
+    sph(p, 0.07, br, (0, 3.05, 0.02), seg=8, rings=6)
+    rod(p, (0, 2.5, 0.6), (0, 2.5, 0.82), 0.015, K('metal', IRON))
+    sph(p, 0.09, K('glow', AMBER), (0, 2.38, 0.82), seg=8, rings=6)
+    p.mark('light_0', (0, 2.3, 0.9))
+    # the fare board on the side
+    box(p, (0.04, 0.6, 0.8), K('paint', 0x1e3a3a), (0.72, 1.75, 0), b=0.01)
+    for k in range(4): box(p, (0.045, 0.05, 0.6), K('paint', CREAM), (0.73, 1.92 - k * 0.12, 0), b=0, seg=1)
+    p.finish()
+
+
+def queue_rail():
+    """2 m of queue barrier along X: two brass stanchions on round feet and a sagging crimson rope"""
+    p = Prop('rt_queue_rail'); br = K('brass')
+    for x in (-1.0, 1.0):
+        cyl(p, 0.16, 0.04, br, (x, 0.02, 0), seg=12, b=0)
+        cyl(p, 0.03, 0.9, br, (x, 0.47, 0), seg=8, b=0)
+        sph(p, 0.05, br, (x, 0.95, 0), seg=8, rings=6)
+    n = 8
+    for k in range(n):
+        x0 = -1.0 + 2.0 * k / n; x1 = x0 + 2.0 / n
+        y0 = 0.88 - 0.22 * (1 - ((x0) ** 2)); y1 = 0.88 - 0.22 * (1 - ((x1) ** 2))
+        rod(p, (x0, y0, 0), (x1, y1, 0), 0.025, K('cloth', CRIMSON), seg=6)
+    p.finish()
+
+
+def poster_board():
+    """a two-sided poster board on iron legs (faces +Z and -Z): travel posters for the gardens, the mast and the
+    barges, a little brass roof"""
+    p = Prop('rt_poster_board'); ir = K('metal', IRON); br = K('brass')
+    for x in (-0.75, 0.75):
+        cyl(p, 0.04, 2.2, ir, (x, 1.1, 0), seg=8, b=0)
+    box(p, (1.6, 1.2, 0.06), K('paint', 0x1e3a3a), (0, 1.5, 0), b=0.01)
+    box(p, (1.7, 0.05, 0.2), br, (0, 2.15, 0), b=0.01)
+    cols = [(SKY, LEAF, CREAM), (SAFFRON, CRIMSON, CREAM), (PLUM, TEAL, SAFFRON)]
+    for sz in (-1, 1):
+        for i, (bg, a, c) in enumerate(cols):
+            x = -0.5 + i * 0.5
+            box(p, (0.44, 1.0, 0.01), K('paint', bg), (x, 1.5, sz * 0.036), b=0, seg=1)
+            sph(p, 0.13, K('paint', a), (x, 1.62, sz * 0.042), (1, 1, 0.1), seg=10, rings=6)
+            box(p, (0.34, 0.07, 0.01), K('paint', c), (x, 1.2, sz * 0.042), b=0, seg=1)
+            box(p, (0.3, 0.12, 0.01), K('paint', a), (x, 1.82, sz * 0.042), b=0, seg=1)
+    p.finish()
+
+
 ALL = [pier, arch, parapet, parapet_post, lamp_twin, flower_boxes, banners,
        rail_lacquer, lacquer_post, lantern_gate, lantern_pier, timber_bay,
        rail_freight, freight_post, girder_bay, sign_gantry, flood_mast, cable_pylon,
-       pylon_head, pylon_arm, cable_tower, garden_lamp, pennants, barge_hull, barge_envelope, signal_lamp]
+       pylon_head, pylon_arm, cable_tower, garden_lamp, pennants, barge_hull, barge_envelope, signal_lamp,
+       ticket_booth, queue_rail, poster_board]
 
 if __name__ == '__main__':
     want = [a for a in sys.argv[1:] if not a.startswith('-')]
