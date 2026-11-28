@@ -26,6 +26,7 @@ var hull := MAX_HULL
 var invuln := 0.0
 var nut_chain := 0
 var nut_last := 0
+var no_nut_juice := OS.get_cmdline_user_args().has("--no-nut-juice")
 
 const ORDER := ["arc_lancer", "scatter_bloom", "thump_lobber", "seeker_hive"]
 const WEAPONS := {
@@ -619,7 +620,14 @@ func drop_nuts(pos: Vector3, n: int) -> void:
 	for i in n:
 		var mi := MeshInstance3D.new(); mi.mesh = nut_mesh; mi.material_override = nut_mat
 		add_child(mi); mi.global_position = pos
-		pickups.append({ node = mi, vel = Vector3(randf_range(-3, 3), randf_range(4, 8), randf_range(-3, 3)), t = 0.0, kind = "nut", spin = Vector3(randf_range(-8, 8), randf_range(-8, 8), 0) })
+		if no_nut_juice:
+			pickups.append({ node = mi, vel = Vector3(randf_range(-3, 3), randf_range(4, 8), randf_range(-3, 3)), t = 0.0, kind = "nut", spin = Vector3(randf_range(-8, 8), randf_range(-8, 8), 0) })
+			continue
+		# a fountain: they spray out in a ring, bounce, then stream in to Vesk one after another
+		var a := TAU * float(i) / maxf(1.0, n) + randf_range(-0.4, 0.4)
+		var sp := randf_range(2.2, 4.2)
+		pickups.append({ node = mi, vel = Vector3(cos(a) * sp, randf_range(6, 9.5), sin(a) * sp), t = 0.0, kind = "nut",
+			spin = Vector3(randf_range(-10, 10), randf_range(-10, 10), 0), pull = 0.55 + float(i) * 0.06 + randf_range(0.0, 0.15)})
 
 func drop_cell(pos: Vector3) -> void:
 	var m := PrismMesh.new(); m.size = Vector3(0.35, 0.35, 0.35)
@@ -725,7 +733,7 @@ func _physics_process(dt: float) -> void:
 			p.t += dt
 			var pos: Vector3 = p.node.global_position
 			var d := pos.distance_to(target)
-			if p.t > 0.5 and (d < (10.0 if p.kind == "nut" else 3.5) or (p.kind == "nut" and p.t > 2.2)):
+			if p.t > float(p.get("pull", 0.5)) and (d < (10.0 if p.kind == "nut" else 3.5) or (p.kind == "nut" and p.t > 2.2)):
 				p.vel = p.vel.lerp((target - pos).normalized() * maxf(14.0, 30.0 - d * 1.5), 1.0 - exp(-10.0 * dt))
 			else:
 				p.vel.y -= 20.0 * dt
@@ -733,7 +741,9 @@ func _physics_process(dt: float) -> void:
 			var q := PhysicsRayQueryParameters3D.create(pos + Vector3(0, 0.3, 0), pos - Vector3(0, 0.12, 0)); q.collision_mask = 1
 			var g := space.intersect_ray(q)
 			if g and p.vel.y < 0:
-				pos.y = g.position.y + 0.12; p.vel.y = absf(p.vel.y) * 0.4; p.vel.x *= 0.7; p.vel.z *= 0.7
+				if p.has("pull") and p.vel.y < -3.0: p.node.scale = Vector3(1.35, 0.6, 1.35)   # a squashy little bounce
+				pos.y = g.position.y + 0.12; p.vel.y = absf(p.vel.y) * (0.55 if p.has("pull") else 0.4); p.vel.x *= 0.7; p.vel.z *= 0.7
+			if p.has("pull"): p.node.scale = p.node.scale.lerp(Vector3.ONE, 1.0 - exp(-12.0 * dt))
 			p.node.global_position = pos
 			p.node.rotation += p.spin * dt
 			if d < 0.75:
@@ -743,7 +753,13 @@ func _physics_process(dt: float) -> void:
 						var now := Time.get_ticks_msec()
 						nut_chain = nut_chain + 1 if now - nut_last < 450 else 0
 						nut_last = now
-						Game.add_nuts(10); Snd.play("nut_pickup", -8, 0.03, 0.03, 1.0 + minf(nut_chain, 12) * 0.045)
+						if no_nut_juice:
+							Game.add_nuts(10); Snd.play("nut_pickup", -8, 0.03, 0.03, 1.0 + minf(nut_chain, 12) * 0.045)
+						else:
+							# the climb goes further, a chime marks every 8th, and each one winks gold at Vesk
+							Game.add_nuts(10); Snd.play("nut_pickup", -8, 0.02, 0.02, 1.0 + minf(nut_chain, 20) * 0.04)
+							if nut_chain > 0 and nut_chain % 8 == 0: Snd.play("combo_up" if Snd.has_sound("combo_up") else "nut_pickup", -12, 0.0, 0.0, 1.0 + minf(nut_chain, 32) * 0.02)
+							if nut_chain % 2 == 0: FX.sparks(target, Color(1, 0.85, 0.35), 3, 2.5)
 					"ammo": _collect_ammo(); Snd.play("cell_pickup", -5, 0.1); Snd.play("weapon_switch", -10)
 					_: heal(1); Snd.play("cell_pickup", -3)
 				p.node.queue_free(); pickups.remove_at(i); continue
