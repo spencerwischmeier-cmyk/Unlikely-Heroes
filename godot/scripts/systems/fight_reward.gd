@@ -2,7 +2,11 @@ extends CanvasLayer
 ## The reward loop after a fight.
 ##   Style bonus   flashy kills pay extra sprockets on the spot (a gold "STYLE" word and a nut burst):
 ##                 a Plated Roller's shell cracked by a wrench/stomp/slam, a kill within 2 s of a
-##                 close-call dodge, a Return to Sender kill, and the final blow of a fight.
+##                 close-call dodge, a Return to Sender kill, and the final blow of a fight when it caps
+##                 a hit chain of 5+. Economy (2026-11-28): bot drops alone still buy the Plaza shop items
+##                 at the same points as before; a stylish player picks up roughly 200-400 extra
+##                 over the level (6 shells x30, 9 finishers x40 at most, 20 a Return to Sender), under a
+##                 tenth of the ~5,000 the level drops, so the Thump Lobber comes about one fight earlier.
 ##   Fight clear   when a fight zone is cleared, a "FIGHT CLEAR" stamp slaps onto the lower screen with
 ##                 the fight's best hit chain, the sprockets it earned and the style count. It is only
 ##                 a picture: it never blocks input or movement.
@@ -11,6 +15,7 @@ extends CanvasLayer
 const HD := preload("res://scripts/ui/hud_draw.gd")
 const STAMP_T := 3.4
 const BONUS := {"plated_smash": 3, "close_call_kill": 3, "sender_kill": 2, "final_blow": 4}   # extra nuts (x10 sprockets)
+const FINISH_CHAIN := 5      # the final blow pays only on a hit chain of at least this
 const WORDS := {"plated_smash": "SHELL SMASH!", "close_call_kill": "CLOSE CALL KILL!", "sender_kill": "RETURN TO SENDER!", "final_blow": "FINISHER!"}
 
 var off := OS.get_cmdline_user_args().has("--no-fight-reward")
@@ -74,7 +79,14 @@ func _on_kill(bot: Node, pos: Vector3, _kind: String) -> void:
 	elif _now() - close_t < 2.0: _bonus("close_call_kill", pos); close_t = -10.0
 
 func _on_event(kind: String, at: Vector3) -> void:
-	if BONUS.has(kind): _bonus(kind, at)
+	if not BONUS.has(kind): return
+	# every fight ends on a final blow, so it only pays when it caps a running hit chain (style, not routine)
+	if kind == "final_blow" and _chain() < FINISH_CHAIN: return
+	_bonus(kind, at)
+
+func _chain() -> int:
+	var hc: Node = Game.main.get_node_or_null("HitChain") if Game.main else null
+	return int(hc.get("chain")) if hc else 0
 
 func _bonus(kind: String, at: Vector3) -> void:
 	var c: Node = Game.combat
@@ -85,13 +97,13 @@ func _bonus(kind: String, at: Vector3) -> void:
 	c.drop_nuts(at + Vector3(0, 0.6, 0), n)
 	c.float_text(at + Vector3(0, 1.6, 0), "%s +%d" % [WORDS[kind], n * 10], Color(1, 0.85, 0.3), 46)
 	FX.sparks(at + Vector3(0, 0.8, 0), Color(1, 0.85, 0.35), 14, 5.0)
-	Snd.play("coin_burst" if Snd.has_sound("coin_burst") else "nut_pickup", -6, 0.05, 0.05)
+	Snd.play("style_bonus" if Snd.has_sound("style_bonus") else "coin_burst", -5, 0.04, 0.05)
 	if log_on: print("[reward] ", kind, " +", n * 10)
 
 func _show_stamp() -> void:
 	if stamp.is_empty(): return
 	stamp_t = STAMP_T
-	Snd.play("cutscenes_poster_slam" if Snd.has_sound("cutscenes_poster_slam") else "land_heavy", -8, 0.03, 0.0)
+	Snd.play("fight_clear" if Snd.has_sound("fight_clear") else "cutscenes_poster_slam", -5, 0.0, 0.0)
 	if log_on: print("[reward] fight clear: best chain x%d, +%d sprockets so far, style %d" % [stamp.best, stamp.nuts, stamp.style])
 
 func _process(dt: float) -> void:
