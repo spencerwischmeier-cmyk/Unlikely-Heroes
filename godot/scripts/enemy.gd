@@ -48,6 +48,9 @@ var startle_cd := 0.0
 var no_number_frame := -1         # combat skips the damage number on this physics frame (glances, armour cracks)
 static var _no_wear := OS.get_cmdline_user_args().has("--no-bot-wear")
 static var _no_react := OS.get_cmdline_user_args().has("--no-bot-react")
+static var _no_weight := OS.get_cmdline_user_args().has("--no-hit-weight")
+static var no_tells := OS.get_cmdline_user_args().has("--no-tells")   # extra audio cues before attacks
+var last_hit := 1.0               # size of the last hit (a heavy finishing blow freezes the frame longer)
 
 ## True for roughly `chance` of spawns. Previews force it with Engine meta "bot_variant" (0 or 1).
 func roll_variant(chance := 0.4) -> bool:
@@ -128,7 +131,7 @@ func kind() -> String:
 func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 	if dead: return false
 	Game.bot_hit.emit(self, amount)
-	hp -= amount; flash = 1.0; pop = 1.0
+	hp -= amount; flash = 1.0; pop = 1.0; last_hit = amount
 	var push := dir; push.y = 0
 	if push.length() < 0.01: push = (global_position - point); push.y = 0
 	push = push.normalized()
@@ -144,7 +147,8 @@ func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 
 func knock(v: Vector3) -> void:
 	velocity += v * 2.6
-	stun = maxf(stun, stagger_time)
+	# a heavier hit staggers longer (a bolt is a tap, a wrench finisher rocks it)
+	stun = maxf(stun, stagger_time if _no_weight else stagger_time * clampf(0.75 + last_hit * 0.2, 0.8, 1.6))
 
 func die(self_destruct := false) -> void:
 	if dead: return
@@ -175,7 +179,7 @@ func _burst() -> void:
 	Snd.at("chars_bot_break", c, -3, 0.12, 0.05)
 	FX.shake(0.6 * burst_scale)
 	Snd.at("explode_small", c, 0.0)
-	FX.stop(0.045)
+	FX.stop(0.045 if _no_weight else clampf(0.035 + last_hit * 0.015, 0.045, 0.09))
 
 func tick_common(dt: float) -> void:
 	t += dt

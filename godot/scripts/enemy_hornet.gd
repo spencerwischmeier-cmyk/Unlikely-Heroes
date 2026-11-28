@@ -79,7 +79,7 @@ func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 	if not killed and not dead and not retreated and not _no_react and hp <= max_hp * 0.5:
 		retreated = true; retreat_t = 1.8
 		if aiming and combat: (combat.aimers as Dictionary).erase(get_instance_id())   # give the shot turn back
-		aiming = false; aim_line.visible = false
+		aiming = false; aim_line.visible = false; remove_meta("lock_click")
 		fire_t = AIM_T + retreat_t + randf_range(0.3, 0.8)
 		orbit_dir = -orbit_dir; wobble = 1.0
 		Snd.at("hornet_buzz", global_position, -2, 0.2, 0.0)
@@ -138,6 +138,9 @@ func _physics_process(dt: float) -> void:
 		if not aiming:
 			aiming = true; Snd.at("hornet_buzz", global_position, -3, 0.0, 0.0)
 		if fire_t > LOCK_T: aim_at = hero_c + player.velocity * 0.15
+		elif not has_meta("lock_click"):
+			set_meta("lock_click", true)   # the aim freezes: a click says "move now"
+			if not no_tells: Snd.at("hook_lock", global_position, -6, 0.05, 0.05)
 		var charge := 1.0 - fire_t / AIM_T
 		eye_light.light_energy = 0.5 + charge * 7.0
 		for e in eyes: (e.mat as StandardMaterial3D).emission_energy_multiplier = 5.0 + charge * 16.0
@@ -150,7 +153,7 @@ func _physics_process(dt: float) -> void:
 		for e in eyes: (e.mat as StandardMaterial3D).emission_energy_multiplier = 5.0
 	if spawn_t > -0.1: _arrive()
 	if fire_t <= 0.0:
-		aiming = false; aim_line.visible = false
+		aiming = false; aim_line.visible = false; remove_meta("lock_click")
 		fire_t = randf_range(2.4, 3.6)
 		var from := global_position + (aim_at - global_position).normalized() * 0.9
 		combat.enemy_shot(from, aim_at)
