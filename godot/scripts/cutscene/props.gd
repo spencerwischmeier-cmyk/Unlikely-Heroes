@@ -56,16 +56,29 @@ static func hard_hat(r: float) -> Node3D:
 	return hat
 
 static func toaster() -> Node3D:
+	# a rounded retro toaster: chrome body with pill-shaped ends, dark slots, a lever, a dial and an eye visor
 	var n := Node3D.new(); n.name = "Toaster"
-	var chrome := M.std(Color(0.8, 0.82, 0.85), 0.95, 0.2)
-	box(n, Vector3(0.28, 0.18, 0.16), chrome, Vector3(0, 0.09, 0))
-	box(n, Vector3(0.02, 0.04, 0.04), M.std(Color(0.1, 0.1, 0.1), 0, 0.5), Vector3(0.15, 0.12, 0))
+	var chrome := M.std(Color(0.86, 0.87, 0.9), 0.95, 0.14)
+	var dark := M.std(Color(0.08, 0.08, 0.09), 0.2, 0.6)
+	var bake := M.std(Color(0.25, 0.2, 0.18), 0.3, 0.5)
+	box(n, Vector3(0.2, 0.18, 0.16), chrome, Vector3(0, 0.1, 0))
+	for x in [-0.1, 0.1]:
+		cyl(n, 0.09, 0.16, chrome, Vector3(x, 0.1, 0), Vector3(PI / 2, 0, 0))
+	box(n, Vector3(0.36, 0.022, 0.18), bake, Vector3(0, 0.011, 0))            # base plate
+	for x in [-0.14, 0.14]:
+		for z in [-0.06, 0.06]: sphere(n, 0.014, dark, Vector3(x, 0.006, z))   # little feet
+	for x in [-0.05, 0.05]:
+		box(n, Vector3(0.024, 0.006, 0.12), dark, Vector3(x, 0.191, 0))       # slots
+	box(n, Vector3(0.012, 0.11, 0.02), dark, Vector3(0.192, 0.11, 0.03))      # lever track
+	box(n, Vector3(0.04, 0.018, 0.03), bake, Vector3(0.205, 0.15, 0.03))       # lever knob
+	cyl(n, 0.022, 0.012, bake, Vector3(0.192, 0.07, -0.04), Vector3(0, 0, PI / 2))   # dial
 	var toast := Node3D.new(); toast.name = "Toast"; n.add_child(toast)
 	for x in [-0.05, 0.05]:
 		box(toast, Vector3(0.02, 0.12, 0.11), M.std(Color(0.72, 0.45, 0.2), 0, 0.9), Vector3(x, 0.14, 0))
 	var eye := M.glow(Color(1, 0.2, 0.1), 0.0)
 	n.set_meta("eye", eye)
-	box(n, Vector3(0.2, 0.02, 0.005), eye, Vector3(0, 0.1, 0.081))
+	box(n, Vector3(0.17, 0.03, 0.006), dark, Vector3(0, 0.12, 0.081))         # visor
+	box(n, Vector3(0.15, 0.014, 0.006), eye, Vector3(0, 0.12, 0.085))
 	return n
 
 static func radio() -> Node3D:
