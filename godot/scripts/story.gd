@@ -279,6 +279,7 @@ func _clear(z: Dictionary) -> void:
 	active = false
 	switches.clear()
 	Game.complete(z.id); Game.zone_cleared.emit(z.id)
+	if OS.get_cmdline_user_args().has("--reward-log"): print("[reward] zone %s cleared, wallet %d" % [z.id, Game.nuts()])
 	_apply_effects(z)
 	if CUT_AFTER.has(z.id) and _cuts_on():
 		play_cutscene(CUT_AFTER[z.id])
@@ -319,4 +320,6 @@ func _debug_step(dt: float, z: Dictionary) -> void:
 		"activate":
 			for sw in switches: if is_instance_valid(sw) and not sw.dead: sw.damage(1.0, sw.center(), Vector3.ZERO); return
 		"":
-			for b in alive: if is_instance_valid(b) and not b.dead: b.die(true)
+			# --auto-drops: the bots drop their sprockets as if Vesk had beaten them (economy measurements)
+			var drops := OS.get_cmdline_user_args().has("--auto-drops")
+			for b in alive: if is_instance_valid(b) and not b.dead: b.die(not drops)
