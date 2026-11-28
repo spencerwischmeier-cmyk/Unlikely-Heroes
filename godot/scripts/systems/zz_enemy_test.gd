@@ -18,7 +18,7 @@ extends Node
 ##   --et-fast            allow many physics steps per rendered frame (slow software renders reach the
 ##                        interesting part sooner)
 ##   --et-skip1           tour: skip the phase 1 slam and go straight to the phase change
-##   --et-cam             a fixed overview camera on the fight (for screenshots)
+##   --et-cam             a fixed overview camera on the fight (for screenshots); --et-close: close-up on the nearest bot
 ##   --et-jump            Vesk double-jumps over the sweeping jib (on in tour mode)
 ##   --et-bot             a simple autoplayer fights: aims at the nearest bot, fires, strafes, dashes away
 ##                        from fusing rollers and locked-on hornets, wrenches rollers that get close
@@ -259,6 +259,16 @@ func _overview(at: Vector3) -> void:
 	if cam == null:
 		cam = Camera3D.new(); cam.fov = 62; Game.main.add_child(cam)
 	cam.current = true
+	if flags.has("close"):
+		# --et-close: a close-up on the nearest bot (for looking at models and hit reactions)
+		var nb: Node3D = null
+		for b in get_tree().get_nodes_in_group("bots"):
+			if not b.dead and (nb == null or b.global_position.distance_to(Game.player.global_position) < nb.global_position.distance_to(Game.player.global_position)): nb = b
+		if nb:
+			var bc: Vector3 = nb.center()
+			cam.global_position = bc + Vector3(2.2, 1.3, 2.6)
+			cam.look_at(bc + Vector3(0, 0.3, 0))
+			return
 	var mid := (at + Game.player.global_position) * 0.5
 	cam.global_position = mid + Vector3(15, 10, 9)
 	cam.look_at(mid + Vector3(0, 1.2, 0))

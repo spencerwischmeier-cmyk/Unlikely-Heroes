@@ -78,6 +78,7 @@ func damage(amount: float, point: Vector3, dir: Vector3) -> bool:
 	var killed := super.damage(amount, point, dir)
 	if not killed and not dead and not retreated and not _no_react and hp <= max_hp * 0.5:
 		retreated = true; retreat_t = 1.8
+		if aiming and combat: (combat.aimers as Dictionary).erase(get_instance_id())   # give the shot turn back
 		aiming = false; aim_line.visible = false
 		fire_t = AIM_T + retreat_t + randf_range(0.3, 0.8)
 		orbit_dir = -orbit_dir; wobble = 1.0

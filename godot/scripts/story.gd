@@ -258,6 +258,10 @@ func _floor_at(p: Vector3) -> bool:
 func _spawn_wave(z: Dictionary, w: Dictionary) -> void:
 	_spawn_in(z.rect, z.get("y", 0.0), w)
 	if wave == 0 and randf() < 0.6: Snd.bark("dodger", "spawn")
+	# a long fight calls its last wave, so the player knows the end is in sight
+	var n: int = z.get("waves", []).size()
+	if not no_pacing and n >= 3 and wave == n - 1 and Game.hud and Game.hud.has_method("toast_small"):
+		Game.hud.toast_small("FINAL WAVE", Color(1, 0.7, 0.35))
 
 ## Unlocks, gates, power and grants of a zone (also applied when a zone is skipped).
 func _apply_effects(z: Dictionary, quiet := false) -> void:
