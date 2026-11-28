@@ -173,18 +173,25 @@ func wisp(pos: Vector3, scale := 1.0) -> void:
 
 ## Telegraph: a flat ring on the ground with a disc that fills it over `time` seconds, then vanishes.
 ## Read it as "this circle gets hit when the disc is full". Returns the node (free it to cancel early).
+var _warn_meshes := {}
 func warn_ring(pos: Vector3, radius: float, time: float, color := Color(1, 0.2, 0.12)) -> Node3D:
 	var root := Node3D.new()
 	add_child(root); root.global_position = pos + Vector3(0, 0.06, 0)
 	var rm := StandardMaterial3D.new(); rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; rm.albedo_color = Color(color.r, color.g, color.b, 0.85)
 	rm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var tr := TorusMesh.new(); tr.inner_radius = radius - 0.12; tr.outer_radius = radius; tr.rings = 48; tr.ring_segments = 4
+	# the ring and disc meshes are cached per radius (building them was a mesh build every telegraph)
+	var mk := snappedf(radius, 0.05)
+	if not _warn_meshes.has(mk):
+		var t0 := TorusMesh.new(); t0.inner_radius = mk - 0.12; t0.outer_radius = mk; t0.rings = 48; t0.ring_segments = 4
+		var d0 := CylinderMesh.new(); d0.top_radius = mk; d0.bottom_radius = mk; d0.height = 0.02; d0.radial_segments = 40; d0.rings = 1
+		_warn_meshes[mk] = [t0, d0]
+	var tr: TorusMesh = _warn_meshes[mk][0]
 	var ring_mi := MeshInstance3D.new(); ring_mi.mesh = tr; ring_mi.material_override = rm; ring_mi.scale = Vector3(1, 0.05, 1)
 	ring_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(ring_mi)
 	var dm := rm.duplicate() as StandardMaterial3D; dm.albedo_color = Color(color.r, color.g, color.b, 0.28)
-	var disc := CylinderMesh.new(); disc.top_radius = radius; disc.bottom_radius = radius; disc.height = 0.02; disc.radial_segments = 40; disc.rings = 1
+	var disc: CylinderMesh = _warn_meshes[mk][1]
 	var disc_mi := MeshInstance3D.new(); disc_mi.mesh = disc; disc_mi.material_override = dm; disc_mi.scale = Vector3(0.05, 1, 0.05)
 	disc_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(disc_mi)
