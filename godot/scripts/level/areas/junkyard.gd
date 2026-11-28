@@ -276,7 +276,7 @@ static func _heap(L, B, rng: RandomNumberGenerator, life) -> void:
 	var steps := [[Vector2(-27.5, 84.0), 3.0, 1.2], [Vector2(-31.0, 86.6), 3.0, 2.4], [Vector2(-34.6, 89.2), 3.0, 3.6], [Vector2(-39.6, 86.0), 5.0, 6.0]]
 	for s in steps:
 		var p: Vector2 = s[0]
-		var tw: MeshInstance3D = L.block(p.x, p.y, s[1], s[1], s[2], 0, JK.mat("rust"), true)
+		var tw: MeshInstance3D = L.block(p.x, p.y, s[1], s[1], s[2], 0, JK.mat("rust"), not JK.hd_on())   # no glowing lip on a bale stack
 		if JK.hd_on():
 			# the block stays as the collider; what you see is a stack of crushed-scrap bales
 			tw.visible = false

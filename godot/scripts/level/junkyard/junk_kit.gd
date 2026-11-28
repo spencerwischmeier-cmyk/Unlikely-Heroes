@@ -45,7 +45,7 @@ static func _pit_tex() -> Texture2D:
 	return nt
 
 ## The layered scrap shader (paint from the instance colour, baked edge/cavity wear from UV2).
-static func scrap_shader_mat(rust := 0.55, chip := 0.85) -> ShaderMaterial:
+static func scrap_shader_mat(rust := 0.7, chip := 0.85) -> ShaderMaterial:
 	var sm := ShaderMaterial.new(); sm.shader = load("res://shaders/scrap.gdshader")
 	sm.set_shader_parameter("pit_nrm", _pit_tex()); sm.set_shader_parameter("rust", rust); sm.set_shader_parameter("chip", chip)
 	return sm

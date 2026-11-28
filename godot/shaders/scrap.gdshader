@@ -6,8 +6,8 @@ shader_type spatial;
 render_mode blend_mix, cull_back, diffuse_burley, specular_schlick_ggx;
 
 uniform float chip = 0.85;
-uniform float rust = 0.55;
-uniform float grime = 0.6;
+uniform float rust = 0.7;
+uniform float grime = 0.75;
 uniform float pit_depth = 0.5;
 uniform sampler2D pit_nrm : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform float pit_scale = 2.5;
@@ -35,7 +35,11 @@ void fragment() {
 	float cav = UV2.y;
 	float n1 = fbm3(wpos * 1.9);
 	float n2 = noise(wpos * 11.0);
-	vec3 paint = tint.rgb * (0.82 + 0.3 * n1);
+	// pale paints (cream, sky blue, pink) age down so they don't glare in the low sun; everything gets a
+	// patchy dirt film so flat plates don't read as clean cards
+	float lum = dot(tint.rgb, vec3(0.3, 0.59, 0.11));
+	vec3 paint = tint.rgb * mix(1.0, 0.6, smoothstep(0.4, 0.8, lum)) * (0.82 + 0.3 * n1);
+	paint = mix(paint, paint * vec3(0.62, 0.55, 0.48), smoothstep(0.4, 0.75, fbm3(wpos * 0.6 + 11.0)) * grime);
 	// chipped edges: wear eats in from the baked edge mask, broken up by noise
 	float chipm = smoothstep(0.42, 0.62, edge * chip + (n2 - 0.5) * 0.55 + (n1 - 0.5) * 0.35);
 	// small scratches and chips anywhere
