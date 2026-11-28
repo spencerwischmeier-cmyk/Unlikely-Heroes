@@ -23,6 +23,23 @@ static func build(L) -> void:
 		gi.visibility_range_end_margin = 6.0
 		n += 1
 	if OS.get_cmdline_user_args().has("--scatter-log"): print("[perf] draw distance set on %d pieces" % n)
+	_particles(L)
+
+## Smoke, sparks, embers and dust far off: each system is still a draw (and a GPU update pass). Small ones
+## stop drawing past 140 m, mid-sized ones past 260 m; tall plumes (12 m and up) are landmarks and stay.
+## `--no-particle-cull` turns it off. (The web/phone builds shorten these further in systems/mobile_quality.gd.)
+static func _particles(L) -> void:
+	if OS.get_cmdline_user_args().has("--no-particle-cull"): return
+	for g in L.find_children("*", "GeometryInstance3D", true, false):
+		if not (g is GPUParticles3D or g is CPUParticles3D): continue
+		var gi := g as GeometryInstance3D
+		if gi.visibility_range_end > 0.0 or _in_sky(gi, L): continue
+		var ab := gi.get_aabb()
+		var sc := gi.global_transform.basis.get_scale()
+		var big := maxf(ab.size.x * sc.x, maxf(ab.size.y * sc.y, ab.size.z * sc.z))
+		if big >= 12.0: continue
+		gi.visibility_range_end = 140.0 if big < 5.0 else 260.0
+		gi.visibility_range_end_margin = 8.0
 
 static func _in_sky(n: Node, L: Node) -> bool:
 	var p := n.get_parent()

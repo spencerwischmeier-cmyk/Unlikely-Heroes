@@ -8,11 +8,38 @@ func _ready() -> void:
 	var radius := 200.0
 	for a in OS.get_cmdline_user_args():
 		if a == "--draw-audit": on = true
+		elif a.begins_with("--draw-audit-under="): _under = a.substr(19)
 		elif a.begins_with("--draw-audit="): on = true; radius = float(a.substr(13))
 	if not on: return
 	await get_tree().create_timer(3.0).timeout
+	# wait for the static batcher to finish so the counts match what the player sees
+	for n in get_parent().get_children():
+		if n.get_script() and String(n.get_script().resource_path).ends_with("zzz_batcher.gd"):
+			var w := 0.0
+			while not n.done and w < 60.0:
+				await get_tree().create_timer(0.25).timeout; w += 0.25
+	await get_tree().create_timer(0.5).timeout
 	_audit(radius)
 	get_tree().quit()
+
+## `--draw-audit-under=<node name>` also lists the first 40 drawn pieces under that node (size, distance, range)
+var _under := ""
+var _listed := 0
+
+## headless (dummy renderer) multimeshes report an empty box: rebuild it from the instances, as the renderer does
+var _mm_boxes := {}
+func _aabb(gi: GeometryInstance3D) -> AABB:
+	var b := gi.get_aabb()
+	if b.size != Vector3.ZERO or not (gi is MultiMeshInstance3D): return b
+	var mm := (gi as MultiMeshInstance3D).multimesh
+	if mm == null or mm.mesh == null or mm.instance_count == 0: return b
+	if _mm_boxes.has(mm): return _mm_boxes[mm]
+	var mb := mm.mesh.get_aabb()
+	var n := mm.instance_count if mm.visible_instance_count < 0 else mm.visible_instance_count
+	var out := mm.get_instance_transform(0) * mb
+	for i in range(1, n): out = out.merge(mm.get_instance_transform(i) * mb)
+	_mm_boxes[mm] = out
+	return out
 
 func _vis(n: Node3D) -> bool:
 	while n:
@@ -33,7 +60,7 @@ func _audit(radius: float) -> void:
 		var gi := g as GeometryInstance3D
 		if not (gi is MeshInstance3D or gi is MultiMeshInstance3D): continue
 		if not _vis(gi): continue
-		var ab := gi.global_transform * gi.get_aabb()
+		var ab := gi.global_transform * _aabb(gi)
 		var d := ab.get_center().distance_to(cam) - ab.size.length() * 0.5
 		if d > radius: continue
 		if gi.visibility_range_end > 0.0 and d > gi.visibility_range_end: continue
@@ -44,11 +71,58 @@ func _audit(radius: float) -> void:
 		if gi is MultiMeshInstance3D: mm_inst += (gi as MultiMeshInstance3D).multimesh.visible_instance_count if (gi as MultiMeshInstance3D).multimesh.visible_instance_count >= 0 else (gi as MultiMeshInstance3D).multimesh.instance_count
 		if gi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF: shadow += surf
 		var path := String(gi.get_path())
+		if _under != "" and path.contains("/" + _under + "/") and _listed < 40:
+			_listed += 1
+			print("[audit-under] %s  surf %d  size %.1f  d %.0f  range %.0f  shadow %d  %s" % [path.get_slice("/" + _under + "/", 1).left(70), surf, ab.size.length(), d, gi.visibility_range_end, gi.cast_shadow, gi.get_class()])
 		var parts := path.split("/")
 		var key := "/".join(parts.slice(2, mini(6, parts.size() - 1)))
 		by_area[key] = by_area.get(key, 0) + surf
 		var mk := "%s %s" % [mesh.resource_path.get_file() if mesh.resource_path != "" else mesh.get_class(), str(mesh.get_instance_id()) if mesh.resource_path == "" else ""]
 		if gi is MeshInstance3D: by_mesh[mk] = by_mesh.get(mk, 0) + 1
+	# lights that can light this spot (within range + distance fade), and how many cast shadows
+	var lights := 0
+	var lshadow := 0
+	for l in get_tree().root.find_children("*", "Light3D", true, false):
+		if l is DirectionalLight3D or not _vis(l) or (l as Light3D).light_energy <= 0.0: continue
+		var ld := (l as Node3D).global_position.distance_to(cam)
+		var lim: float = (l as Light3D).distance_fade_begin + (l as Light3D).distance_fade_length if (l as Light3D).distance_fade_enabled else radius
+		if ld > minf(lim, radius): continue
+		lights += 1
+		if (l as Light3D).shadow_enabled: lshadow += 1
+	# shadow casters the sun's shadow map actually draws (within its max distance)
+	var sun_d := 100.0
+	for l in get_tree().root.find_children("*", "DirectionalLight3D", true, false): if (l as Light3D).shadow_enabled: sun_d = (l as DirectionalLight3D).directional_shadow_max_distance
+	var near_shadow := 0
+	for g in get_tree().root.find_children("*", "GeometryInstance3D", true, false):
+		var gi := g as GeometryInstance3D
+		if not (gi is MeshInstance3D or gi is MultiMeshInstance3D) or gi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF or not _vis(gi): continue
+		var ab2 := gi.global_transform * _aabb(gi)
+		var d2 := ab2.get_center().distance_to(cam) - ab2.size.length() * 0.5
+		if d2 > sun_d: continue
+		if gi.visibility_range_end > 0.0 and d2 > gi.visibility_range_end: continue
+		near_shadow += 1
+	var parts_n := 0
+	var cpu_amt := 0
+	var gpu_amt := 0
+	var emitting := 0
+	var by_p := {}
+	for g in get_tree().root.find_children("*", "GPUParticles3D", true, false) + get_tree().root.find_children("*", "CPUParticles3D", true, false):
+		var pd := (g as Node3D).global_position.distance_to(cam)
+		if not (_vis(g) and pd < radius): continue
+		if (g as GeometryInstance3D).visibility_range_end > 0.0 and pd > (g as GeometryInstance3D).visibility_range_end: continue
+		parts_n += 1
+		var em: bool = g.emitting
+		if em: emitting += 1
+		var amt: int = g.amount
+		if g is CPUParticles3D: cpu_amt += amt
+		else: gpu_amt += int(amt * (g as GPUParticles3D).amount_ratio)
+		var pp := String(g.get_path()).split("/")
+		var pk := "%s %s" % [g.get_class().left(3), "/".join(pp.slice(2, mini(5, pp.size() - 1)))]
+		by_p[pk] = by_p.get(pk, 0) + 1
+	print("[audit] particles: %d emitting, CPU particles %d, GPU particles %d" % [emitting, cpu_amt, gpu_amt])
+	var pk2 := by_p.keys(); pk2.sort_custom(func(a, b): return by_p[a] > by_p[b])
+	for k in pk2.slice(0, 8): print("[audit] particle systems %4d  %s" % [by_p[k], k])
+	print("[audit] lights %d (shadowed %d), sun-shadow casters within %.0f m: %d, particle systems %d" % [lights, lshadow, sun_d, near_shadow, parts_n])
 	print("[audit] objects %d, surfaces %d (shadow-casting %d), multimesh instances %d, radius %.0f" % [objects, total, shadow, mm_inst, radius])
 	var ak := by_area.keys(); ak.sort_custom(func(a, b): return by_area[a] > by_area[b])
 	for k in ak.slice(0, 30): print("[audit] area %5d  %s" % [by_area[k], k])
