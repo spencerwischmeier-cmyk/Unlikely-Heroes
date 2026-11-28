@@ -216,7 +216,12 @@ func _on_combat_event(kind: String, _at: Vector3) -> void:
 	var first := not calls_seen.has(kind)
 	if not first and kind != "boss_quake" and randf() > 0.6: return
 	# a warning always gets through; chatter waits for a quiet moment
-	if kind != "boss_quake" and Snd.voice_player and Snd.voice_player.playing: return
+	if kind != "boss_quake" and Snd.voice_player and Snd.voice_player.playing:
+		# the phase change is worth waiting for: try again once the current line is over
+		if kind == "boss_phase2" and int(call_cd.get("retry", 0)) < 4:
+			call_cd["retry"] = int(call_cd.get("retry", 0)) + 1
+			get_tree().create_timer(1.2).timeout.connect(_on_combat_event.bind(kind, _at))
+		return
 	call_cd[kind] = now + float(CALL_GAP.get(kind, 10.0)); calls_seen[kind] = true
 	var set_: Array = CALLS[kind][0 if first else 1]
 	Snd.line_started.emit("dodger_call_" + kind, "dodger", set_.pick_random())
