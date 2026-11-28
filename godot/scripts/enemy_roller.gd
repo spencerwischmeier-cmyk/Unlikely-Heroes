@@ -90,7 +90,7 @@ func _build_plates() -> void:
 		host.add_child(pl); plates.append(pl)
 	if cap:
 		var brow := MeshInstance3D.new(); brow.mesh = box(Vector3(0.62, 0.13, 0.1)); brow.material_override = plate_mat
-		brow.position = Vector3(0, 1.0, 0.47); brow.rotation.x = -0.35; cap.add_child(brow); plates.append(brow)
+		brow.position = Vector3(0, 0.96, 0.4); brow.rotation.x = -0.35; cap.add_child(brow); plates.append(brow)
 		for x in [-0.5, 0.5]:
 			var ch := MeshInstance3D.new(); ch.mesh = box(Vector3(0.08, 0.3, 0.42)); ch.material_override = plate_mat
 			ch.position = Vector3(x, 0.72, 0.12); cap.add_child(ch); plates.append(ch)
