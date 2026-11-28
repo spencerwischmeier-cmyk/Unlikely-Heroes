@@ -152,7 +152,8 @@ static func flush() -> void:
 		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		# the small dressing (rails, flowers) skips the shadow pass; the structure casts
 		if path.contains("flowers") or path.contains("rail_") or path.contains("post") or path.contains("parapet") \
-				or path.contains("pennant") or path.contains("head") or path.contains("arm") or path.contains("signal") or path.contains("garden_lamp"):
+				or path.contains("pennant") or path.contains("head") or path.contains("arm") or path.contains("signal") or path.contains("garden_lamp") \
+				or path.contains("queue") or path.contains("poster") or path.contains("mk_"):
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
 	batches.clear()
@@ -177,6 +178,7 @@ static func build(L: Node3D) -> void:
 		_cableway()
 		_barge()
 		_dish_rail()
+		_station_life()
 	flush()
 	_clouds()
 	segs.clear(); decks.clear(); masts.clear()
@@ -523,3 +525,39 @@ static func _dish_rail() -> void:
 			k += 1
 		u += 10.0
 	_pennants("dish", c, 2.6, 4.0)
+
+## people-scale life at the station ends, from the market and Skyharbor kits plus the route kit: a ticket booth
+## and queue rails, benches, potted plants, poster boards, stools (all visual only, kept off the walk lines)
+const BENCH := "res://models/kit/bench.glb"
+const PLANTER := "res://models/kit/planter.glb"
+const STOOLS := "res://models/market/mk_stools.glb"
+const JARS := "res://models/market/mk_jars.glb"
+
+static func _station_life() -> void:
+	var y := 6.6
+	var warm := Color(1.0, 0.72, 0.42)
+	# the Roof Gardens station (x -31..-23, z -44..-36; the walk line runs west -> east along z -42..-38)
+	if _L.islands.has("mast_cable_station"):
+		var bt := xf(Vector3(-27.6, y, -43.35))
+		put("cableway", "rt_ticket_booth", bt)
+		light(bt * Vector3(0, 2.3, 0.9), warm, 0.9, 5.0)
+		label("TICKETS", bt * Vector3(0, 2.05, 0.56), 0.0, 48, 0.005, Color(0.2, 0.14, 0.08), Color(1, 0.93, 0.8))
+		put("cableway", "rt_queue_rail", xf(Vector3(-25.9, y, -42.75)))
+		put("cableway", "rt_poster_board", xf(Vector3(-25.3, y, -43.55)))
+		put("cableway", BENCH, xf(Vector3(-28.6, y, -36.7), PI))
+		for p in [Vector3(-25.6, y, -36.75), Vector3(-30.4, y, -43.0)]:
+			put("cableway", PLANTER, xf(p, 0.3, Vector3(0.5, 0.5, 0.5)))
+	# the signal mast terminal (x 0..6, z -57..-50; the walk line runs along z -55..-51)
+	if _L.islands.has("mast_terminal"):
+		put("cableway", BENCH, xf(Vector3(1.9, y, -56.45)))
+		put("cableway", PLANTER, xf(Vector3(3.9, y, -56.55), 0.0, Vector3(0.5, 0.5, 0.5)))
+		put("cableway", "rt_poster_board", xf(Vector3(1.6, y, -50.45), PI))
+		put("cableway", STOOLS, xf(Vector3(4.9, y, -50.6), 0.4, Vector3(0.8, 0.8, 0.8)))
+	# the balloon barge (x 54..62, z -40..-28; you land through the east gap and walk west to the tether)
+	if _L.islands.has("pier_barge"):
+		put("barge", BENCH, xf(Vector3(58.6, 3.0, -28.7), PI))
+		put("barge", "rt_poster_board", xf(Vector3(55.4, 3.0, -28.6), PI))
+		for p in [Vector3(61.3, 3.0, -30.6), Vector3(54.8, 3.0, -39.2)]:
+			put("barge", PLANTER, xf(p, 0.7, Vector3(0.5, 0.5, 0.5)))
+		put("barge", JARS, xf(Vector3(57.4, 3.0, -39.3), 0.2, Vector3(0.8, 0.8, 0.8)))
+		put("barge", "rt_queue_rail", xf(Vector3(55.2, 3.0, -30.6), PI / 2))

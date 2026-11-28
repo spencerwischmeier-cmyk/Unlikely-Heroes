@@ -505,7 +505,10 @@ static func _cableway(L, rng: RandomNumberGenerator) -> void:
 		for s in [-1, 1]: YK.beam(L, Vector3(3.0, 6.6, -53.5 + s * 3.0), Vector3(3.0, 11.6, -53.5), 0.25, "yellow")
 	C.luggage(Vector3(-27, 6.6, -38.5), 1.6, 5, rng)
 	C.prop("luggage_cart", Vector3(-29, 6.6, -42), 0.5, 1.0, Vector2.ZERO, true)
-	C.broken_sign("CABLEWAY CLOSED", Vector3(-24.6, 9.5 if RL.sky_on() else 10.2, -40), PI / 2, Color(1.0, 0.45, 0.3), 0.2, 0.01)
+	if RL.sky_on():   # off the bullwheel tower (its name board is there now): propped on the south railing
+		C.broken_sign("CABLEWAY CLOSED", Vector3(-27.4, 7.35, -35.85), PI, Color(1.0, 0.45, 0.3), 0.12, 0.0045)
+	else:
+		C.broken_sign("CABLEWAY CLOSED", Vector3(-24.6, 10.2, -40), PI / 2, Color(1.0, 0.45, 0.3), 0.2, 0.01)
 	_sign(L, "CABLE LINE TO THE SIGNAL MAST", Vector3(-30.2, 6.6, -36.6), PI)
 	C.flush()
 
