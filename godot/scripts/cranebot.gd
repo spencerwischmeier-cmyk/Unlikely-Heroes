@@ -122,6 +122,10 @@ var quake_rings: Array = []     # { node, r, hit }
 var quake_next := -1.0          # the second ring follows after this many seconds
 var alarm_lights: Array = []
 var hiccup_t := 0.0
+static var no_lip := OS.get_cmdline_user_args().has("--no-arena-lip")
+var lip: MultiMeshInstance3D    # glowing hazard lip round the arena rim while the fight is on
+var lip_mat: StandardMaterial3D
+var floor_y := 0.0              # arena floor height (the crane itself starts high up, dropping in)
 
 func _m(c: Color, metal := 0.5, rough := 0.4) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new(); m.albedo_color = c; m.metallic = metal; m.roughness = rough
@@ -349,13 +353,14 @@ func _rail_lock(locked: bool) -> void:
 
 func _hide() -> void:
 	_clear_quakes(); _alarm_off(); _fan_hide()
+	if lip: lip.visible = false
 	visible = false; magnet.visible = false; cable.visible = false; warn.visible = false
 	dead = true; state = "off"
 	body.process_mode = Node.PROCESS_MODE_DISABLED; hitbox.process_mode = Node.PROCESS_MODE_DISABLED
 	_rail_on(false)
 
 func spawn(pos: Vector3, area_: Rect2) -> void:
-	area = area_
+	area = area_; floor_y = pos.y
 	position = Vector3(pos.x, 24, pos.z)
 	state = "intro"; st_t = 4.2; t = 0; flash = 0; yaw = PI; turn_yaw = PI; pitch = 0.2; sprays = 0; last_attack = ""
 	hp = BOSS_HP; dead = false; landed = false; phase = 1; pending_rip = false; stun_t = 0.0; jib_h = JIB_UP
@@ -367,6 +372,7 @@ func spawn(pos: Vector3, area_: Rect2) -> void:
 	body.process_mode = Node.PROCESS_MODE_INHERIT; hitbox.process_mode = Node.PROCESS_MODE_INHERIT
 	eye_mat.emission = Color(1, 0.16, 0.16)
 	intro_warn = FX.warn_ring(Vector3(pos.x, 0, pos.z), 3.6, 1.9, Color(1, 0.3, 0.15))
+	if not no_lip: _build_lip.call_deferred()
 	Snd.at("crane_warn", Vector3(pos.x, 2, pos.z), 2, 0.0)
 	_spawn_crates()
 
@@ -523,6 +529,76 @@ func _alarm_off() -> void:
 	for l in alarm_lights: if is_instance_valid(l): l.queue_free()
 	alarm_lights.clear()
 
+## The arena rim during the fight: a glowing hazard lip along the railings (not across the gate, where the
+## floor carries on) and a soft push back in, so circle-strafing or a shockwave hop doesn't carry Vesk over
+## the rail by accident. A dash (or a rail ride) goes straight through it: leaving on purpose still works.
+## `--no-arena-lip` turns it off.
+func _rim_open(p: Vector3, n: Vector2) -> bool:
+	# the lip only belongs where a low railing is all that stands between Vesk and the drop: a ray at knee
+	# height hits it but one at head height clears it. Gates, walls and open walkways are left alone.
+	var sp := get_world_3d().direct_space_state
+	var d := Vector3(n.x, 0, n.y) * 2.6
+	var lo := PhysicsRayQueryParameters3D.create(Vector3(p.x, floor_y + 0.5, p.z), Vector3(p.x, floor_y + 0.5, p.z) + d)
+	lo.collision_mask = 1
+	if sp.intersect_ray(lo).is_empty(): return true
+	var hi := PhysicsRayQueryParameters3D.create(Vector3(p.x, floor_y + 1.7, p.z), Vector3(p.x, floor_y + 1.7, p.z) + d)
+	hi.collision_mask = 1
+	return not sp.intersect_ray(hi).is_empty()
+
+func _build_lip() -> void:
+	if area.size.x <= 0.0 or not is_inside_tree(): return
+	if lip == null:
+		lip_mat = StandardMaterial3D.new(); lip_mat.albedo_color = Color(0.2, 0.12, 0.05)
+		lip_mat.emission_enabled = true; lip_mat.emission = Color(1, 0.55, 0.15); lip_mat.emission_energy_multiplier = 2.0
+		var bm := BoxMesh.new(); bm.size = Vector3(1.8, 0.1, 0.3)
+		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.mesh = bm
+		lip = MultiMeshInstance3D.new(); lip.multimesh = mm; lip.material_override = lip_mat
+		lip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; lip.top_level = true
+		add_child(lip)
+	var xfs: Array = []
+	var r := area
+	var sides := [[Vector2(r.position.x, r.position.y), Vector2(r.end.x, r.position.y), Vector2(0, -1)],
+		[Vector2(r.position.x, r.end.y), Vector2(r.end.x, r.end.y), Vector2(0, 1)],
+		[Vector2(r.position.x, r.position.y), Vector2(r.position.x, r.end.y), Vector2(-1, 0)],
+		[Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), Vector2(1, 0)]]
+	for sd in sides:
+		var a: Vector2 = sd[0]; var b: Vector2 = sd[1]; var n: Vector2 = sd[2]
+		var steps := int(a.distance_to(b) / 2.0)
+		for i in steps:
+			var u := (i + 0.5) / steps
+			var pt := a.lerp(b, u) - n * 0.45
+			var p3 := Vector3(pt.x, floor_y + 0.05, pt.y)
+			if _rim_open(p3, n): continue
+			var yaw_ := 0.0 if n.y != 0.0 else PI / 2
+			xfs.append(Transform3D(Basis(Vector3.UP, yaw_), p3))
+	if Engine.has_meta("et_log"): print("[enemy-test] arena lip: %d segments" % xfs.size())
+	lip.multimesh.instance_count = xfs.size()
+	for i in xfs.size(): lip.multimesh.set_instance_transform(i, xfs[i])
+	lip.global_transform = Transform3D.IDENTITY
+	lip.visible = true
+
+func _arena_lip(dt: float) -> void:
+	if no_lip or area.size.x <= 0.0: return
+	if lip and lip_mat: lip_mat.emission_energy_multiplier = 1.6 + sin(t * 4.0) * 0.8
+	var p := player.global_position
+	if absf(p.y - floor_y) > 5.0 or player.get("riding") == true or float(player.get("since_dash")) < 0.4: return
+	var inner := area.grow(-1.8)
+	if inner.has_point(Vector2(p.x, p.z)): return
+	var n := Vector2.ZERO
+	if p.x < inner.position.x: n.x = -1.0
+	elif p.x > inner.end.x: n.x = 1.0
+	if p.z < inner.position.y: n.y = -1.0
+	elif p.z > inner.end.y: n.y = 1.0
+	n = n.normalized()
+	if not area.has_point(Vector2(p.x, p.z)) or _rim_open(p, n): return
+	# outward speed bleeds away and a gentle push brings him back off the rail
+	var v := Vector2(player.velocity.x, player.velocity.z)
+	var out := v.dot(n)
+	if out > 0.0: v -= n * out * (1.0 - exp(-14.0 * dt))
+	var depth := clampf((Vector2(p.x, p.z) - Vector2(clampf(p.x, inner.position.x, inner.end.x), clampf(p.z, inner.position.y, inner.end.y))).length() / 1.8, 0.0, 1.0)
+	v -= n * depth * 6.0 * dt
+	player.velocity.x = v.x; player.velocity.z = v.y
+
 ## Kept for older callers.
 func crew_down() -> void:
 	pass
@@ -556,6 +632,7 @@ func _physics_process(dt: float) -> void:
 		_:
 			if Game.input_locked: return
 			_fight(dt, hero, hero_flat, to_hero, hd, speed, angry)
+			_arena_lip(dt)
 	_damage_fx(dt)
 	_pose(dt, hero)
 
@@ -723,6 +800,7 @@ func _pick_attack(speed: float, angry: bool) -> void:
 		"crew": st_t = 1.2
 		"quake":
 			state = "quake_wind"; st_t = 1.1
+			Game.combat_event.emit("boss_quake", position)
 			FX.warn_ring(Vector3(position.x, position.y, position.z), 4.0, 1.1, Color(1, 0.45, 0.15))
 			Snd.at("crane_warn", center(), 3, 0.0)
 			Snd.at("enemy_windup_slam" if Snd.has_sound("enemy_windup_slam") else "chars_crane_roar", center(), 0, 0.05)
@@ -881,6 +959,7 @@ func _rip(dt: float, to_hero: Vector3) -> void:
 				if bd.length() < 10.0 and bd.length() > 0.1: b.knock(bd.normalized() * 3.0)
 			_alarm_on()
 			Snd.at("zone_alarm", position, -2, 0.0)
+		Game.combat_event.emit("boss_phase2", position)
 		rail_path.visible = true; _rail_lock(false); _rail_on(true); rail_cd = 0.0
 		Snd.at("rail_unlock", position, 2)
 		if Game.hud and Game.hud.has_method("show_banner"): Game.hud.show_banner("GRIND THE TRACK RAIL", "Ride it up and ram the cab. Double jump the jib!", Color(1, 0.75, 0.3))

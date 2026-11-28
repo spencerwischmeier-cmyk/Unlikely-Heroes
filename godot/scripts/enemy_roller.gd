@@ -101,6 +101,7 @@ func _crack(point: Vector3, dir: Vector3) -> void:
 	if Engine.has_meta("et_log"): print("[enemy-test] plated roller cracked (armor left %.2f)" % armor)
 	armor = 0.0
 	no_number_frame = Engine.get_physics_frames()
+	Game.combat_event.emit("plated_crack", global_position)
 	var live := plates.filter(func(n): return is_instance_valid(n))
 	break_parts = break_parts.filter(func(n): return not (n in plates))
 	plates.clear()
@@ -190,6 +191,7 @@ func _physics_process(dt: float) -> void:
 			if model: model.rotation.y = sin(t * 40.0) * 0.15
 			if st_t <= 0.0:
 				state = "chase"; velocity.y = 3.0; eye_open = 1.0; pop = 0.8
+				if plated: Game.combat_event.emit("plated_seen", global_position)
 				if plated and combat and not Engine.has_meta("plated_seen"):
 					Engine.set_meta("plated_seen", true)    # the first one of a run says how to beat it
 					combat.float_text(center() + Vector3(0, 1.2, 0), "PLATED! WRENCH IT", Color(0.8, 0.92, 1.0), 40)
