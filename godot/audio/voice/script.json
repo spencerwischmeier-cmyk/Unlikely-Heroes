@@ -187,7 +187,15 @@
  "rate": ["Wow. A shot. Three out of ten.", "Five out of ten. Points for effort.", "Solid. Six out of ten.", "Seven out of ten. Not bad, old man.", "Okay, that was an eight. Don't let it go to your head.", "Nine out of ten! I'm telling everyone!", "[shouting] TEN OUT OF TEN! Okay, nine. No, ten!"],
  "levelup": ["[excited] Ooh, your blaster just went up a level! It looks so shiny and dangerous!", "[cheering] Level up! I'm putting that in my scrapbook!", "[impressed] Whoa. It's humming. Is it supposed to hum? I like the hum."],
  "washer": ["[gasps] A Lucky Washer! That's the luckiest kind of washer!", "[delighted] Ooh, shiny! Gizmart trades those for the good stuff!", "[whispering] Lucky Washer. Pocket it before somebody sees."],
- "page": ["[curious] A pink slip? It's got Foreman Grudd's stamp on it. Huh.", "[reading slowly] 'Your position has been... discontinued.' Ouch. Who wrote this?"]
+ "page": ["[curious] A pink slip? It's got Foreman Grudd's stamp on it. Huh.", "[reading slowly] 'Your position has been... discontinued.' Ouch. Who wrote this?"],
+ "platedFirst": ["[alarmed] Plated one! Bolts just bounce off. Wrench it, or stomp it!"],
+ "plated": ["[scoffs] Another tin can. Wrench it!", "[urgent] Armoured roller! Crack the shell!", "[amused] That one's wearing a saucepan. Wrench!"],
+ "crackFirst": ["[delighted] Shell's off! Now it's just a regular grumpy ball."],
+ "crack": ["[cheering] Cracked it!", "[laughing] Peeled like a tin of beans!", "[gleeful] Ha! No more armour for you."],
+ "phase2First": ["[shocked] It ripped its own arm off. [pause] That's... commitment. [urgent] Grind the track rail!"],
+ "phase2": ["[nervous] Here we go again!"],
+ "quakeFirst": ["[shouting] It's rearing up! Jump the shockwaves, jump!"],
+ "quake": ["[shouting] Jump! Jump!", "[urgent] Shockwaves! Up, up!", "[shouting] Rings again! Hop!"]
 },
 "vesk": {
  "hurt": ["[grunts in pain] Ugh!", "[yelps, angry] Hey!", "[grunts, offended] Rude!", "[pained groan] Oof. My back.", "[angry growl] Watch it, tin can!", "[sharp hiss of pain] Agh, that stings!"],
