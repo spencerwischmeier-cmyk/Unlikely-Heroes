@@ -19,6 +19,7 @@ var fps_t := 0.0
 var fps_frames := 0
 var slow_for := 0.0
 var fast_for := 0.0
+var _done := {}      # instance ids already tuned
 
 func _ready() -> void:
 	if not Device.lite(): queue_free(); return
@@ -84,8 +85,13 @@ func _sweep(root: Node) -> void:
 		if n is GeometryInstance3D or n is Light3D: _tune(n)
 
 func _tune(n: Node) -> void:
-	if n.has_meta("_q"): return
-	n.set_meta("_q", true)
+	# remembered here, not as node metadata: the static batcher (zzz_batcher.gd) leaves any node with
+	# metadata alone, so a meta tag on every piece turned batching off on the web and phone builds
+	var id := n.get_instance_id()
+	if _done.has(id): return
+	_done[id] = true
+	# merged batches copy the settings of the pieces they replace (already tuned): don't scale them twice
+	if n.get_parent() and n.get_parent().name == "StaticBatches": return
 	var phone := tier == "phone"
 	var reach := Device.reach()
 	if n is OmniLight3D or n is SpotLight3D:
