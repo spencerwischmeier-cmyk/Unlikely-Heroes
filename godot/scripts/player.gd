@@ -123,6 +123,7 @@ var skid_puff := 0.0
 var acc_lean := 0.0          # forward/back tilt from speeding up / slowing down
 var _prev_hv := Vector2.ZERO
 var _start_cd := 0.0
+var _lite_jets: bool = preload("res://scripts/device.gd").lite() and not OS.get_cmdline_user_args().has("--no-lite-extra")
 
 func _ready() -> void:
 	var cs := CollisionShape3D.new()
@@ -912,7 +913,10 @@ func _update_jets(dt: float) -> void:
 	jet_power = lerpf(jet_power, target, 1.0 - exp(-(30.0 if target > jet_power else 10.0) * dt))
 	var tilt_to := 1.05 if dash_t > 0.0 else (0.75 if long_jump and not grounded else 0.0)
 	jet_tilt = lerpf(jet_tilt, tilt_to, 1.0 - exp(-14.0 * dt))
-	for j in jets: j.light_energy = 0.3 + jet_power * (3.0 + randf())
+	for j in jets:
+		j.light_energy = 0.3 + jet_power * (3.0 + randf())
+		# browsers/phones: the two jet lights only switch on while the jets fire (each light is extra work per pixel)
+		if _lite_jets: j.visible = jet_power > 0.05
 	if chest_bone < 0: return
 	var chest := skel.global_transform * skel.get_bone_global_pose(chest_bone)
 	for i in flames.size():

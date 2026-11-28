@@ -20,6 +20,9 @@ var fps_frames := 0
 var slow_for := 0.0
 var fast_for := 0.0
 var _done := {}      # instance ids already tuned
+## `--no-lite-extra`: the 2026-11-28 additions off (particle draw distance, shorter phone lamp reach,
+## no shadows from props under 4 m on phones) for before/after comparisons
+var no_lite_extra := OS.get_cmdline_user_args().has("--no-lite-extra")
 
 func _ready() -> void:
 	if not Device.lite(): queue_free(); return
@@ -101,18 +104,27 @@ func _tune(n: Node) -> void:
 		# cube shadows cost six passes per light, so browsers keep omni lights shadowless
 		elif l.shadow_enabled and l is OmniLight3D: l.shadow_enabled = false
 		l.distance_fade_enabled = true
-		var far := 34.0 if phone else 55.0
+		var far := (34.0 if no_lite_extra else 26.0) if phone else 55.0
 		if l.distance_fade_begin <= 0.0 or l.distance_fade_begin > far: l.distance_fade_begin = far
 		l.distance_fade_length = 10.0
 		l.distance_fade_shadow = minf(l.distance_fade_begin, 22.0)
 		return
-	if n is GPUParticles3D:
-		(n as GPUParticles3D).amount_ratio = 0.45 if phone else 0.7
-		return
-	if n is CPUParticles3D:
-		var cp := n as CPUParticles3D
-		var want := maxi(1, int(cp.amount * (0.45 if phone else 0.7)))
-		if want < cp.amount: cp.amount = want
+	if n is GPUParticles3D or n is CPUParticles3D:
+		if n is GPUParticles3D: (n as GPUParticles3D).amount_ratio = 0.45 if phone else 0.7
+		else:
+			var cp := n as CPUParticles3D
+			var want := maxi(1, int(cp.amount * (0.45 if phone else 0.7)))
+			if want < cp.amount: cp.amount = want
+		# smoke, sparks and dust far off are a few pixels each but still a draw (and a GPU particle
+		# update pass): stop drawing them past a distance (big smoke columns sit in the sky and keep theirs)
+		var pg := n as GeometryInstance3D
+		if not no_lite_extra and pg.visibility_range_end <= 0.0 and not _in_sky(pg):
+			var pab := pg.get_aabb()
+			var psc := pg.global_transform.basis.get_scale()
+			var psize := maxf(pab.size.x * psc.x, maxf(pab.size.y * psc.y, pab.size.z * psc.z))
+			if psize < 12.0:   # tall smoke plumes are landmarks: those keep drawing
+				pg.visibility_range_end = (70.0 if phone else 120.0) * (1.0 if psize < 5.0 else 1.8)
+				pg.visibility_range_end_margin = 6.0
 		return
 	if n is Label3D: return
 	var gi := n as GeometryInstance3D
@@ -127,7 +139,7 @@ func _tune(n: Node) -> void:
 	elif big < 15.0 and not (gi is MultiMeshInstance3D):
 		gi.visibility_range_end = (230.0 if big >= 6.0 else 150.0) * reach
 		gi.visibility_range_end_margin = 8.0
-	if phone and big < 2.5 and gi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
+	if phone and big < (2.5 if no_lite_extra else 4.0) and gi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
 		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 func _in_sky(n: Node) -> bool:

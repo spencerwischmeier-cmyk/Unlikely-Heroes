@@ -84,7 +84,9 @@ func _audit(radius: float) -> void:
 	var emitting := 0
 	var by_p := {}
 	for g in get_tree().root.find_children("*", "GPUParticles3D", true, false) + get_tree().root.find_children("*", "CPUParticles3D", true, false):
-		if not (_vis(g) and (g as Node3D).global_position.distance_to(cam) < radius): continue
+		var pd := (g as Node3D).global_position.distance_to(cam)
+		if not (_vis(g) and pd < radius): continue
+		if (g as GeometryInstance3D).visibility_range_end > 0.0 and pd > (g as GeometryInstance3D).visibility_range_end: continue
 		parts_n += 1
 		var em: bool = g.emitting
 		if em: emitting += 1
